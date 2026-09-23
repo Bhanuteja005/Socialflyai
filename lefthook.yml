@@ -1,0 +1,18 @@
+# Git hooks, installed by `bun install` (root "prepare" script).
+# Fast checks only: the full typecheck + test suite runs in CI, where it cannot be skipped.
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,tsx,js,jsx,json,jsonc,css}"
+      run: bunx biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    gitleaks:
+      # Secrets were committed to the previous SocialFly repos and had to be rotated.
+      # This is the first line of defence; security.yml in CI is the second.
+      run: sh scripts/hooks/gitleaks.sh
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}

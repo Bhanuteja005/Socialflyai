@@ -1,0 +1,5 @@
+{
+	"extends": "@socialfly/tsconfig/bun.json",
+	"include": ["**/*.ts"],
+	"exclude": ["node_modules"]
+}

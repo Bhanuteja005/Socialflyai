@@ -1,0 +1,59 @@
+# Production OpenTelemetry Collector config (runs as its own Container App).
+#
+# Services export OTLP here; the collector batches, drops noise, scrubs anything
+# that slipped past pino's redaction, and forwards to the telemetry backend. The
+# backend is chosen HERE, not in the services: swapping SigNoz Cloud for Grafana
+# Cloud or Azure Monitor is a change to this file only.
+receivers:
+  otlp:
+    protocols:
+      http: { endpoint: 0.0.0.0:4318 }
+      grpc: { endpoint: 0.0.0.0:4317 }
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+  # Belt and braces behind the app-side redaction.
+  attributes/scrub:
+    actions:
+      - { key: http.request.header.authorization, action: delete }
+      - { key: http.request.header.cookie, action: delete }
+      - { key: enduser.email, action: hash }
+  # Probes are excluded app-side too; this catches anything that still slips through.
+  filter/probes:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["url.path"] == "/health"'
+        - 'attributes["url.path"] == "/ready"'
+
+exporters:
+  otlphttp:
+    endpoint: ${env:TELEMETRY_BACKEND_OTLP_ENDPOINT}
+    headers:
+      # e.g. "signoz-ingestion-key: <key>" — injected from a Container Apps secret.
+      ${env:TELEMETRY_BACKEND_AUTH_HEADER_NAME}: ${env:TELEMETRY_BACKEND_AUTH_HEADER_VALUE}
+
+extensions:
+  health_check: { endpoint: 0.0.0.0:13133 }
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/probes, attributes/scrub, batch]
+      exporters: [otlphttp]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/scrub, batch]
+      exporters: [otlphttp]

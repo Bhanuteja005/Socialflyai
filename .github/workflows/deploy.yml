@@ -1,0 +1,222 @@
+name: Deploy to production
+
+# Push to main ⇒ live, but only through the gate: the same CI a PR runs must pass
+# before a single image is built. Structure follows the reference monorepo's
+# proven pipeline (OIDC, record-live → deploy → smoke → automatic rollback), plus
+# a database-migration step it did not have.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing image tag (commit SHA) to roll forward/back to. Blank = build this commit."
+        required: false
+        type: string
+
+permissions:
+  id-token: write # OIDC federation to Azure — no long-lived client secret in GitHub
+  contents: read
+
+# Serialised and NEVER cancelled mid-flight: stopping between "update api" and
+# "update web" would leave production running two different builds.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+  REGISTRY: ${{ vars.AZURE_ACR_NAME }}.azurecr.io
+  RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+jobs:
+  verify:
+    if: ${{ !inputs.image_tag }}
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build ${{ matrix.app }}
+    needs: verify
+    # AZURE_ACR_NAME unset (forks, or before Azure is provisioned) ⇒ main still gets
+    # the full CI run above, but nothing is built or deployed.
+    if: ${{ always() && !inputs.image_tag && needs.verify.result == 'success' && vars.AZURE_ACR_NAME != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: api, port: "4400", dockerfile: infra/docker/service.Dockerfile }
+          - { app: auth, port: "4800", dockerfile: infra/docker/service.Dockerfile }
+          - { app: worker, port: "4500", dockerfile: infra/docker/service.Dockerfile }
+          - { app: web, port: "3000", dockerfile: infra/docker/web.Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and push (ACR Tasks)
+        # NEXT_PUBLIC_* are BUILD args: Next.js inlines them into the client bundle,
+        # so setting them on the running container would have no effect.
+        run: |
+          set -euo pipefail
+          args=(
+            --registry "${{ vars.AZURE_ACR_NAME }}"
+            --image "socialfly/${{ matrix.app }}:${IMAGE_TAG}"
+            --image "socialfly/${{ matrix.app }}:latest"
+            --file "${{ matrix.dockerfile }}"
+            --build-arg "APP=${{ matrix.app }}"
+            --build-arg "PORT=${{ matrix.port }}"
+            --build-arg "APP_VERSION=${IMAGE_TAG}"
+          )
+          if [ "${{ matrix.app }}" = "web" ]; then
+            args+=(
+              --build-arg "NEXT_PUBLIC_API_URL=${{ vars.API_URL }}"
+              --build-arg "NEXT_PUBLIC_AUTH_URL=${{ vars.AUTH_URL }}"
+              --build-arg "NEXT_PUBLIC_SITE_URL=${{ vars.WEB_URL }}"
+              --build-arg "NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}"
+            )
+          fi
+          az acr build "${args[@]}" .
+
+  release:
+    name: Migrate, deploy, smoke, roll back on failure
+    needs: [verify, build]
+    # Explicit rather than !contains(failure): when verify fails, build is SKIPPED,
+    # and "skipped" is not "failure" — the short form would deploy unbuilt images.
+    if: ${{ always() && !cancelled()
+      && (needs.verify.result == 'success' || inputs.image_tag)
+      && (needs.build.result == 'success' || inputs.image_tag) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL }}
+    env:
+      APP_API: ${{ vars.ACA_API_APP }}
+      APP_AUTH: ${{ vars.ACA_AUTH_APP }}
+      APP_WORKER: ${{ vars.ACA_WORKER_APP }}
+      APP_WEB: ${{ vars.ACA_WEB_APP }}
+      JOB_MIGRATE: ${{ vars.ACA_MIGRATE_JOB }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Check required configuration
+        run: |
+          set -euo pipefail
+          missing=()
+          for v in RG APP_API APP_AUTH APP_WORKER APP_WEB JOB_MIGRATE; do
+            [ -n "${!v}" ] || missing+=("$v")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository variables for: ${missing[*]} (Settings → Secrets and variables → Actions → Variables)"
+            exit 1
+          fi
+
+      - name: Record the currently live images
+        # Captured BEFORE anything changes, so rollback restores what was actually
+        # serving — not a guess at "the previous commit".
+        id: current
+        run: |
+          set -euo pipefail
+          for key in API AUTH WORKER WEB; do
+            app_var="APP_${key}"
+            image=$(az containerapp show -n "${!app_var}" -g "$RG" --query 'properties.template.containers[0].image' -o tsv)
+            echo "$(echo "$key" | tr 'A-Z' 'a-z')=${image}" >> "$GITHUB_OUTPUT"
+            echo "live ${key}: ${image}"
+          done
+
+      - name: Run database migrations
+        # A Container Apps JOB running the new api image: the database stays on the
+        # private network (no runner firewall hole). Migrations must be backward
+        # compatible (expand → deploy → contract), because a rollback below
+        # restores OLD code against the NEW schema.
+        run: |
+          set -euo pipefail
+          az containerapp job update -n "$JOB_MIGRATE" -g "$RG" \
+            --image "${REGISTRY}/socialfly/api:${IMAGE_TAG}" \
+            --command "bun" --args "/app/packages/db/src/migrate.ts"
+          execution=$(az containerapp job start -n "$JOB_MIGRATE" -g "$RG" --query name -o tsv)
+          echo "migration execution: $execution"
+          for i in $(seq 1 60); do
+            status=$(az containerapp job execution show -n "$JOB_MIGRATE" -g "$RG" --job-execution-name "$execution" --query properties.status -o tsv)
+            case "$status" in
+              Succeeded) echo "migrations applied"; exit 0 ;;
+              Failed|Stopped|Degraded) echo "::error::migration $status — nothing was deployed"; exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo "::error::migration timed out"; exit 1
+
+      - name: Deploy
+        # Backends first so the new web bundle never calls an API that doesn't exist
+        # yet. The worker drains in-flight jobs on SIGTERM before the swap.
+        run: |
+          set -euo pipefail
+          az containerapp update -n "$APP_AUTH"   -g "$RG" --image "${REGISTRY}/socialfly/auth:${IMAGE_TAG}"
+          az containerapp update -n "$APP_API"    -g "$RG" --image "${REGISTRY}/socialfly/api:${IMAGE_TAG}"
+          az containerapp update -n "$APP_WORKER" -g "$RG" --image "${REGISTRY}/socialfly/worker:${IMAGE_TAG}"
+          az containerapp update -n "$APP_WEB"    -g "$RG" --image "${REGISTRY}/socialfly/web:${IMAGE_TAG}"
+
+      - name: Smoke test
+        # /ready checks each service's real dependencies (DB, Redis, queue), so a
+        # container that boots with a bad connection string fails here — the
+        # reference repo's static /health would have passed it.
+        run: |
+          set -euo pipefail
+          check() {
+            local name="$1" url="$2" code="000"
+            for attempt in $(seq 1 30); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" || echo 000)
+              if [ "$code" = "200" ]; then echo "ok  $name ($attempt attempt(s))"; return 0; fi
+              sleep 10
+            done
+            echo "FAIL $name: last status $code after 5 minutes"; return 1
+          }
+          check auth "${{ vars.AUTH_URL }}/ready"
+          check api  "${{ vars.API_URL }}/ready"
+          check web  "${{ vars.WEB_URL }}"
+
+      - name: Roll back
+        if: ${{ failure() && steps.current.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          echo "::error::Deploy or smoke test failed — restoring the previously live images."
+          az containerapp update -n "$APP_AUTH"   -g "$RG" --image "${{ steps.current.outputs.auth }}"
+          az containerapp update -n "$APP_API"    -g "$RG" --image "${{ steps.current.outputs.api }}"
+          az containerapp update -n "$APP_WORKER" -g "$RG" --image "${{ steps.current.outputs.worker }}"
+          az containerapp update -n "$APP_WEB"    -g "$RG" --image "${{ steps.current.outputs.web }}"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${{ vars.API_URL }}/ready" || echo 000)
+            [ "$code" = "200" ] && { echo "previous version healthy again"; exit 0; }
+            sleep 10
+          done
+          echo "::error::Rollback did not become healthy — production needs manual attention."
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy: ${{ job.status }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image tag | \`${IMAGE_TAG}\` |"
+            echo "| Actor | @${{ github.actor }} |"
+            echo ""
+            echo "Previously live (re-run this workflow with that tag to roll back):"
+            echo '```'
+            echo "auth:   ${{ steps.current.outputs.auth }}"
+            echo "api:    ${{ steps.current.outputs.api }}"
+            echo "worker: ${{ steps.current.outputs.worker }}"
+            echo "web:    ${{ steps.current.outputs.web }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

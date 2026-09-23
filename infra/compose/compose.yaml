@@ -1,0 +1,142 @@
+# SocialFly local infrastructure.
+#
+#   bun run cli stack up                  core: postgres, redis, minio, mailpit
+#   bun run cli stack up observability    + Grafana LGTM (traces, logs, metrics)
+#   bun run cli stack down
+#
+# The apps themselves (api, auth, worker, web) run on the host with `bun dev` for
+# fast reload. `--profile apps` runs them in containers instead, from the same
+# Dockerfiles CI builds — use it to reproduce a production-image bug locally.
+#
+# Ports are bound to 127.0.0.1 only: nothing here is meant to be reachable from
+# the LAN, and the dev credentials below are public.
+
+name: socialfly
+
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 3s
+  retries: 20
+  start_period: 5s
+
+services:
+  postgres:
+    # pgvector preinstalled: the research/AEO features store embeddings next to
+    # tenant data instead of in a separate vector database.
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_USER: socialfly
+      POSTGRES_PASSWORD: socialfly
+      POSTGRES_DB: socialfly
+    ports: ["127.0.0.1:${SF_POSTGRES_PORT:-5434}:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD-SHELL", "pg_isready -U socialfly -d socialfly"]
+
+  redis:
+    image: redis:7.4-alpine
+    # AOF on: BullMQ delayed jobs (scheduled posts) must survive a restart.
+    # noeviction: Redis must never silently drop queue keys under memory pressure.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:${SF_REDIS_PORT:-6380}:6379"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "redis-cli", "ping"]
+
+  storage:
+    # S3-compatible object storage. (MinIO stopped publishing community images in
+    # late 2025; RustFS is a drop-in S3 replacement.) Production uses Cloudflare R2
+    # — same S3 API, only S3_* env vars change. Console: http://localhost:9001
+    image: rustfs/rustfs:1.0.0
+    environment:
+      RUSTFS_ACCESS_KEY: socialfly
+      RUSTFS_SECRET_KEY: socialfly-dev-secret
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: [storage_data:/data]
+
+  # One-shot: creates the media bucket and makes it publicly readable. Instagram
+  # and Threads fetch media from a public URL, so published media must be public.
+  storage-init:
+    image: amazon/aws-cli:2.36.50
+    depends_on: [storage]
+    environment:
+      AWS_ACCESS_KEY_ID: socialfly
+      AWS_SECRET_ACCESS_KEY: socialfly-dev-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        s3="aws --endpoint-url http://storage:9000 s3api"
+        for i in $$(seq 1 30); do $$s3 list-buckets >/dev/null 2>&1 && break; sleep 1; done
+        $$s3 head-bucket --bucket socialfly-media 2>/dev/null || $$s3 create-bucket --bucket socialfly-media
+        $$s3 put-bucket-policy --bucket socialfly-media --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::socialfly-media/*"]}]}'
+        echo "bucket socialfly-media ready"
+    restart: "no"
+
+  mailpit:
+    # Catches every email the auth service sends. Inbox: http://localhost:8025
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+
+  # ── observability ──────────────────────────────────────────────────────────
+  lgtm:
+    # Grafana + Tempo (traces) + Loki (logs) + Prometheus (metrics) + an OTel
+    # collector, in one container. Services export OTLP to :4318 exactly as they do
+    # in production; only the endpoint differs. UI: http://localhost:3001 (admin/admin)
+    image: grafana/otel-lgtm:0.11.10
+    profiles: [observability, full]
+    ports:
+      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes: [lgtm_data:/data]
+
+  # ── apps (production images) ───────────────────────────────────────────────
+  api:
+    profiles: [apps, full]
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { APP: api, PORT: "4400" } }
+    env_file: [../../.env]
+    environment: &app-env
+      DATABASE_URL: postgres://socialfly:socialfly@postgres:5432/socialfly
+      REDIS_URL: redis://redis:6379
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      S3_ENDPOINT: http://storage:9000
+      SMTP_URL: smtp://mailpit:1025
+    ports: ["127.0.0.1:4400:4400"]
+    depends_on: &app-deps
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  auth:
+    profiles: [apps, full]
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { APP: auth, PORT: "4800" } }
+    env_file: [../../.env]
+    environment: *app-env
+    ports: ["127.0.0.1:4800:4800"]
+    depends_on: *app-deps
+
+  worker:
+    profiles: [apps, full]
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { APP: worker, PORT: "4500" } }
+    env_file: [../../.env]
+    environment: *app-env
+    ports: ["127.0.0.1:4500:4500"]
+    depends_on: *app-deps
+
+  web:
+    profiles: [apps, full]
+    build: { context: ../.., dockerfile: infra/docker/web.Dockerfile }
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [api, auth]
+
+volumes:
+  postgres_data:
+  redis_data:
+  storage_data:
+  lgtm_data:

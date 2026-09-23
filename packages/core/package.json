@@ -1,0 +1,51 @@
+{
+	"name": "@socialfly/core",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./auth": "./src/auth/index.ts",
+		"./crypto": "./src/crypto.ts",
+		"./errors": "./src/errors.ts",
+		"./http": "./src/http/index.ts",
+		"./ids": "./src/ids.ts",
+		"./logger": "./src/logger.ts",
+		"./mail": "./src/mail.ts",
+		"./redis": "./src/redis.ts",
+		"./security": "./src/security.ts",
+		"./telemetry": "./src/telemetry/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@hono/standard-validator": "^0.2.0",
+		"@opentelemetry/api": "^1.9.1",
+		"@opentelemetry/api-logs": "^0.222.0",
+		"@opentelemetry/core": "^2.11.0",
+		"@opentelemetry/exporter-logs-otlp-http": "^0.222.0",
+		"@opentelemetry/exporter-metrics-otlp-http": "^0.222.0",
+		"@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+		"@opentelemetry/resources": "^2.11.0",
+		"@opentelemetry/sdk-logs": "^0.222.0",
+		"@opentelemetry/sdk-metrics": "^2.11.0",
+		"@opentelemetry/sdk-trace-base": "^2.11.0",
+		"@opentelemetry/sdk-trace-node": "^2.11.0",
+		"@opentelemetry/semantic-conventions": "^1.43.0",
+		"@sentry/bun": "^10.75.2",
+		"hono": "^4.13.8",
+		"hono-openapi": "^1.3.3",
+		"ioredis": "^5.8.0",
+		"nodemailer": "^10.0.10",
+		"pino": "^10.3.1",
+		"pino-pretty": "^13.1.0",
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@types/bun": "^1.4.2",
+		"@types/nodemailer": "^8.0.2",
+		"typescript": "5.9.3"
+	}
+}

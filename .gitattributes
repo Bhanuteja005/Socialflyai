@@ -1,0 +1,36 @@
+# Line endings, settled once for every contributor and every platform.
+#
+# Why this file exists: without it, Git falls back to each machine's core.autocrlf.
+# On Windows that is `true`, which checks every text file out as CRLF. Biome — which
+# this repo runs on save, in `bun run format`, and in `bun run check` — writes LF and
+# has no lineEnding override (see biome.json). So the formatter rewrote CRLF files to
+# LF, the byte count of every one of them changed, and Git reported 463 files as
+# "modified" whose content was byte-for-byte identical to HEAD. A real 124-file change
+# set was buried in 463 files of noise.
+#
+# `text=auto eol=lf` makes LF canonical in the repository AND in the working tree on
+# every OS, so Git and Biome now want the same bytes and neither can dirty a file the
+# other just wrote. It overrides core.autocrlf, so no one has to configure anything.
+* text=auto eol=lf
+
+# Binaries: never run end-of-line conversion or line-based diffs over these.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.mp4  binary
+*.webm binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.xlsx binary
+*.pdf  binary
+
+# SVG is text and should diff as text, but it is an asset — keep it out of language stats.
+*.svg text eol=lf linguist-language=SVG
+
+# Lockfiles are generated. Keep them LF, and keep them out of review diffs.
+bun.lock text eol=lf -diff linguist-generated

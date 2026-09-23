@@ -1,0 +1,29 @@
+{
+	"name": "@socialfly/db",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./schema": "./src/schema/index.ts",
+		"./testing": "./src/testing.ts"
+	},
+	"scripts": {
+		"generate": "drizzle-kit generate",
+		"migrate": "bun run src/migrate.ts",
+		"seed": "bun run src/seed.ts",
+		"studio": "drizzle-kit studio",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@socialfly/core": "workspace:*",
+		"drizzle-orm": "^0.45.3",
+		"postgres": "^3.4.9"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@types/bun": "^1.4.2",
+		"drizzle-kit": "^0.31.11",
+		"typescript": "5.9.3"
+	}
+}

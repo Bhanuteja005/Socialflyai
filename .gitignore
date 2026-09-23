@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# env — only .env.example is committed (see .env.example for why)
+.env
+.env.*
+!.env.example
+
+# test / tooling output
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# local
+.DS_Store
+*.log
+.cache/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# Claude Code local settings (machine-specific)
+.claude/

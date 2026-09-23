@@ -1,0 +1,34 @@
+{
+	"name": "@socialfly/worker",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"imports": {
+		"#src/*": "./src/*"
+	},
+	"scripts": {
+		"dev": "bun --watch src/index.ts",
+		"start": "bun src/index.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@bull-board/api": "^9.10.1",
+		"@bull-board/hono": "^9.10.1",
+		"@socialfly/config": "workspace:*",
+		"@socialfly/core": "workspace:*",
+		"@socialfly/db": "workspace:*",
+		"@socialfly/integrations": "workspace:*",
+		"@socialfly/queue": "workspace:*",
+		"bullmq": "^6.3.8",
+		"hono": "^4.13.8",
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@types/bun": "^1.4.2",
+		"drizzle-orm": "^0.45.3",
+		"postgres": "^3.4.9",
+		"typescript": "5.9.3"
+	}
+}

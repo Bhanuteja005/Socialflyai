@@ -1,0 +1,4 @@
+[test]
+# Points every test at the socialfly_test database and migrates it before any
+# app module (and its env validation) is imported.
+preload = ["./src/tests/setup.ts"]

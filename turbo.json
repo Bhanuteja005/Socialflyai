@@ -1,0 +1,21 @@
+{
+	"$schema": "https://turborepo.dev/schema.json",
+	"ui": "stream",
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": [".next/**", "!.next/cache/**", "dist/**"]
+		},
+		"typecheck": {
+			"dependsOn": ["^typecheck"]
+		},
+		"test": {
+			"outputs": []
+		},
+		"dev": {
+			"persistent": true,
+			"cache": false
+		}
+	},
+	"globalPassThroughEnv": ["npm_package_version"]
+}

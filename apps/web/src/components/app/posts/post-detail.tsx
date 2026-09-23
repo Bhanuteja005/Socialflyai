@@ -1,0 +1,277 @@
+"use client";
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, CalendarX2, Clock, Pencil, Send, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { EmptyState, Skeleton } from "@/components/ui/feedback";
+import { toast } from "@/components/ui/toast";
+import { usePost } from "@/hooks/queries";
+import { api, call, callVoid } from "@/lib/api-client";
+import type { PostDetail } from "@/lib/api-types";
+import { errorMessage, isApiError } from "@/lib/errors";
+import { formatDateTime, formatRelative, zoneLabel } from "@/lib/format";
+import { qk } from "@/lib/query-keys";
+import { isPostEditable } from "@/lib/status";
+import { MediaThumb } from "../media/media-thumb";
+import { useOrg } from "../org-provider";
+import { PageHeader } from "../page-header";
+import { PostStatusBadge } from "../status-badge";
+import { PostTimeline } from "./post-timeline";
+import { TargetCard } from "./target-card";
+
+function usePostMutations(post: PostDetail | undefined) {
+	const { orgId } = useOrg();
+	const queryClient = useQueryClient();
+	const router = useRouter();
+	const id = post?.id ?? "";
+	const onUpdated = (updated: PostDetail) => {
+		queryClient.setQueryData(qk.post(orgId, updated.id), updated);
+		void queryClient.invalidateQueries({ queryKey: qk.postsAll(orgId) });
+	};
+
+	return {
+		unschedule: useMutation({
+			mutationFn: () => call(api.posts[":id"].unschedule.$post({ param: { id } })),
+			onSuccess: (p) => {
+				onUpdated(p);
+				toast.success("Moved back to drafts");
+			},
+			onError: (e) => toast.error(errorMessage(e)),
+		}),
+		publishNow: useMutation({
+			mutationFn: () =>
+				call(api.posts[":id"].schedule.$post({ param: { id }, json: { scheduledAt: null } })),
+			onSuccess: (p) => {
+				onUpdated(p);
+				toast.success("Publishing now");
+			},
+			onError: (e) =>
+				toast.error(
+					isApiError(e) && e.code === "post_invalid"
+						? `${e.message}. Edit the post to fix it.`
+						: errorMessage(e),
+				),
+		}),
+		retry: useMutation({
+			mutationFn: (v: { targetId: string; confirmNotPublished: boolean }) =>
+				call(
+					api.posts[":id"].targets[":targetId"].retry.$post({
+						param: { id, targetId: v.targetId },
+						json: { confirmNotPublished: v.confirmNotPublished },
+					}),
+				),
+			onSuccess: (p) => {
+				onUpdated(p);
+				toast.success("Retrying — we'll update the status shortly");
+			},
+			onError: (e) => toast.error(errorMessage(e)),
+		}),
+		remove: useMutation({
+			mutationFn: () => callVoid(api.posts[":id"].$delete({ param: { id } })),
+			onSuccess: () => {
+				queryClient.removeQueries({ queryKey: qk.post(orgId, id) });
+				void queryClient.invalidateQueries({ queryKey: qk.postsAll(orgId) });
+				toast.success("Post deleted");
+				router.replace("/posts");
+			},
+			onError: (e) => toast.error(errorMessage(e)),
+		}),
+	};
+}
+
+export function PostDetailView({ id }: { id: string }) {
+	const { org, can } = useOrg();
+	const { data: post, isPending, isError, error } = usePost(id);
+	const actions = usePostMutations(post);
+	const [confirmDelete, setConfirmDelete] = useState(false);
+
+	if (isPending) {
+		return (
+			<div className="grid gap-6">
+				<Skeleton className="h-9 w-64" />
+				<Skeleton className="h-40" />
+				<Skeleton className="h-56" />
+			</div>
+		);
+	}
+	if (isError) {
+		return (
+			<EmptyState
+				title={
+					isApiError(error) && error.status === 404 ? "Post not found" : "Couldn't load this post"
+				}
+				description={
+					isApiError(error) && error.status === 404
+						? "It may have been deleted."
+						: errorMessage(error)
+				}
+				action={
+					<Button variant="outline" asChild>
+						<Link href="/posts">Back to posts</Link>
+					</Button>
+				}
+			/>
+		);
+	}
+
+	const editor = can("editor");
+	const editable = editor && isPostEditable(post);
+	const canPublishNow =
+		editor && post.targets.some((t) => t.status === "draft" || t.status === "canceled");
+	const anyPublished = post.targets.some((t) => t.status === "published");
+
+	return (
+		<>
+			<PageHeader
+				eyebrow={
+					<Link href="/posts" className="inline-flex items-center gap-1 hover:text-foreground">
+						<ArrowLeft className="size-3.5" aria-hidden="true" />
+						Posts
+					</Link>
+				}
+				title={
+					<span className="flex flex-wrap items-center gap-3">
+						Post
+						<PostStatusBadge status={post.status} />
+					</span>
+				}
+				description={
+					post.scheduledAt ? (
+						<span className="inline-flex items-center gap-1.5">
+							<Clock className="size-3.5" aria-hidden="true" />
+							{formatDateTime(post.scheduledAt, org.timezone)}{" "}
+							{zoneLabel(org.timezone, new Date(post.scheduledAt))} ·{" "}
+							{formatRelative(post.scheduledAt)}
+						</span>
+					) : (
+						`Created ${formatRelative(post.createdAt)}`
+					)
+				}
+				actions={
+					editor ? (
+						<>
+							{post.status === "scheduled" ? (
+								<Button
+									variant="outline"
+									loading={actions.unschedule.isPending}
+									onClick={() => actions.unschedule.mutate()}
+								>
+									<CalendarX2 />
+									Unschedule
+								</Button>
+							) : null}
+							{canPublishNow ? (
+								<Button
+									variant="outline"
+									loading={actions.publishNow.isPending}
+									onClick={() => actions.publishNow.mutate()}
+								>
+									<Send />
+									Publish now
+								</Button>
+							) : null}
+							{editable ? (
+								<Button asChild>
+									<Link href={`/posts/${post.id}/edit`}>
+										<Pencil />
+										Edit
+									</Link>
+								</Button>
+							) : null}
+							<Button
+								variant="danger-outline"
+								size="icon"
+								aria-label="Delete post"
+								onClick={() => setConfirmDelete(true)}
+							>
+								<Trash2 />
+							</Button>
+						</>
+					) : null
+				}
+			/>
+
+			<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+				<div className="grid gap-6">
+					<Card>
+						<CardHeader>
+							<CardTitle>Content</CardTitle>
+						</CardHeader>
+						<CardContent className="grid gap-4">
+							{post.content ? (
+								<p className="whitespace-pre-wrap text-[15px] leading-relaxed">{post.content}</p>
+							) : (
+								<p className="text-muted-foreground text-sm">No main text.</p>
+							)}
+							{post.media.length ? (
+								<ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+									{post.media.map((m) => (
+										<li key={m.id}>
+											<a
+												href={m.url}
+												target="_blank"
+												rel="noreferrer"
+												aria-label={`Open ${m.fileName}`}
+											>
+												<MediaThumb asset={m} className="ring-1 ring-border" />
+											</a>
+										</li>
+									))}
+								</ul>
+							) : null}
+						</CardContent>
+					</Card>
+					<Card>
+						<CardHeader>
+							<CardTitle>Channels</CardTitle>
+						</CardHeader>
+						<ul className="mt-2 divide-y divide-border">
+							{post.targets.map((t) => (
+								<TargetCard
+									key={t.id}
+									target={t}
+									timeZone={org.timezone}
+									canRetry={editor}
+									retrying={actions.retry.isPending && actions.retry.variables?.targetId === t.id}
+									onRetry={(confirmNotPublished) =>
+										actions.retry
+											.mutateAsync({ targetId: t.id, confirmNotPublished })
+											.catch(() => undefined)
+									}
+								/>
+							))}
+						</ul>
+					</Card>
+				</div>
+				<Card className="lg:sticky lg:top-6">
+					<CardHeader>
+						<CardTitle>Activity</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<PostTimeline post={post} timeZone={org.timezone} />
+					</CardContent>
+				</Card>
+			</div>
+
+			<ConfirmDialog
+				open={confirmDelete}
+				onOpenChange={setConfirmDelete}
+				title="Delete this post?"
+				description={
+					anyPublished
+						? "Anything not yet sent is canceled. Copies already published stay on the platforms — delete those there if needed."
+						: "Scheduled sends are canceled and the post is removed from SocialFly."
+				}
+				confirmLabel="Delete post"
+				tone="danger"
+				loading={actions.remove.isPending}
+				onConfirm={() => actions.remove.mutate()}
+			/>
+		</>
+	);
+}

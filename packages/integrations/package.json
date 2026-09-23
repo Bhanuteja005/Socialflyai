@@ -1,0 +1,22 @@
+{
+	"name": "@socialfly/integrations",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@socialfly/core": "workspace:*",
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@types/bun": "^1.4.2",
+		"typescript": "5.9.3"
+	}
+}

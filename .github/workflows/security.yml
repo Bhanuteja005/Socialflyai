@@ -1,0 +1,37 @@
+name: Security
+
+# The previous SocialFly repos had database passwords, API keys and page tokens
+# committed to git. This workflow makes that fail loudly instead of shipping.
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 5 * * 1" # weekly: new advisories appear without any code change
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # scan the full history, not just the tip
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - name: bun audit
+        # High and critical only: fail on what matters, report the rest.
+        run: bun audit --audit-level=high

@@ -1,0 +1,28 @@
+# gitleaks config: default rules + SocialFly specifics.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "meta-access-token"
+description = "Meta (Facebook/Instagram) access token"
+regex = '''\bEAA[A-Za-z0-9]{60,}\b'''
+tags = ["meta", "token"]
+
+[[rules]]
+id = "postgres-url-with-password"
+description = "Postgres connection string with an inline password"
+regex = '''postgres(?:ql)?://[^:\s/]+:[^@\s]{6,}@[^\s'"]+'''
+tags = ["database"]
+[rules.allowlist]
+# The public local-dev credentials used by compose, tests and .env.example.
+regexes = ['''postgres://socialfly:socialfly@''']
+
+[allowlist]
+description = "Local-only dev values that are public by design"
+paths = ['''bun\.lock''']
+regexes = [
+  '''socialfly-dev-secret''',
+  '''dev-only-jwt-secret-do-not-use-in-production''',
+  # packages/config's dev-only TOKEN_ENCRYPTION_KEY default — production refuses to boot on it.
+  '''ZGV2LW9ubHktdG9rZW4ta2V5LTMyLWJ5dGVzLWxvbmc=''',
+]

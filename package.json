@@ -1,0 +1,34 @@
+{
+	"name": "@socialfly/workspace",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"packageManager": "bun@1.3.13",
+	"workspaces": [
+		"apps/*",
+		"packages/*",
+		"scripts"
+	],
+	"scripts": {
+		"dev": "bun run scripts/index.ts dev",
+		"cli": "bun run scripts/index.ts",
+		"build": "turbo build",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"typecheck": "turbo typecheck",
+		"test": "turbo test",
+		"db:generate": "bun --cwd packages/db run generate",
+		"db:migrate": "bun run scripts/index.ts db migrate",
+		"db:studio": "bun --cwd packages/db run studio",
+		"prepare": "lefthook install"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.14",
+		"@commitlint/cli": "^21.2.3",
+		"@commitlint/config-conventional": "^21.2.0",
+		"lefthook": "^2.1.14",
+		"turbo": "^2.11.2",
+		"typescript": "5.9.3"
+	}
+}
