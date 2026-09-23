@@ -28,8 +28,8 @@ which run on Node. Every service exports OpenTelemetry traces, metrics and logs;
 | Service | Responsibility | Talks to | Local port |
 |---|---|---|---|
 | `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP | 4800 |
-| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports | Postgres, Redis, storage, SMTP, Anthropic | 4400 |
-| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs | 4500 |
+| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports, research / SEO / AI-visibility reports | Postgres, Redis, storage, SMTP, Anthropic, DataForSEO | 4400 |
+| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, website research, AI-visibility checks, SEO refresh, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs, websites, DataForSEO | 4500 |
 | `apps/app` | The product UI: sign-in/sign-up, onboarding, dashboard, composer, calendar, channels, media, settings. `/` redirects to `/dashboard` | auth, api | 4700 |
 | `apps/site` | Public marketing site: landing, features, solutions, comparisons, free tools, blog, legal. Statically rendered; no API client, no auth. "Log in"/"Get started" link to the app | — | 4701 |
 | `apps/admin` | Internal admin console for staff (see `docs/admin-console.md`) | auth, api | 4702 |
@@ -90,6 +90,9 @@ users ─┬─ auth_sessions (refresh hash + previous hash for reuse detection)
                                         ├─ channels (tokens AES-256-GCM encrypted)
                                         ├─ media_assets (source: upload | ai)
                                         ├─ brand_profiles, ai_generations
+                                        ├─ research_runs ── research_pages
+                                        ├─ competitors, keywords ── keyword_rankings (per UTC day)
+                                        ├─ visibility_prompts ── visibility_checks (one engine answer)
                                         └─ posts ─┬─ post_media
                                                   └─ post_targets ─┬─ post_target_events
                                                                    └─ post_target_metrics (engagement snapshots)
@@ -245,6 +248,80 @@ API (`/analytics`, every member can read; refresh needs editor):
   LIMIT 1` on the `(target_id, captured_at)` index): drizzle leaves columns unqualified
   in single-table queries, which silently breaks correlated subqueries.
 
+## Research, SEO & AI visibility
+
+`packages/research` — stateless like `packages/ai`: a polite crawler, the brand-analysis
+text task, AI-visibility engines (Claude, ChatGPT, Gemini, Perplexity), deterministic
+mention scoring, sentiment, and a DataForSEO client. Each paid call reports its cost in
+micro-USD. Persistence, budgets, schedules and retries live in the worker and the API.
+
+```
+POST /research/runs ─▶ research_runs (pending) ─▶ research queue: crawl <run>
+                         crawling  ─▶ research_pages (upsert + progress per page)
+                         analyzing ─▶ analyzeBrand (text model) ─▶ insights ─▶ succeeded
+job scheduler (7 d) ─▶ visibility-plan ─▶ visibility-org <org> ─▶ visibility_checks
+job scheduler (7 d) ─▶ seo-plan        ─▶ seo-refresh <org>    ─▶ keyword metrics, keyword_rankings
+```
+
+- **One queue** (`research`, concurrency 2, 10-minute BullMQ lock: a crawl or a round of
+  engine calls is minutes of network waits). Job ids: `research.crawl.<run>`; per-org
+  jobs carry the week number (`research.visibility.<org>.w<week>`) so planner runs and
+  replicas collapse onto one job per week; a user's "run now" gets its own 10-minute
+  bucket (`…f<bucket>`). Two attempts: every processor resumes rather than repeats.
+- **Research runs.** The worker is the only writer of `research_runs.status` after the
+  API inserts `pending` (plus the maintenance sweep) — the same ownership rule as AI
+  media. One active run per organization (advisory lock + check in the API → 409). The
+  crawl obeys robots.txt; a site that disallows us fails as `robots_disallowed` with a
+  message telling the user how to allow SocialFlyBot. A retry whose crawl finished
+  (status `analyzing`) re-uses the stored pages. Failure semantics mirror AI media: a
+  non-retryable `AiError` fails the run without a throw; anything else is retried and
+  fails on the last attempt with a user-safe message. Runs still active after 30 minutes
+  are failed as `timeout` by the `recover-stuck-targets` maintenance task.
+- **Metering.** Every paid run writes ONE `ai_generations` row (`kind` = `research`,
+  `visibility` or `seo`) with its total cost, so these features draw on the same monthly
+  AI budget as posts and images. The API refuses research, keyword ideas and "run now"
+  with 429 `ai_budget_exceeded`; scheduled visibility and SEO jobs skip an organization
+  over budget (the worker replicates the API's effective-budget rule in
+  `apps/worker/src/research/budget.ts`). Spend already paid is billed even when a run
+  ends in an error.
+- **AI visibility.** Every active prompt (at most 25 per org) × every configured engine,
+  2 calls in flight. Each answer is scored by `analyzeMention` (brand = brand profile
+  name, else the organization name; domain = brand profile website; competitors with
+  their aliases and domains) and, only when the brand is mentioned, classified for
+  sentiment by the text model. An engine that errors is stored as a check with its
+  `errorCode` and an empty answer — the run carries on. Pairs answered successfully in
+  the last 6 days (scheduled) or 30 minutes (forced) are skipped, which makes replans
+  and retries free. Answers are capped at 8,000 characters.
+- **SEO** (only with DataForSEO credentials). Keyword metrics are refreshed when never
+  measured or older than 30 days (batches of 100 per location/language; a keyword the
+  provider knows nothing about stays null but is marked measured). Tracked keywords get
+  the Google position of the brand's domain once per UTC day (`keyword_rankings`,
+  upsert). Adding or tracking keywords enqueues a forced refresh right away.
+- **Missing keys hide features** (`GET /research/capabilities`): research needs the text
+  model, SEO needs DataForSEO, each visibility engine needs its provider key.
+
+API (`/research`; every member can read, writes and paid calls need editor):
+
+| Route | Returns |
+|---|---|
+| `GET /capabilities` | `{ research, seo, visibilityEngines: {id, model}[] }` |
+| `POST /runs { url? }` | 202 run. `url` defaults to the brand website (422 `no_website`); https assumed; IPs and intranet hosts refused (422 `invalid_url`); 409 `research_in_progress`; 503 without a text model; 429 over budget |
+| `GET /runs?limit`, `/runs/latest`, `/runs/:id`, `/runs/:id/pages?before&limit` | runs newest first; latest = latest succeeded, else latest, else null; pages keyset-paginated |
+| `POST /insights/apply` | adds picked buyer questions (→ prompts, up to the 25-active cap), competitors (source `ai`) and keywords; duplicates skipped case-insensitively |
+| `GET/POST /competitors`, `PATCH/DELETE /competitors/:id` | names unique per org regardless of case (409 `competitor_exists`); domains stored bare (`acme.com`) |
+| `GET/POST /keywords`, `PATCH/DELETE /keywords/:id`, `GET /keywords/:id/rankings?days` | keywords (≤ 500 per org) with metrics and latest + previous position; ranking history per day |
+| `POST /keywords/ideas` | related keywords with metrics, synchronously; billed (`kind = seo`); 503 without DataForSEO |
+| `GET/POST /visibility/prompts`, `PATCH/DELETE /visibility/prompts/:id` | prompts with last check and 30-day mention rate; at most 25 active (409 `prompt_limit`) |
+| `POST /visibility/run` | 202; one per organization per hour (Redis `SET NX EX`), else 429 with `retryAfterSeconds` |
+| `GET /visibility/summary?days` | mention rate, average rank, sentiment, own-citation rate, per engine, share of voice, weekly trend |
+| `GET /visibility/prompts/:id/checks?limit`, `GET /visibility/checks/:id` | answers (400-character excerpt in lists, full answer by id) with citations and the competitors named |
+
+- **Report semantics.** Errored checks are excluded from every rate — an engine outage
+  says nothing about visibility. Rates are 0–1 fractions, or null when there is no
+  successful check. Share of voice = mentions of the brand (or of one competitor) over
+  all brand + competitor mentions. Weeks start on Monday, in UTC. Competitors deleted
+  since a check are dropped from it.
+
 ## Observability
 
 - **Logs**: pino JSON to stdout, secrets/PII redacted, `trace_id` on every line, mirrored to OTel logs.
@@ -261,6 +338,7 @@ API (`/analytics`, every member can read; refresh needs editor):
 - Double-submit CSRF on cookie-authenticated writes; allowed origins per first-party client.
 - Platform tokens encrypted at rest (AES-256-GCM, key id in the ciphertext, rotation supported).
 - OAuth `state` single-use in Redis; PKCE where supported; invitations bound to the invited email.
+- Website research is SSRF-guarded: every crawl request (start URL and each redirect hop) must resolve to public addresses only — no loopback, private, link-local/metadata (169.254.169.254) or CGNAT ranges (`packages/research/src/net-guard.ts`). Production should additionally deny the worker egress to metadata endpoints (DNS rebinding is only partly mitigated in-process).
 - gitleaks in pre-commit and CI; `bun audit` weekly; containers run as non-root.
 
 ## Roadmap
@@ -273,6 +351,6 @@ API (`/analytics`, every member can read; refresh needs editor):
 | 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice, budgets | ✅ |
 | 3b | AI short videos: scripts, AI/library/theme backgrounds, voiceover, ffmpeg render | ✅ (backend; not yet rendered against live OpenAI TTS) |
 | 4 | Analytics: platform adapters, collector, reports API, dashboards, best times | ✅ (adapters not yet verified against live accounts) |
-| 5 | Research + SEO/AEO + AI-visibility (pgvector, crawler, LLM citation tracking) | |
+| 5 | Research + SEO/AEO + AI-visibility: crawler, brand briefs, competitors, keywords & rankings, AI-engine citation tracking | ✅ (backend; engines and DataForSEO not yet exercised against live accounts) |
 | 6 | Engagement inbox: listening, reply drafts, approval | |
 | 7 | Ads: campaign drafts, Meta/Google/LinkedIn/TikTok/X/Pinterest sync | |

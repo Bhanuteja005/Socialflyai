@@ -9,7 +9,9 @@ import {
 	type PublishStatusJob,
 	publishQueueName,
 	QUEUES,
+	type ResearchJob,
 	type TokenRefreshJob,
+	WEEK_MS,
 } from "./jobs";
 
 /**
@@ -32,6 +34,19 @@ const publishJobDefaults: JobsOptions = {
 const analyticsJobDefaults: JobsOptions = {
 	attempts: 3,
 	backoff: { type: "exponential", delay: 60_000 },
+	removeOnComplete: { age: 24 * 3600 },
+	removeOnFail: { age: 7 * 24 * 3600 },
+};
+
+/**
+ * Research jobs make paid calls, but each processor resumes instead of repeating:
+ * a crawl whose analysis failed re-uses its stored pages, a visibility run skips
+ * prompt×engine pairs already answered, an SEO refresh skips keywords already
+ * updated. So a second attempt costs only what the first one did not finish.
+ */
+const researchJobDefaults: JobsOptions = {
+	attempts: 2,
+	backoff: { type: "exponential", delay: 30_000 },
 	removeOnComplete: { age: 24 * 3600 },
 	removeOnFail: { age: 7 * 24 * 3600 },
 };
@@ -196,6 +211,47 @@ export class JobProducer {
 			]),
 		);
 		return added.length;
+	}
+
+	/** Crawl + analyse one research run (the API inserted it as `pending`). */
+	async enqueueResearchCrawl(runId: string) {
+		await this.queue(QUEUES.research).add("crawl", { task: "crawl", runId } satisfies ResearchJob, {
+			...researchJobDefaults,
+			jobId: jobIds.researchCrawl(runId),
+		});
+	}
+
+	/** AI-visibility checks for one organization: weekly from the planner, or forced by a user. */
+	async enqueueVisibilityCheck(
+		organizationId: string,
+		opts: { force?: boolean; now?: number } = {},
+	) {
+		await this.enqueueResearchOrg("visibility", organizationId, opts);
+	}
+
+	/** Keyword metrics and rankings for one organization: weekly, or forced after keywords are added. */
+	async enqueueSeoRefresh(organizationId: string, opts: { force?: boolean; now?: number } = {}) {
+		await this.enqueueResearchOrg("seo", organizationId, opts);
+	}
+
+	private async enqueueResearchOrg(
+		kind: "visibility" | "seo",
+		organizationId: string,
+		{ force = false, now = Date.now() }: { force?: boolean; now?: number },
+	) {
+		const data = {
+			task: kind === "visibility" ? "visibility-org" : "seo-refresh",
+			organizationId,
+			...(force ? { force: true } : {}),
+		} satisfies ResearchJob;
+		await this.queue(QUEUES.research).add(data.task, data, {
+			...researchJobDefaults,
+			jobId: force
+				? jobIds.researchOrgForced(kind, organizationId, Math.floor(now / 600_000))
+				: jobIds.researchOrg(kind, organizationId, Math.floor(now / WEEK_MS)),
+			// A scheduled job is kept past its week so a late replan within it stays a no-op.
+			...(force ? {} : { removeOnComplete: { age: 8 * 24 * 3600 } }),
+		});
 	}
 
 	/** Readiness probe: the queue Redis answers. */

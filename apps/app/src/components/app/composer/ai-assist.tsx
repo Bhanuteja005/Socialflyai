@@ -43,17 +43,20 @@ export function AiAssist({
 	composer,
 	activeTab,
 	disabled,
+	initialBrief,
 }: {
 	composer: Composer;
 	/** The editor tab in view ("main" or a channel id) — quick actions work on its text. */
 	activeTab: string;
 	disabled?: boolean;
+	/** Handed over from elsewhere (a Research content idea): open straight away with it. */
+	initialBrief?: string;
 }) {
-	const [open, setOpen] = useState(false);
+	const [open, setOpen] = useState(Boolean(initialBrief));
 	const [tab, setTab] = useState("write");
 	const caps = useAiCapabilities();
 	// Lives out here, not in the panel, so closing the sheet keeps the brief and drafts.
-	const write = useWriteForm();
+	const write = useWriteForm(initialBrief);
 
 	return (
 		<DialogPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -144,9 +147,9 @@ export function AiAssist({
 
 // ── Write with AI ────────────────────────────────────────────────────────────
 
-function useWriteForm() {
+function useWriteForm(initialBrief = "") {
 	const afterAiCall = useAfterAiCall();
-	const [brief, setBrief] = useState("");
+	const [brief, setBrief] = useState(initialBrief);
 	const [tone, setTone] = useState("");
 	const [variants, setVariants] = useState(2);
 	const [link, setLink] = useState("");

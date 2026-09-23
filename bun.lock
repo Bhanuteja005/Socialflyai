@@ -49,6 +49,7 @@
         "@socialfly/db": "workspace:*",
         "@socialfly/integrations": "workspace:*",
         "@socialfly/queue": "workspace:*",
+        "@socialfly/research": "workspace:*",
         "bullmq": "^6.3.8",
         "hono": "^4.13.8",
         "hono-openapi": "^1.3.3",
@@ -144,6 +145,7 @@
         "@socialfly/db": "workspace:*",
         "@socialfly/integrations": "workspace:*",
         "@socialfly/queue": "workspace:*",
+        "@socialfly/research": "workspace:*",
         "bullmq": "^6.3.8",
         "hono": "^4.13.8",
         "zod": "^4.6.5",
@@ -257,6 +259,23 @@
       "dependencies": {
         "bullmq": "^6.3.8",
         "ioredis": "^5.8.0",
+        "zod": "^4.6.5",
+      },
+      "devDependencies": {
+        "@socialfly/tsconfig": "workspace:*",
+        "@types/bun": "^1.4.2",
+        "typescript": "5.9.3",
+      },
+    },
+    "packages/research": {
+      "name": "@socialfly/research",
+      "version": "0.0.0",
+      "dependencies": {
+        "@anthropic-ai/sdk": "^0.128.0",
+        "@google/genai": "^2.24.0",
+        "@socialfly/ai": "workspace:*",
+        "@socialfly/integrations": "workspace:*",
+        "openai": "^7.23.0",
         "zod": "^4.6.5",
       },
       "devDependencies": {
@@ -787,6 +806,8 @@
     "@socialfly/integrations": ["@socialfly/integrations@workspace:packages/integrations"],
 
     "@socialfly/queue": ["@socialfly/queue@workspace:packages/queue"],
+
+    "@socialfly/research": ["@socialfly/research@workspace:packages/research"],
 
     "@socialfly/scripts": ["@socialfly/scripts@workspace:scripts"],
 

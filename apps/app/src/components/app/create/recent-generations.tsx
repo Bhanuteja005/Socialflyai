@@ -5,11 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/componen
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import {
 	Clapperboard,
+	Eye,
 	FileText,
 	GalleryHorizontal,
 	Hash,
 	ImageIcon,
 	PenSquare,
+	Search,
+	Telescope,
 	Wand2,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,6 +33,9 @@ const KIND_ICON: Record<GenerationKind, typeof ImageIcon> = {
 	carousel: GalleryHorizontal,
 	video_script: Clapperboard,
 	video: Clapperboard,
+	research: Telescope,
+	visibility: Eye,
+	seo: Search,
 };
 
 /** The line a person would recognise the generation by: its prompt, brief or topic. */

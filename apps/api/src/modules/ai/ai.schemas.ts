@@ -1,4 +1,5 @@
 import { CAROUSEL_THEMES, carouselSlideSchema, VOICES, videoSceneSchema } from "@socialfly/ai";
+import { schema } from "@socialfly/db";
 import { z } from "zod";
 
 // The text-task bodies are the task input schemas from @socialfly/ai, re-exported so the
@@ -92,16 +93,8 @@ export const videoBody = z
 	});
 export type VideoInput = z.output<typeof videoBody>;
 
-export const GENERATION_KINDS = [
-	"post",
-	"rewrite",
-	"hashtags",
-	"carousel_outline",
-	"image",
-	"carousel",
-	"video_script",
-	"video",
-] as const;
+// Straight from the database enum, so a new kind can never be missing from the API filters.
+export const GENERATION_KINDS = schema.aiGenerationKind.enumValues;
 
 export const listGenerationsQuery = z.object({
 	kind: z.enum(GENERATION_KINDS).optional(),

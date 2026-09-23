@@ -62,6 +62,13 @@ const FRIENDLY: Record<string, string> = {
 	ai_refused: "The AI declined this request. Try rephrasing it.",
 	ai_invalid_output: "The AI returned something we couldn't use. Please try again.",
 	ai_unavailable: "The AI service is unavailable right now. Please try again in a minute.",
+	no_website:
+		"Add your website in Brand voice settings, or enter a URL here, so we know what to research.",
+	research_in_progress: "A research run is already in progress. It will finish in a few minutes.",
+	robots_disallowed:
+		"Your website's robots.txt asks crawlers not to read these pages, so we stopped. Allow our crawler (SocialFlyBot) or research a different URL.",
+	seo_not_configured:
+		"Keyword data isn't set up on this server. Ask whoever runs SocialFly to add DataForSEO credentials.",
 	network_error: "Can't reach SocialFly right now. Check your connection and try again.",
 };
 

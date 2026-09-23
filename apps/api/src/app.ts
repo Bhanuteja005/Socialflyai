@@ -23,6 +23,7 @@ import {
 	organizationsRoutes,
 } from "#src/modules/organizations/organizations.routes.ts";
 import { postsRoutes } from "#src/modules/posts/posts.routes.ts";
+import { researchRoutes } from "#src/modules/research/research.routes.ts";
 
 const base = new Hono()
 	.use(
@@ -70,6 +71,7 @@ const api = new Hono()
 	.route("/posts", postsRoutes)
 	.route("/ai", aiRoutes)
 	.route("/analytics", analyticsRoutes)
+	.route("/research", researchRoutes)
 	.route("/admin", adminRoutes);
 
 export const app = base.route("/", api);

@@ -37,4 +37,26 @@ export const qk = {
 		["org", orgId, "analytics", "post", postId] as const,
 	bestTimes: (orgId: string, channelIds: string) =>
 		["org", orgId, "analytics", "best-times", channelIds] as const,
+	researchAll: (orgId: string) => ["org", orgId, "research"] as const,
+	researchCapabilities: (orgId: string) => ["org", orgId, "research", "capabilities"] as const,
+	researchRuns: (orgId: string) => ["org", orgId, "research", "runs"] as const,
+	researchRunsList: (orgId: string, limit: number) =>
+		["org", orgId, "research", "runs", "list", limit] as const,
+	researchLatestRun: (orgId: string) => ["org", orgId, "research", "runs", "latest"] as const,
+	researchRun: (orgId: string, id: string) => ["org", orgId, "research", "runs", id] as const,
+	researchPages: (orgId: string, runId: string) =>
+		["org", orgId, "research", "runs", runId, "pages"] as const,
+	competitors: (orgId: string) => ["org", orgId, "research", "competitors"] as const,
+	keywords: (orgId: string) => ["org", orgId, "research", "keywords"] as const,
+	keywordRankings: (orgId: string, id: string, days: number) =>
+		["org", orgId, "research", "keywords", id, "rankings", days] as const,
+	visibilityAll: (orgId: string) => ["org", orgId, "research", "visibility"] as const,
+	visibilityPrompts: (orgId: string) =>
+		["org", orgId, "research", "visibility", "prompts"] as const,
+	visibilitySummary: (orgId: string, days: number) =>
+		["org", orgId, "research", "visibility", "summary", days] as const,
+	promptChecks: (orgId: string, promptId: string) =>
+		["org", orgId, "research", "visibility", "checks", "prompt", promptId] as const,
+	visibilityCheck: (orgId: string, id: string) =>
+		["org", orgId, "research", "visibility", "checks", id] as const,
 };

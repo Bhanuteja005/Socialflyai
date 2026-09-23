@@ -14,6 +14,7 @@ import {
 	Radio,
 	Rows3,
 	Sparkles,
+	Telescope,
 	UserRound,
 	Users,
 } from "lucide-react";
@@ -94,6 +95,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 		{ href: "/calendar", label: "Calendar", icon: CalendarDays },
 		{ href: "/posts", label: "Posts", icon: Rows3 },
 		{ href: "/analytics", label: "Analytics", icon: BarChart3 },
+		{ href: "/research", label: "Research", icon: Telescope },
 		{ href: "/create", label: "Create", icon: Sparkles },
 		{ href: "/media", label: "Media", icon: Images },
 		{ href: "/channels", label: "Channels", icon: Radio, badge: needsReauth },

@@ -7,3 +7,4 @@ export * from "./media";
 export * from "./organizations";
 export * from "./posts";
 export * from "./relations";
+export * from "./research";

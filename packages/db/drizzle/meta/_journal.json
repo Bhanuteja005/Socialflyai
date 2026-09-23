@@ -50,6 +50,20 @@
       "when": 1790163858826,
       "tag": "0006_analytics_index",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790164928541,
+      "tag": "0007_research",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790166132672,
+      "tag": "0008_research_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,10 @@ export const aiGenerationKind = pgEnum("ai_generation_kind", [
 	"carousel",
 	"video_script",
 	"video",
+	// Phase 5: ledger rows so research, AI-visibility and SEO spend count toward the same budget.
+	"research",
+	"visibility",
+	"seo",
 ]);
 
 export const aiGenerationStatus = pgEnum("ai_generation_status", [

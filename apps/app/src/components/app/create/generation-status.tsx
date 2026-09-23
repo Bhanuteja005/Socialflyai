@@ -17,6 +17,9 @@ export const GENERATION_KIND: Record<GenerationKind, string> = {
 	carousel: "Carousel",
 	video_script: "Video script",
 	video: "Video",
+	research: "Brand research",
+	visibility: "AI visibility check",
+	seo: "Keyword data",
 };
 
 export const GENERATION_STATUS: Record<GenerationStatus, { label: string; tone: BadgeTone }> = {

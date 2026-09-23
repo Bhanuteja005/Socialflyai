@@ -84,3 +84,48 @@ export type PostAnalytics = InferResponseType<(typeof api.analytics.posts)[":pos
 export type PostAnalyticsTarget = PostAnalytics["targets"][number];
 export type BestTimes = InferResponseType<(typeof api.analytics)["best-times"]["$get"], 200>;
 export type BestTimeCell = BestTimes["cells"][number];
+
+// ── Research (Phase 5) ──────────────────────────────────────────────────────
+export type ResearchCapabilities = InferResponseType<typeof api.research.capabilities.$get, 200>;
+export type VisibilityEngine = ResearchCapabilities["visibilityEngines"][number];
+export type EngineId = VisibilityEngine["id"];
+export type ResearchRun = InferResponseType<(typeof api.research.runs)[":id"]["$get"], 200>;
+export type ResearchRunStatus = ResearchRun["status"];
+export type BrandInsights = NonNullable<ResearchRun["insights"]>;
+export type ContentIdea = BrandInsights["contentIdeas"][number];
+export type ResearchPagesPage = InferResponseType<
+	(typeof api.research.runs)[":id"]["pages"]["$get"],
+	200
+>;
+export type ResearchPage = ResearchPagesPage["items"][number];
+export type ApplyInsightsInput = InferRequestType<typeof api.research.insights.apply.$post>["json"];
+export type Competitor = InferResponseType<
+	typeof api.research.competitors.$get,
+	200
+>["items"][number];
+export type CompetitorInput = InferRequestType<typeof api.research.competitors.$post>["json"];
+export type CompetitorUpdate = InferRequestType<
+	(typeof api.research.competitors)[":id"]["$patch"]
+>["json"];
+export type Keyword = InferResponseType<typeof api.research.keywords.$get, 200>["items"][number];
+export type KeywordRankings = InferResponseType<
+	(typeof api.research.keywords)[":id"]["rankings"]["$get"],
+	200
+>;
+export type KeywordIdea = InferResponseType<
+	typeof api.research.keywords.ideas.$post,
+	200
+>["items"][number];
+export type VisibilityPrompt = InferResponseType<
+	typeof api.research.visibility.prompts.$get,
+	200
+>["items"][number];
+export type VisibilitySummary = InferResponseType<typeof api.research.visibility.summary.$get, 200>;
+export type VisibilityCheck = InferResponseType<
+	(typeof api.research.visibility.prompts)[":id"]["checks"]["$get"],
+	200
+>["items"][number];
+export type VisibilityCheckDetail = InferResponseType<
+	(typeof api.research.visibility.checks)[":id"]["$get"],
+	200
+>;

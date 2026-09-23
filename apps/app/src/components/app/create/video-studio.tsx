@@ -113,7 +113,14 @@ const withHashtags = (text: string, hashtags: string[]) =>
 const clampSeconds = (n: number) =>
 	Math.min(SCENE_MAX_SECONDS, Math.max(SCENE_MIN_SECONDS, Math.round(n)));
 
-export function VideoStudio({ caps }: { caps: AiCapabilities }) {
+export function VideoStudio({
+	caps,
+	initialTopic,
+}: {
+	caps: AiCapabilities;
+	/** Pre-filled topic, e.g. from a Research content idea. */
+	initialTopic?: string;
+}) {
 	const idBase = useId();
 	const counter = useRef(0);
 	const newScene = (s: Partial<VideoScene> = {}): Scene => {
@@ -131,7 +138,7 @@ export function VideoStudio({ caps }: { caps: AiCapabilities }) {
 
 	// Without a text model there's no script step: start straight at the scenes.
 	const [stage, setStage] = useState<Stage>(caps.text ? "script" : "scenes");
-	const [topic, setTopic] = useState("");
+	const [topic, setTopic] = useState(initialTopic ?? "");
 	const [length, setLength] = useState<number>(30);
 	const [platform, setPlatform] = useState<ProviderId>("instagram");
 	const [topicTouched, setTopicTouched] = useState(false);

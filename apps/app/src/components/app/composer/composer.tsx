@@ -26,9 +26,11 @@ type ComposerProps = {
 	post?: PostDetail;
 	presetDate?: string | null;
 	prefill?: ComposerPrefill;
+	/** Opens the AI assist with this brief already written. */
+	brief?: string;
 };
 
-export function Composer({ channels, providers, post, presetDate, prefill }: ComposerProps) {
+export function Composer({ channels, providers, post, presetDate, prefill, brief }: ComposerProps) {
 	const { org } = useOrg();
 	const [initial] = useState(() => initialState(org.timezone, post, presetDate, prefill));
 	const composer = useComposer(initial, channels, org.timezone);
@@ -110,7 +112,7 @@ export function Composer({ channels, providers, post, presetDate, prefill }: Com
 					<Card>
 						<CardHeader className="flex-row items-center justify-between gap-2">
 							<CardTitle>Content</CardTitle>
-							<AiAssist composer={composer} activeTab={tab} disabled={busy} />
+							<AiAssist composer={composer} activeTab={tab} disabled={busy} initialBrief={brief} />
 						</CardHeader>
 						<CardContent className="grid gap-4">
 							<ContentEditor

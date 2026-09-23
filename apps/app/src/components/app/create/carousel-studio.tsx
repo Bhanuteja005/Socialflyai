@@ -45,7 +45,14 @@ const PLATFORM_OPTIONS: ProviderId[] = ["linkedin", "instagram", "facebook", "th
 const withHashtags = (text: string, hashtags: string[]) =>
 	hashtags.length ? `${text.trim()}\n\n${hashtags.join(" ")}` : text.trim();
 
-export function CarouselStudio({ caps }: { caps: AiCapabilities }) {
+export function CarouselStudio({
+	caps,
+	initialTopic,
+}: {
+	caps: AiCapabilities;
+	/** Pre-filled topic, e.g. from a Research content idea. */
+	initialTopic?: string;
+}) {
 	const idBase = useId();
 	const counter = useRef(0);
 	const newSlide = (heading = "", body = ""): Slide => {
@@ -56,7 +63,7 @@ export function CarouselStudio({ caps }: { caps: AiCapabilities }) {
 
 	// Without a text model there's no outline step: start straight at the slides.
 	const [stage, setStage] = useState<"topic" | "slides">(caps.text ? "topic" : "slides");
-	const [topic, setTopic] = useState("");
+	const [topic, setTopic] = useState(initialTopic ?? "");
 	const [slideCount, setSlideCount] = useState(6);
 	const [platform, setPlatform] = useState<ProviderId>("linkedin");
 	const [topicTouched, setTopicTouched] = useState(false);

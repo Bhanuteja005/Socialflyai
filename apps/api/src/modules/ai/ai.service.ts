@@ -9,16 +9,15 @@ import {
 	suggestHashtags,
 	type TextModel,
 	type TextResult,
-	usdToMicros,
 	videoScript,
 	type videoScriptInput,
 } from "@socialfly/ai";
 import { AppError, notFound } from "@socialfly/core/errors";
-import { and, type Database, desc, eq, inArray, lt, schema, sql } from "@socialfly/db";
+import { and, type Database, desc, eq, inArray, lt, schema } from "@socialfly/db";
 import type { JobProducer } from "@socialfly/queue";
 import type { z } from "zod";
 import { toMediaDto } from "#src/modules/media/media.service.ts";
-import { budgetPeriodStart, effectiveBudgetUsd } from "./ai.budget.ts";
+import { assertBudget, orgBudget } from "./ai.budget.ts";
 import type {
 	BrandProfileInput,
 	CarouselInput,
@@ -31,7 +30,7 @@ import type {
 	VideoInput,
 } from "./ai.schemas.ts";
 
-const { aiGenerations, brandProfiles, mediaAssets, organizations } = schema;
+const { aiGenerations, brandProfiles, mediaAssets } = schema;
 
 type GenerationRow = typeof aiGenerations.$inferSelect;
 type BrandRow = typeof brandProfiles.$inferSelect;
@@ -45,7 +44,7 @@ const notConfigured = (what: string) =>
  * Translates the provider-neutral failure kind into an HTTP answer. Keyed on `kind`,
  * never on message text: providers reword messages freely.
  */
-function toAppError(error: unknown): unknown {
+export function toAppError(error: unknown): unknown {
 	if (!isAiError(error)) return error;
 	switch (error.kind) {
 		case "not_configured":
@@ -155,47 +154,11 @@ export class AiService {
 	}
 
 	private async budget(orgId: string) {
-		const start = budgetPeriodStart();
-		// One round trip: the override lives on the org row, the spend is summed from the ledger.
-		const [row] = await this.db
-			.select({
-				override: organizations.aiMonthlyBudgetUsd,
-				// Written out qualified: drizzle leaves columns unqualified in single-table queries,
-				// and an unqualified "id" inside the subquery would bind to ai_generations.id.
-				used: sql<string>`(select coalesce(sum(g.cost_micros), 0) from ai_generations g where g.organization_id = organizations.id and g.created_at >= ${start.toISOString()})`,
-			})
-			.from(organizations)
-			.where(eq(organizations.id, orgId))
-			.limit(1);
-		const usedMicros = Number(row?.used ?? 0);
-		const limitUsd = effectiveBudgetUsd(row?.override ?? null);
-		const usedUsd = microsToUsd(usedMicros);
-		return {
-			summary: {
-				limitUsd,
-				usedUsd,
-				remainingUsd:
-					limitUsd === null ? null : microsToUsd(Math.max(0, usdToMicros(limitUsd) - usedMicros)),
-				periodStart: start.toISOString(),
-			},
-			exceeded: limitUsd !== null && usedMicros >= usdToMicros(limitUsd),
-		};
+		return orgBudget(this.db, orgId);
 	}
 
-	/**
-	 * Checked before every paid call. A single call can still overshoot by its own cost —
-	 * we cannot know that cost up front — but the org cannot keep spending past the limit.
-	 */
 	private async assertBudget(orgId: string) {
-		const { summary, exceeded } = await this.budget(orgId);
-		if (exceeded) {
-			throw new AppError(
-				429,
-				"ai_budget_exceeded",
-				`This organization has used its monthly AI budget of $${summary.limitUsd}. It resets at the start of next month.`,
-				{ limitUsd: summary.limitUsd, usedUsd: summary.usedUsd },
-			);
-		}
+		await assertBudget(this.db, orgId);
 	}
 
 	// ── brand profile ───────────────────────────────────────────────────────────

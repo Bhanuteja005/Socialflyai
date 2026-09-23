@@ -32,6 +32,9 @@ const KIND_LABEL: Record<GenerationKind, string> = {
 	carousel: "Carousel",
 	video_script: "Video script",
 	video: "Video",
+	research: "Website research",
+	visibility: "AI visibility",
+	seo: "SEO data",
 };
 const KINDS = Object.keys(KIND_LABEL) as GenerationKind[];
 const STATUSES = Object.keys(GENERATION_STATUS) as GenerationStatus[];

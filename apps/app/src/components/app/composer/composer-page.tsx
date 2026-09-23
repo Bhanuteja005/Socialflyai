@@ -43,7 +43,9 @@ function ReadOnlyNotice() {
 /**
  * `/compose` accepts a hand-over from the Create page:
  * - `?generation=<id>` attaches the media an AI image/carousel/video generation produced;
- * - `?content=<text>` pre-fills the post text (e.g. a carousel caption).
+ * - `?content=<text>` pre-fills the post text (e.g. a carousel caption);
+ * - `?brief=<text>` opens the AI assist with that brief (a Research content idea), and
+ *   `&platforms=linkedin,x` pre-selects the active channels on those platforms.
  * The generation is re-read from the API rather than passed in the URL so the
  * link survives a reload and can't smuggle in media from another organization.
  */
@@ -55,6 +57,8 @@ export function NewPostPage() {
 	const generationId = params.get("generation");
 	const generation = useGeneration(generationId);
 	const content = params.get("content");
+	const brief = params.get("brief")?.slice(0, 4000) || undefined;
+	const platforms = new Set((params.get("platforms") ?? "").split(",").filter(Boolean));
 
 	if (!can("editor")) return <ReadOnlyNotice />;
 	const waitingForMedia =
@@ -84,8 +88,12 @@ export function NewPostPage() {
 				channels={channels.data}
 				providers={providers.data}
 				presetDate={params.get("date")}
+				brief={brief}
 				prefill={{
 					content: content ?? undefined,
+					channels: platforms.size
+						? channels.data.filter((c) => c.status === "active" && platforms.has(c.provider))
+						: undefined,
 					media: generation.data?.status === "succeeded" ? generation.data.media : undefined,
 				}}
 			/>

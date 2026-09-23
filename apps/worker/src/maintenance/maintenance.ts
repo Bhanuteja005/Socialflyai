@@ -3,7 +3,7 @@ import { and, type Database, eq, inArray, isNotNull, lt, lte, schema, sql } from
 import type { JobProducer, MaintenanceJob } from "@socialfly/queue";
 import type { TargetState } from "#src/publishing/target-state.ts";
 
-const { postTargets, channels, aiGenerations } = schema;
+const { postTargets, channels, aiGenerations, researchRuns } = schema;
 
 /** A target left in `publishing` this long means its worker died mid-attempt. */
 const STUCK_PUBLISHING_MS = 15 * 60_000;
@@ -11,6 +11,8 @@ const STUCK_PUBLISHING_MS = 15 * 60_000;
 const STUCK_PROCESSING_MS = 2 * 3600_000;
 /** Far beyond any real image call (providers time out at ~3 min, with one retry). */
 const STUCK_AI_GENERATION_MS = 30 * 60_000;
+/** A crawl is capped at 8 minutes and one analysis call; 30 minutes means the job was lost. */
+const STUCK_RESEARCH_RUN_MS = 30 * 60_000;
 
 /**
  * Periodic self-healing. BullMQ delayed jobs are the primary scheduler; these
@@ -35,7 +37,12 @@ export class Maintenance {
 				// no behavioural gain — both are "a worker died mid-job" sweeps.
 				const targets = await this.recoverStuckTargets();
 				const aiGenerations = await this.recoverStuckAiGenerations();
-				return { ...targets, aiGenerations: aiGenerations.recovered };
+				const researchRuns = await this.recoverStuckResearchRuns();
+				return {
+					...targets,
+					aiGenerations: aiGenerations.recovered,
+					researchRuns: researchRuns.recovered,
+				};
 			}
 			case "schedule-token-refresh":
 				return this.scheduleTokenRefresh();
@@ -126,6 +133,35 @@ export class Maintenance {
 			.returning({ id: aiGenerations.id });
 		if (stuck.length > 0)
 			this.logger.error({ count: stuck.length }, "stuck ai generations marked failed");
+		return { recovered: stuck.length };
+	}
+
+	/**
+	 * Research runs whose job was lost would block the org's next run forever (the API
+	 * allows one active run). Failing them is safe: a late job sees `failed` and stops,
+	 * and a brief that does finish late still wins (see research/crawl.ts).
+	 */
+	async recoverStuckResearchRuns() {
+		const stuck = await this.db
+			.update(researchRuns)
+			.set({
+				status: "failed",
+				errorCode: "timeout",
+				errorMessage: "This research took too long and was stopped. Please try again.",
+				completedAt: new Date(),
+			})
+			.where(
+				and(
+					inArray(researchRuns.status, ["pending", "crawling", "analyzing"]),
+					lt(
+						researchRuns.createdAt,
+						sql`now() - make_interval(secs => ${STUCK_RESEARCH_RUN_MS / 1000})`,
+					),
+				),
+			)
+			.returning({ id: researchRuns.id });
+		if (stuck.length > 0)
+			this.logger.error({ count: stuck.length }, "stuck research runs marked failed");
 		return { recovered: stuck.length };
 	}
 

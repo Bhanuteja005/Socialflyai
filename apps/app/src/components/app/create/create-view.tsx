@@ -4,6 +4,7 @@ import { Button } from "@socialfly/ui/components/button";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@socialfly/ui/components/tabs";
 import { Clapperboard, Eye, GalleryHorizontal, ImageIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useAiCapabilities } from "@/hooks/use-ai";
 import { errorMessage } from "@/lib/errors";
@@ -16,11 +17,27 @@ import { RecentGenerations } from "./recent-generations";
 import { VideoStudio } from "./video-studio";
 
 type CreateTab = "image" | "carousel" | "video";
+const TABS: readonly string[] = ["image", "carousel", "video"];
+
+/**
+ * `/create?tab=carousel|video&topic=…` opens a studio with its topic filled in —
+ * the hand-off from a Research content idea. Read once; the studios own it after.
+ */
+function useHandOff() {
+	const params = useSearchParams();
+	const tab = params.get("tab");
+	const topic = params.get("topic")?.slice(0, 500) ?? "";
+	return {
+		tab: (tab && TABS.includes(tab) ? tab : "image") as CreateTab,
+		topic: tab === "carousel" || tab === "video" ? topic : "",
+	};
+}
 
 export function CreateView() {
 	const { can } = useOrg();
 	const caps = useAiCapabilities();
-	const [tab, setTab] = useState<CreateTab>("image");
+	const handOff = useHandOff();
+	const [tab, setTab] = useState<CreateTab>(handOff.tab);
 
 	return (
 		<div className="grid gap-6">
@@ -73,10 +90,16 @@ export function CreateView() {
 						<ImageStudio caps={caps.data} />
 					</TabsContent>
 					<TabsContent value="carousel" forceMount className="data-[state=inactive]:hidden">
-						<CarouselStudio caps={caps.data} />
+						<CarouselStudio
+							caps={caps.data}
+							initialTopic={handOff.tab === "carousel" ? handOff.topic : undefined}
+						/>
 					</TabsContent>
 					<TabsContent value="video" forceMount className="data-[state=inactive]:hidden">
-						<VideoStudio caps={caps.data} />
+						<VideoStudio
+							caps={caps.data}
+							initialTopic={handOff.tab === "video" ? handOff.topic : undefined}
+						/>
 					</TabsContent>
 				</Tabs>
 			)}

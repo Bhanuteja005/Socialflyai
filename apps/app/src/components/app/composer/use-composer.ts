@@ -27,7 +27,12 @@ function defaultLater(timeZone: string) {
 }
 
 /** Starting content for a new post, e.g. handed over from the Create page. */
-export type ComposerPrefill = { content?: string; media?: MediaAsset[] };
+export type ComposerPrefill = {
+	content?: string;
+	media?: MediaAsset[];
+	/** Channels to start selected (e.g. those matching a Research idea's platforms). */
+	channels?: Channel[];
+};
 
 export function initialState(
 	timeZone: string,
@@ -39,9 +44,11 @@ export function initialState(
 		const preset = presetDate ? new Date(presetDate) : null;
 		return {
 			content: prefill?.content ?? "",
-			channelIds: [],
+			channelIds: prefill?.channels?.map((c) => c.id) ?? [],
 			overrides: {},
-			settings: {},
+			settings: Object.fromEntries(
+				(prefill?.channels ?? []).map((c) => [c.id, defaultSettings(c.provider)]),
+			),
 			media: prefill?.media ?? [],
 			mode: "later",
 			scheduledLocal:

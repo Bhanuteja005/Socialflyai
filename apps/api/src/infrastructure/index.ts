@@ -7,6 +7,12 @@ import { createRedis } from "@socialfly/core/redis";
 import { createDb } from "@socialfly/db";
 import { createProviderRegistry } from "@socialfly/integrations";
 import { createQueueConnection, JobProducer, publishQueueName, QUEUES } from "@socialfly/queue";
+import {
+	createDataForSeo,
+	createVisibilityEngines,
+	type DataForSeo,
+	type VisibilityEngine,
+} from "@socialfly/research";
 import { S3Client } from "bun";
 import { QueueStats } from "./queue-stats.ts";
 
@@ -67,3 +73,17 @@ export const mailer = createMailer({ smtpUrl: env.SMTP_URL, from: env.MAIL_FROM,
  * mutable object whose fields are read at call time, so tests can swap in fakes.
  */
 export const ai: AiModels = createAi(env);
+
+/**
+ * Research tools that the API calls or reports on. Visibility engines are only listed
+ * here (ids and models for /research/capabilities); the worker is what asks them.
+ * DataForSEO is called directly for keyword ideas, which the user waits for. Mutable,
+ * like `ai`, so tests can swap in fakes.
+ */
+export const researchTools: {
+	visibilityEngines: { id: VisibilityEngine["id"]; model: string }[];
+	seo: Pick<DataForSeo, "keywordIdeas"> | null;
+} = {
+	visibilityEngines: createVisibilityEngines(env).map((e) => ({ id: e.id, model: e.model })),
+	seo: createDataForSeo(env),
+};

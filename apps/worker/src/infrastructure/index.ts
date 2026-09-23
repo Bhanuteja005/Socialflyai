@@ -5,6 +5,14 @@ import { createLogger } from "@socialfly/core/logger";
 import { createDb } from "@socialfly/db";
 import { createProviderRegistry } from "@socialfly/integrations";
 import { createQueueConnection, JobProducer } from "@socialfly/queue";
+import {
+	analyzeBrand,
+	analyzeMention,
+	classifySentiment,
+	crawlSite,
+	createDataForSeo,
+	createVisibilityEngines,
+} from "@socialfly/research";
 import { S3Client } from "bun";
 import { AiMediaProcessor } from "#src/ai/ai-media.ts";
 import { AnalyticsCollector } from "#src/analytics/analytics-collector.ts";
@@ -13,6 +21,7 @@ import { ChannelTokens } from "#src/channels/channel-tokens.ts";
 import { Maintenance } from "#src/maintenance/maintenance.ts";
 import { PublishingEngine } from "#src/publishing/publishing-engine.ts";
 import { TargetState } from "#src/publishing/target-state.ts";
+import { ResearchProcessor } from "#src/research/research-processor.ts";
 
 /** Process-wide singletons, created once here and closed once in index.ts. */
 export const logger = createLogger({
@@ -77,4 +86,23 @@ export const aiMedia = new AiMediaProcessor({
 	storage,
 	logger,
 	publicMediaUrl: env.S3_PUBLIC_URL,
+});
+
+/**
+ * Website research, AI visibility and SEO. Engines and DataForSEO follow the same rule
+ * as every other provider: a missing key turns the feature off instead of failing boot.
+ */
+export const research = new ResearchProcessor({
+	db,
+	ai,
+	fns: { crawlSite, analyzeBrand, analyzeMention, classifySentiment },
+	engines: createVisibilityEngines(env),
+	seo: createDataForSeo(env),
+	jobs,
+	logger,
+	config: {
+		maxPages: env.RESEARCH_MAX_PAGES,
+		userAgent: env.RESEARCH_USER_AGENT,
+		monthlyBudgetUsd: env.AI_ORG_MONTHLY_BUDGET_USD,
+	},
 });

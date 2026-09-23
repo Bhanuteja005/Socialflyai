@@ -32,6 +32,11 @@ export const QUEUES = {
 	 * analytics reads can never delay a publish, which has a user-visible deadline.
 	 */
 	analytics: "analytics",
+	/**
+	 * Website research, AI-visibility checks and SEO refreshes: minutes-long jobs made
+	 * of many paid calls, kept apart so they can never hold up publishing or media.
+	 */
+	research: "research",
 } as const;
 
 export const publishJobSchema = z.object({
@@ -86,6 +91,29 @@ export const analyticsJobSchema = z.discriminatedUnion("task", [
 export type AnalyticsJob = z.infer<typeof analyticsJobSchema>;
 
 /**
+ * Research work. `crawl` runs one research_runs row (crawl → brand analysis). The
+ * two planners (on weekly job schedulers) fan out one per-organization job each:
+ * `visibility-org` asks every configured AI engine the org's prompts, `seo-refresh`
+ * updates keyword metrics and Google rankings. `force` marks a user's "run now".
+ */
+export const researchJobSchema = z.discriminatedUnion("task", [
+	z.object({ task: z.literal("crawl"), runId: z.uuid() }),
+	z.object({ task: z.literal("visibility-plan") }),
+	z.object({
+		task: z.literal("visibility-org"),
+		organizationId: z.uuid(),
+		force: z.boolean().optional(),
+	}),
+	z.object({ task: z.literal("seo-plan") }),
+	z.object({
+		task: z.literal("seo-refresh"),
+		organizationId: z.uuid(),
+		force: z.boolean().optional(),
+	}),
+]);
+export type ResearchJob = z.infer<typeof researchJobSchema>;
+
+/**
  * Deterministic job ids make enqueueing idempotent: scheduling the same target
  * twice (double click, API retry, sweep racing the original job) is a no-op in
  * BullMQ instead of a double post. The schedule version is part of the id so a
@@ -109,4 +137,20 @@ export const jobIds = {
 	/** User-requested refresh: its own 10-minute bucket so it is not swallowed by the hourly job. */
 	analyticsRefresh: (kind: "posts" | "account", channelId: string, tenMinuteBucket: number) =>
 		`analytics.refresh.${kind}.${channelId}.${tenMinuteBucket}`,
+	/** One job per research run: a double submit or a replayed enqueue is a no-op. */
+	researchCrawl: (runId: string) => `research.crawl.${runId}`,
+	/**
+	 * Scheduled per-org jobs carry the week number, so every planner run and replica
+	 * in a week collapses onto one job; a forced run gets a 10-minute bucket of its own
+	 * so it is not swallowed by that week's scheduled job.
+	 */
+	researchOrg: (kind: "visibility" | "seo", organizationId: string, weekBucket: number) =>
+		`research.${kind}.${organizationId}.w${weekBucket}`,
+	researchOrgForced: (
+		kind: "visibility" | "seo",
+		organizationId: string,
+		tenMinuteBucket: number,
+	) => `research.${kind}.${organizationId}.f${tenMinuteBucket}`,
 };
+
+export const WEEK_MS = 7 * 24 * 3600_000;

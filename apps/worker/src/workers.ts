@@ -9,7 +9,9 @@ import {
 	publishStatusJobSchema,
 	QUEUE_PREFIX,
 	QUEUES,
+	researchJobSchema,
 	tokenRefreshJobSchema,
+	WEEK_MS,
 } from "@socialfly/queue";
 import { DelayedError, type Processor, Queue, Worker } from "bullmq";
 import { CallBudgetExhausted } from "#src/analytics/call-budget.ts";
@@ -25,6 +27,7 @@ import {
 	maintenance,
 	providers,
 	queueConnection,
+	research,
 } from "#src/infrastructure/index.ts";
 
 /** Maintenance cadence. Cheap indexed queries — safe to run every minute. */
@@ -41,6 +44,8 @@ const SCHEDULES: { id: MaintenanceJob["task"]; everyMs: number }[] = [
 const ANALYTICS_PLAN_EVERY_MS = 15 * 60_000;
 /** Low on purpose: each job is a platform read that competes with publishing for budget. */
 const ANALYTICS_CONCURRENCY = 2;
+/** Each research job is many slow paid calls; two at a time keeps provider limits and spend smooth. */
+const RESEARCH_CONCURRENCY = 2;
 
 const wanted = (queue: string) =>
 	env.WORKER_QUEUES.length === 0 || env.WORKER_QUEUES.includes(queue);
@@ -147,6 +152,37 @@ export async function startWorkers() {
 		},
 		{ concurrency: ANALYTICS_CONCURRENCY },
 	);
+
+	start(
+		QUEUES.research,
+		async (job) =>
+			research.run(researchJobSchema.parse(job.data), {
+				attemptsMade: job.attemptsMade,
+				maxAttempts: job.opts.attempts ?? 1,
+			}),
+		{
+			concurrency: RESEARCH_CONCURRENCY,
+			// A crawl or a visibility run takes minutes of network waits; with the default 30 s
+			// lock a slow-but-healthy job could be declared stalled and run twice (paying twice).
+			lockDuration: 10 * 60_000,
+		},
+	);
+
+	if (wanted(QUEUES.research)) {
+		const q = new Queue(QUEUES.research, { connection: queueConnection, prefix: QUEUE_PREFIX });
+		// Weekly: answers from AI engines and Google positions move slowly, and each check is paid.
+		await q.upsertJobScheduler(
+			"visibility-plan",
+			{ every: WEEK_MS },
+			{ name: "visibility-plan", data: { task: "visibility-plan" } },
+		);
+		await q.upsertJobScheduler(
+			"seo-plan",
+			{ every: WEEK_MS },
+			{ name: "seo-plan", data: { task: "seo-plan" } },
+		);
+		await q.close();
+	}
 
 	if (wanted(QUEUES.analytics)) {
 		const q = new Queue(QUEUES.analytics, { connection: queueConnection, prefix: QUEUE_PREFIX });
