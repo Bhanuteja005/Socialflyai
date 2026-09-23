@@ -210,6 +210,66 @@ type TokenResponse = {
 	scope?: string;
 };
 
+// ---------------------------------------------------------------------------
+// Google OAuth (shared with the Google Ads adapter)
+// ---------------------------------------------------------------------------
+
+/**
+ * `prompt=consent` forces Google to issue a refresh token even when the user
+ * granted access before (otherwise it is only sent on first consent).
+ * https://developers.google.com/identity/protocols/oauth2/web-server
+ */
+export function googleAuthorizationUrl(
+	clientId: string,
+	scopes: string[],
+	{ redirectUri, state }: { redirectUri: string; state: string },
+) {
+	const url = new URL(AUTH_URL);
+	url.search = form({
+		client_id: clientId,
+		redirect_uri: redirectUri,
+		response_type: "code",
+		scope: scopes.join(" "),
+		access_type: "offline",
+		prompt: "consent",
+		include_granted_scopes: "true",
+		state,
+	});
+	return { url: url.toString() };
+}
+
+/** Token endpoint call (code exchange or refresh); `invalid_grant` maps to `auth`. */
+export async function requestGoogleToken(
+	provider: string,
+	client: { clientId: string; clientSecret: string },
+	params: Record<string, string>,
+): Promise<TokenResponse> {
+	return providerJson<TokenResponse>(provider, TOKEN_URL, {
+		method: "POST",
+		headers: { "Content-Type": "application/x-www-form-urlencoded" },
+		body: form({
+			...params,
+			client_id: client.clientId,
+			client_secret: client.clientSecret,
+		}),
+		classify: (status, body) => classifyGoogleError(provider, status, body),
+	});
+}
+
+/** Google does not rotate refresh tokens; `fallbackRefresh` keeps the current one. */
+export function googleTokenSet(
+	t: TokenResponse,
+	fallbackRefresh: string | null,
+	requestedScopes: string[],
+): TokenSet {
+	return {
+		accessToken: t.access_token,
+		refreshToken: t.refresh_token ?? fallbackRefresh,
+		expiresAt: expiresAtFrom(t.expires_in),
+		scopes: t.scope?.split(" ").filter(Boolean) ?? requestedScopes,
+	};
+}
+
 /** videos.list `id` accepts up to 50 comma-separated ids. */
 const YOUTUBE_MAX_IDS = 50;
 
@@ -528,46 +588,16 @@ export class YouTubeProvider implements SocialProvider<Settings> {
 		return followers === undefined ? [] : [{ date: today, followers }];
 	}
 
-	/**
-	 * `prompt=consent` forces Google to issue a refresh token even when the user
-	 * granted access before (otherwise it is only sent on first consent).
-	 * https://developers.google.com/identity/protocols/oauth2/web-server
-	 */
 	async getAuthorizationUrl({ redirectUri, state }: { redirectUri: string; state: string }) {
-		const url = new URL(AUTH_URL);
-		url.search = form({
-			client_id: this.config.clientId,
-			redirect_uri: redirectUri,
-			response_type: "code",
-			scope: SCOPES.join(" "),
-			access_type: "offline",
-			prompt: "consent",
-			include_granted_scopes: "true",
-			state,
-		});
-		return { url: url.toString() };
+		return googleAuthorizationUrl(this.config.clientId, SCOPES, { redirectUri, state });
 	}
 
 	private async requestToken(params: Record<string, string>): Promise<TokenResponse> {
-		return providerJson<TokenResponse>(this.id, TOKEN_URL, {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: form({
-				...params,
-				client_id: this.config.clientId,
-				client_secret: this.config.clientSecret,
-			}),
-			classify: this.classify,
-		});
+		return requestGoogleToken(this.id, this.config, params);
 	}
 
 	private toTokens(t: TokenResponse, fallbackRefresh: string | null): TokenSet {
-		return {
-			accessToken: t.access_token,
-			refreshToken: t.refresh_token ?? fallbackRefresh,
-			expiresAt: expiresAtFrom(t.expires_in),
-			scopes: t.scope?.split(" ").filter(Boolean) ?? SCOPES,
-		};
+		return googleTokenSet(t, fallbackRefresh, SCOPES);
 	}
 
 	async exchangeCode({

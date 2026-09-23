@@ -115,6 +115,8 @@ export class AdminService {
 			aiRows,
 			analyticsCounts,
 			engagementCounts,
+			adsCounts,
+			adsSpend,
 		] = await Promise.all([
 			this.db
 				.select({
@@ -194,6 +196,23 @@ export class AdminService {
 				`) as unknown as Promise<
 				{ itemsNew: number; repliesUnconfirmed: number; repliesFailed24h: number }[]
 			>,
+			// Ads health: unconfirmed campaigns (all-time — each needs a human to check the ads
+			// manager) and what is live right now.
+			this.db.execute(sql`
+					select
+						(select count(*) from ad_accounts a where a.status <> 'disconnected')::int as "accounts",
+						(select count(*) from ad_campaigns c where c.status = 'active')::int as "campaignsActive",
+						(select count(*) from ad_campaigns c where c.status = 'unconfirmed')::int as "unconfirmed"
+				`) as unknown as Promise<
+				{ accounts: number; campaignsActive: number; unconfirmed: number }[]
+			>,
+			// Spend is never summed across currencies.
+			this.db.execute(sql`
+					select c.currency, coalesce(sum(m.spend), 0)::float8 as spend
+					from ad_campaign_metrics_daily m join ad_campaigns c on c.id = m.campaign_id
+					where m.day >= (now() - interval '7 days')::date
+					group by c.currency
+				`) as unknown as Promise<{ currency: string; spend: number }[]>,
 		]);
 
 		const zero = { total: 0, new7d: 0 };
@@ -223,6 +242,14 @@ export class AdminService {
 				itemsNew: Number(engagementCounts[0]?.itemsNew ?? 0),
 				repliesUnconfirmed: Number(engagementCounts[0]?.repliesUnconfirmed ?? 0),
 				repliesFailed24h: Number(engagementCounts[0]?.repliesFailed24h ?? 0),
+			},
+			ads: {
+				accounts: Number(adsCounts[0]?.accounts ?? 0),
+				campaignsActive: Number(adsCounts[0]?.campaignsActive ?? 0),
+				spend7dByCurrency: Object.fromEntries(
+					adsSpend.map((r) => [r.currency, Math.round(Number(r.spend) * 100) / 100]),
+				) as Record<string, number>,
+				unconfirmed: Number(adsCounts[0]?.unconfirmed ?? 0),
 			},
 		};
 	}

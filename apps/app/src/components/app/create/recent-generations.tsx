@@ -11,6 +11,7 @@ import {
 	Hash,
 	ImageIcon,
 	Inbox,
+	Megaphone,
 	MessageSquareReply,
 	PenSquare,
 	Search,
@@ -40,6 +41,7 @@ const KIND_ICON: Record<GenerationKind, typeof ImageIcon> = {
 	seo: Search,
 	triage: Inbox,
 	reply_draft: MessageSquareReply,
+	ad_copy: Megaphone,
 };
 
 /** The line a person would recognise the generation by: its prompt, brief or topic. */

@@ -56,6 +56,8 @@ export const aiGenerationKind = pgEnum("ai_generation_kind", [
 	// Phase 6: engagement inbox — batch triage by the worker, reply drafts from the API.
 	"triage",
 	"reply_draft",
+	// Phase 7: AI-written ad copy and targeting suggestions.
+	"ad_copy",
 ]);
 
 export const aiGenerationStatus = pgEnum("ai_generation_status", [

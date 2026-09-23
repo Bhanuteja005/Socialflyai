@@ -3,7 +3,7 @@ import { workerEnv as env } from "@socialfly/config";
 import { TokenCipher } from "@socialfly/core/crypto";
 import { createLogger } from "@socialfly/core/logger";
 import { createDb } from "@socialfly/db";
-import { createProviderRegistry } from "@socialfly/integrations";
+import { createAdsRegistry, createProviderRegistry } from "@socialfly/integrations";
 import { createQueueConnection, JobProducer } from "@socialfly/queue";
 import {
 	analyzeBrand,
@@ -14,6 +14,10 @@ import {
 	createVisibilityEngines,
 } from "@socialfly/research";
 import { S3Client } from "bun";
+import { AdTokens } from "#src/ads/ad-tokens.ts";
+import { AdsSync } from "#src/ads/ads-sync.ts";
+import { AdsWriter } from "#src/ads/ads-writer.ts";
+import { AdCampaignState } from "#src/ads/campaign-state.ts";
 import { AiMediaProcessor } from "#src/ai/ai-media.ts";
 import { AnalyticsCollector } from "#src/analytics/analytics-collector.ts";
 import { RedisCallBudget } from "#src/analytics/call-budget.ts";
@@ -62,7 +66,19 @@ export const engine = new PublishingEngine({
 	publicMediaUrl: env.S3_PUBLIC_URL,
 });
 export const replyState = new ReplyState(db);
-export const maintenance = new Maintenance(db, jobs, targetState, logger, replyState);
+/** Ad platforms (Phase 7). A platform without credentials is skipped, like publishing. */
+export const adsProviders = createAdsRegistry(env);
+export const adCampaignState = new AdCampaignState(db);
+export const adTokens = new AdTokens(db, adsProviders, tokenCipher, logger);
+
+export const maintenance = new Maintenance(
+	db,
+	jobs,
+	targetState,
+	logger,
+	replyState,
+	adCampaignState,
+);
 
 export const analytics = new AnalyticsCollector({
 	db,
@@ -131,6 +147,31 @@ export const replySender = new ReplySender({
 	providers,
 	tokens: channelTokens,
 	state: replyState,
+	jobs,
+	logger,
+});
+
+/**
+ * Ads: the writer creates campaigns (always paused) and starts/stops spend; the sync
+ * reads statuses and spend with its own per-provider read budget (20 calls a minute),
+ * separate from analytics and the inbox.
+ */
+export const adsWriter = new AdsWriter({
+	db,
+	providers: adsProviders,
+	tokens: adTokens,
+	state: adCampaignState,
+	jobs,
+	logger,
+	publicMediaUrl: env.S3_PUBLIC_URL,
+	serverDailyCeiling: env.ADS_MAX_DAILY_BUDGET,
+});
+export const adsSync = new AdsSync({
+	db,
+	providers: adsProviders,
+	tokens: adTokens,
+	state: adCampaignState,
+	budget: new RedisCallBudget(queueConnection, { max: 20, windowMs: 60_000 }, "ads"),
 	jobs,
 	logger,
 });

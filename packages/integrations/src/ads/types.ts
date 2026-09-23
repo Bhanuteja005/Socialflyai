@@ -166,7 +166,15 @@ export interface AdsProvider {
 	refreshTokens?(refreshToken: string): Promise<TokenSet>;
 
 	/** Pure: errors a user can fix before anything is sent (budget minimums, text limits, required media). */
-	validate(draft: CampaignDraft, account: { currency: string }): string[];
+	/**
+	 * `metadata` (page/organization/identity/board/funding instrument) is passed when the
+	 * caller has it, so missing identity setup is reported before submission rather than
+	 * at creation. Adapters must still enforce it in createCampaign.
+	 */
+	validate(
+		draft: CampaignDraft,
+		account: { currency: string; metadata?: Record<string, unknown> },
+	): string[];
 	/** Interest / location / job-title search for the targeting picker. Read-only. */
 	searchTargeting?(
 		ctx: AdsContext,

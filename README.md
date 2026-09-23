@@ -54,7 +54,7 @@ team runs every week:
 6. **Measure** — impressions, engagement, mentions and AI citations.
 7. **Advertise** — turn winning posts into ad campaigns.
 
-Steps 1–4 and 6 (measure) and the foundations under them are built today; the rest is the [roadmap](#-roadmap).
+All seven steps are built. Platform integrations are covered by tests against simulated APIs; see [docs/platforms.md](docs/platforms.md) and [docs/ads.md](docs/ads.md) for what still needs verifying on live accounts and which platform approvals are required.
 
 ## 🚀 Features available now
 
@@ -71,6 +71,12 @@ Steps 1–4 and 6 (measure) and the foundations under them are built today; the 
 - **Research & AI visibility** — crawl your website into a brand brief (topics, buyer questions,
   competitors, content gaps and ready-to-create ideas), track whether ChatGPT, Claude, Gemini and
   Perplexity mention you versus competitors, and (with DataForSEO) keyword volumes and Google ranks.
+- **Engagement inbox** — comments, replies and mentions from every connected platform plus keyword
+  listening on Reddit and X, AI triage of what deserves an answer, on-brand AI reply drafts, and
+  optional admin approval before anything is posted.
+- **Ads** — AI-written ad copy and targeting, campaign drafts with approval for Meta, Google,
+  LinkedIn, TikTok, Pinterest and X. Campaigns are always created paused; an admin activates them by
+  typing the exact budget, under a hard daily budget ceiling. Spend and results sync back daily.
 - **Analytics** — impressions, reach and engagement per post and per channel (X, Facebook,
   Instagram, Threads, YouTube, Reddit, LinkedIn pages), follower growth, top posts, and a
   best-time-to-post heatmap from your own results.
@@ -167,8 +173,8 @@ docs/           architecture, platform setup, deployment, runbooks
 | — | Split into site / app / admin console; Jenkins CI/CD | ✅ Done |
 | 4 | Analytics: per-post and per-account metrics, dashboards, best time to post | ✅ Done |
 | 5 | Research, SEO/AEO and AI-visibility tracking | ✅ Done |
-| 6 | Engagement inbox: listening, reply drafts, approval | 🚧 Next |
-| 7 | Ads: campaign drafts, Meta / Google / LinkedIn / TikTok / X / Pinterest sync | Planned |
+| 6 | Engagement inbox: comments, mentions, listening, AI triage and reply drafts, approval | ✅ Done |
+| 7 | Ads: Meta, Google, LinkedIn, TikTok, Pinterest and X — AI copy, approval, paused-by-default creation, spend sync | ✅ Done |
 
 Details in [docs/architecture.md](docs/architecture.md#roadmap). Have an idea?
 [Open a feature request](https://github.com/Bhanuteja005/Socialflyai/issues/new/choose).
@@ -188,6 +194,7 @@ and gitleaks on staged files. Documentation:
 - [Architecture](docs/architecture.md): services, data model, publishing engine, decisions
 - [CI/CD with Jenkins](docs/ci-jenkins.md): pipeline stages, controller setup, credentials, rollback
 - [Admin console](docs/admin-console.md): staff access, what it shows, audit trail
+- [Ads](docs/ads.md): safety model, per-platform setup and the approvals each platform needs
 - [Platform setup](docs/platforms.md): creating the LinkedIn / Meta / X / Reddit / Google apps
 - [Deploying to Azure](docs/deployment-azure.md): Container Apps, secrets, CI/CD
 - [Runbook: publishing](docs/runbooks/publishing.md): what to do when posts fail

@@ -57,7 +57,7 @@ import type {
 export type MetaConfig = { appId: string; appSecret: string; graphVersion: string };
 
 const DIALOG_HOST = "https://www.facebook.com";
-const GRAPH_HOST = "https://graph.facebook.com";
+export const GRAPH_HOST = "https://graph.facebook.com";
 
 // ---------------------------------------------------------------------------
 // Shared Graph helpers (also used by threads.ts)
@@ -424,6 +424,71 @@ export function toContainerState(status: string | undefined, message?: string): 
 
 type TokenResponse = { access_token: string; token_type?: string; expires_in?: number };
 
+/**
+ * Facebook Login dialog URL. Shared with the Meta ads adapter, which uses the same
+ * app with the ads permissions.
+ * https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow
+ */
+export function metaAuthorizationUrl(
+	config: MetaConfig,
+	scopes: string[],
+	{ redirectUri, state }: { redirectUri: string; state: string },
+) {
+	const url = new URL(`${DIALOG_HOST}/${config.graphVersion}/dialog/oauth`);
+	url.search = form({
+		client_id: config.appId,
+		redirect_uri: redirectUri,
+		state,
+		response_type: "code",
+		scope: scopes.join(","),
+	});
+	return { url: url.toString() };
+}
+
+/**
+ * Code → short-lived user token (~1-2h) → long-lived user token (~60 days).
+ * Page tokens derived from the LONG-lived user token do not expire, which is
+ * why the exchange matters even though we publish with page tokens.
+ * https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived
+ */
+export async function exchangeMetaCode(
+	provider: string,
+	config: MetaConfig,
+	scopes: string[],
+	{ code, redirectUri }: { code: string; redirectUri: string },
+): Promise<TokenSet> {
+	const graph = `${GRAPH_HOST}/${config.graphVersion}`;
+	const classify = (s: number, b: string) => classifyMetaError(provider, s, b);
+	const short = await providerJson<TokenResponse>(
+		provider,
+		`${graph}/oauth/access_token?${form({
+			client_id: config.appId,
+			client_secret: config.appSecret,
+			redirect_uri: redirectUri,
+			code,
+		})}`,
+		{ classify },
+	);
+	const long = await providerJson<TokenResponse>(
+		provider,
+		`${graph}/oauth/access_token?${form({
+			grant_type: "fb_exchange_token",
+			client_id: config.appId,
+			client_secret: config.appSecret,
+			fb_exchange_token: short.access_token,
+		})}`,
+		{ classify },
+	);
+	return {
+		accessToken: long.access_token,
+		// Facebook Login has no refresh token: a long-lived user token can only be
+		// re-obtained by the user logging in again.
+		refreshToken: null,
+		expiresAt: expiresAtFrom(long.expires_in),
+		scopes,
+	};
+}
+
 type PageRow = {
 	id: string;
 	name: string;
@@ -463,25 +528,10 @@ abstract class MetaBase<TSettings extends Record<string, unknown>>
 		return (status: number, body: string) => classifyMetaError(this.id, status, body, mutating);
 	}
 
-	/** https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow */
 	async getAuthorizationUrl({ redirectUri, state }: { redirectUri: string; state: string }) {
-		const url = new URL(`${DIALOG_HOST}/${this.config.graphVersion}/dialog/oauth`);
-		url.search = form({
-			client_id: this.config.appId,
-			redirect_uri: redirectUri,
-			state,
-			response_type: "code",
-			scope: this.scopes.join(","),
-		});
-		return { url: url.toString() };
+		return metaAuthorizationUrl(this.config, this.scopes, { redirectUri, state });
 	}
 
-	/**
-	 * Code → short-lived user token (~1-2h) → long-lived user token (~60 days).
-	 * Page tokens derived from the LONG-lived user token do not expire, which is
-	 * why the exchange matters even though we publish with page tokens.
-	 * https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived
-	 */
 	async exchangeCode({
 		code,
 		redirectUri,
@@ -489,34 +539,7 @@ abstract class MetaBase<TSettings extends Record<string, unknown>>
 		code: string;
 		redirectUri: string;
 	}): Promise<ConnectResult> {
-		const short = await providerJson<TokenResponse>(
-			this.id,
-			`${this.graph}/oauth/access_token?${form({
-				client_id: this.config.appId,
-				client_secret: this.config.appSecret,
-				redirect_uri: redirectUri,
-				code,
-			})}`,
-			{ classify: this.classify() },
-		);
-		const long = await providerJson<TokenResponse>(
-			this.id,
-			`${this.graph}/oauth/access_token?${form({
-				grant_type: "fb_exchange_token",
-				client_id: this.config.appId,
-				client_secret: this.config.appSecret,
-				fb_exchange_token: short.access_token,
-			})}`,
-			{ classify: this.classify() },
-		);
-		const tokens: TokenSet = {
-			accessToken: long.access_token,
-			// Facebook Login has no refresh token: a long-lived user token can only be
-			// re-obtained by the user logging in again.
-			refreshToken: null,
-			expiresAt: expiresAtFrom(long.expires_in),
-			scopes: this.scopes,
-		};
+		const tokens = await exchangeMetaCode(this.id, this.config, this.scopes, { code, redirectUri });
 		return { tokens, accounts: await this.discoverAccounts(tokens.accessToken) };
 	}
 

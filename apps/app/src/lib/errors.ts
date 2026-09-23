@@ -28,6 +28,12 @@ export class ApiError extends Error {
 		return fields && typeof fields === "object" ? (fields as Record<string, string>) : {};
 	}
 
+	/** 422 `ads_invalid` → the campaign's problems, one sentence each. */
+	get problems(): string[] {
+		const problems = this.details?.problems;
+		return Array.isArray(problems) ? problems.map(String) : [];
+	}
+
 	/** 422 `post_invalid` → per-channel problems. */
 	get targets(): PostInvalidTarget[] {
 		const targets = this.details?.targets;
@@ -78,6 +84,23 @@ const FRIENDLY: Record<string, string> = {
 		"You can have up to 10 active listening queries. Pause or delete one to add another.",
 	provider_unavailable:
 		"Listening needs a connected channel on a platform that supports search, like Reddit or X.",
+	ads_not_configured:
+		"This ad platform isn't set up on this server yet. Ask whoever runs SocialFly to add its credentials.",
+	ads_invalid: "The campaign has problems to fix before it can be saved.",
+	confirm_mismatch:
+		"The amount you typed doesn't match the campaign's budget, so nothing was activated.",
+	budget_ceiling:
+		"This budget is above your organization's daily ceiling. Lower it, or ask an admin to raise the ceiling.",
+	ceiling_too_high: "That's above this server's daily ceiling. Choose a lower amount.",
+	campaign_not_deletable: "Only drafts and rejected campaigns can be deleted. Archive it instead.",
+	campaign_locked: "This campaign has already been sent to the platform and can't be edited here.",
+	campaign_changed: "Someone changed this campaign meanwhile. Reload and try again.",
+	identity_required:
+		"This ad account still needs an identity (page, profile or funding source). Finish its setup on the Accounts tab.",
+	account_inactive: "This ad account isn't active. Reconnect it on the Accounts tab.",
+	ad_account_unavailable:
+		"This ad account isn't active right now. Check it on the Accounts tab and reconnect if needed.",
+	connect_expired: "The connection took too long. Please connect again.",
 	network_error: "Can't reach SocialFly right now. Check your connection and try again.",
 };
 

@@ -28,8 +28,8 @@ which run on Node. Every service exports OpenTelemetry traces, metrics and logs;
 | Service | Responsibility | Talks to | Local port |
 |---|---|---|---|
 | `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP | 4800 |
-| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports, research / SEO / AI-visibility reports, engagement inbox | Postgres, Redis, storage, SMTP, Anthropic, DataForSEO | 4400 |
-| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, website research, AI-visibility checks, SEO refresh, inbox sync / listening / triage and reply sending, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs, websites, DataForSEO | 4500 |
+| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports, research / SEO / AI-visibility reports, engagement inbox, ads | Postgres, Redis, storage, SMTP, Anthropic, DataForSEO | 4400 |
+| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, website research, AI-visibility checks, SEO refresh, inbox sync / listening / triage and reply sending, ad campaign creation / activation / sync, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs, websites, DataForSEO | 4500 |
 | `apps/app` | The product UI: sign-in/sign-up, onboarding, dashboard, composer, calendar, channels, media, settings. `/` redirects to `/dashboard` | auth, api | 4700 |
 | `apps/site` | Public marketing site: landing, features, solutions, comparisons, free tools, blog, legal. Statically rendered; no API client, no auth. "Log in"/"Get started" link to the app | — | 4701 |
 | `apps/admin` | Internal admin console for staff (see `docs/admin-console.md`) | auth, api | 4702 |
@@ -94,6 +94,7 @@ users ─┬─ auth_sessions (refresh hash + previous hash for reuse detection)
                                         ├─ competitors, keywords ── keyword_rankings (per UTC day)
                                         ├─ visibility_prompts ── visibility_checks (one engine answer)
                                         ├─ engagement_items ── engagement_replies, listening_queries
+                                        ├─ ad_accounts ── ad_campaigns ── ad_campaign_metrics_daily
                                         └─ posts ─┬─ post_media
                                                   └─ post_targets ─┬─ post_target_events
                                                                    └─ post_target_metrics (engagement snapshots)
@@ -429,11 +430,163 @@ API (`/inbox`; every member reads, editors triage, draft and reply, admins appro
 | `GET/PATCH /settings` | `replyApprovalRequired` and per channel `supportsInbox`, `canRead`, `canReply`, `missingScopes` |
 | `POST /sync` | 202 `{ queued }`; one per organization per 5 minutes, else 429 with `retryAfterSeconds` |
 
+## Ads
+
+Paid campaigns on Meta (Facebook + Instagram), Google, LinkedIn, TikTok, Pinterest and X,
+drafted (optionally with AI copy), approved, created and started from SocialFly, with
+spend synced back. Ad platforms are separate adapters (`AdsProvider`,
+`packages/integrations/src/ads/`) and separate connections (`ad_accounts`): different
+OAuth permissions, often a different app approval, and one login can manage many ad
+accounts. A platform without credentials is hidden (`GET /ads/providers` → `configured`).
+
+```
+connect (admin) ─▶ OAuth ─▶ pending selection (Redis, sealed) ─▶ ad_accounts (tokens AES-256-GCM)
+                                                                   └─ identity: page / org / board / funding instrument
+draft (editor, AI copy optional) ─▶ submit ─▶ approve (admin) ─▶ ads-write-<provider>: create ─▶ PAUSED on the platform
+                                              activate (admin, budget typed back) ─▶ ads-write-<provider>: activate ─▶ spending
+job scheduler (30 min) ─▶ ads: sync-plan ─▶ sync-account <account> ─▶ status reconcile + ad_campaign_metrics_daily
+```
+
+### Money-safety model
+
+Mistakes here cost the customer money, so every layer assumes the others can fail:
+
+1. **Nothing spends without a person.** Every adapter creates campaigns (and their ad
+   sets, creatives, ads) **PAUSED** — that is the `createCampaign` contract. The only call
+   that starts spending is `setStatus(…, "active")`, and the only job that makes it is
+   `activate`, which the API enqueues only when an admin or owner asks for it on a paused
+   campaign **and types the budget back exactly** (`POST /ads/campaigns/:id/activate
+   { confirmBudget }`, 422 `confirm_mismatch` otherwise — "I thought it was 50, not 500").
+2. **Hard ceilings.** `ADS_MAX_DAILY_BUDGET` (server, default 500, `0` = none) and
+   `organizations.ads_max_daily_budget` (an organization may only lower it) cap the daily
+   budget of any campaign, in the account's currency; a lifetime budget is checked as
+   budget ÷ days. Checked at submit, approval, retry and activation (API), and once more by
+   the worker right before it calls `setStatus("active")` — a ceiling lowered after
+   approval still wins.
+3. **Validation before anything is sent.** Submit/approve run zod, the budget rules, the
+   account's status and identity (`identityRequired`), the provider's capabilities, media
+   (the organization's `ready` media only), the "not political / not a special category"
+   declaration, and the adapter's pure `validate(draft, { currency, metadata })`; all
+   problems come back at once as 422 `ads_invalid` (`details.problems[]`). The worker
+   re-runs `validate` on current state before creating.
+4. **Never twice, never blind.** Mutations follow the publishing engine: one queue per
+   platform (`ads-write-<provider>`, rate limited with the adapter's `writeRateLimit`), one
+   BullMQ attempt, deterministic job ids `ads.<campaign>.<version>`, a conditional claim on
+   `(version, status)` that bumps the version, and the publishing `decide()` policy. An
+   unknown outcome is never retried automatically.
+5. **Declarations.** Adapters tell the platforms the ad is not political and not in a
+   special category (Meta `special_ad_categories: []`, Google's EU political flag,
+   LinkedIn `politicalIntent`), so submitting requires the user to confirm it
+   (`declarations.notPoliticalOrSpecialCategory: true`); who confirmed and when is stored
+   in the draft and shown on the campaign.
+
+### Campaign state machine
+
+```
+draft ⇄ pending_approval ──approve──▶ approved ──(claim)──▶ creating ─┬─▶ paused ⇄ active ─▶ completed
+  ▲       │ (an edit keeps it pending)   ▲                            ├─▶ failed       (platform said no; orphans recorded)
+  │       └──reject──▶ rejected ─resubmit┘                            └─▶ unconfirmed  (may exist — never auto-retried)
+  └── submit=false                       ├── retry (failed; unconfirmed only with confirmNotCreated; never once created)
+                                         └── rate_limited / transient before creating (delayed job, bounded)
+paused / active / completed / failed-or-unconfirmed with a platform id ──archive──▶ archived
+```
+
+- **Ownership.** The API's ads service writes draft, pending_approval, approved, rejected
+  (and `archived` for a campaign that never reached the platform); the worker
+  (`apps/worker/src/ads/`: `AdCampaignState`, the writer and the sync) writes creating,
+  paused, active, completed, failed, unconfirmed and platform archiving. Nobody else writes
+  `ad_campaigns.status`. A request (approve, activate, pause, archive, retry) bumps
+  `version` and enqueues under it; every worker write is conditional on the version it
+  claimed, so a newer request makes older jobs stale instead of racing them.
+- **Approval.** An editor's submit waits for an admin/owner; an admin's or owner's submit
+  is approved at once. Approval only creates the campaign — paused. Viewers read.
+- **Create failures.** `auth` → one token refresh and resend (a 401/403 is a refusal);
+  `rate_limited`/`transient` → back to `approved` with a delayed job (bounded by the
+  publishing `MAX_ATTEMPTS`); `invalid_request` → `failed` with the platform's message, and
+  objects the adapter could not clean up (`details.orphanedExternalIds`) are named in the
+  message and kept in `externalObjects` (`type: "orphan"`) so a person can remove them;
+  `unknown_outcome` (or an error after the call went out) → `unconfirmed`: the user checks
+  the ads manager, then `POST /retry { confirmNotCreated: true }`.
+- **Status failures** (activate/pause/archive) keep the status and set `errorCode`
+  (`activate_failed`, `pause_failed`, …). An unknown outcome sets `status_unconfirmed` and
+  immediately makes a **read** (`getCampaignStatus`, safe to repeat) to reconcile. A failed
+  or refused activation also clears `activatedBy/At`. Where a platform cannot archive,
+  archiving pauses it there. Activate/pause/archive leave no status marker while queued,
+  so an enqueue failure is a 503 the user retries rather than a silent loss.
+- **Self-healing** (maintenance): campaigns `approved` for 2 minutes with no live job are
+  re-enqueued (with the due-target sweep); campaigns stuck in `creating` for 15 minutes
+  become `unconfirmed` (with `recover-stuck-targets`).
+
+### Sync
+
+A job scheduler runs `sync-plan` every 30 minutes on the `ads` queue (concurrency 2): one
+`sync-account` per active ad account that has created campaigns, with 30-minute bucketed
+ids (`ads.sync.<account>.<bucket>`). For each paused/active campaign it reads the platform
+status — a campaign paused, resumed or deleted in the ads manager is reconciled
+(`paused`/`active`/`archived`), a platform rejection becomes `failed`
+(`rejected_by_platform`), a campaign past its end date `completed`, `in_review` only
+updates `platformStatus` — then reads the last 3 days of insights (in the account's
+timezone; platforms revise spend late) into `ad_campaign_metrics_daily` (upsert; spend is
+always overwritten, a metric missing from an answer keeps its stored value). Reads have
+their own per-provider call budget in Redis (20 calls/min, `sf:ads:budget:*`): a spent
+budget delays the job without a retry; `auth` → one refresh, then skip the run;
+`invalid_request` → skip that call. Status writes are conditional on the version and
+status read, so a sync never overwrites a request made meanwhile.
+
+### Tokens and identity
+
+`AdTokens` (worker) mirrors `ChannelTokens`: decrypt, refresh before expiry under a row
+lock, `needs_reauth` when the platform revokes the refresh; tokens are refreshed when used
+(the 30-minute sync keeps them fresh). The API refreshes the same way for the one read it
+makes itself, targeting search. X Ads is OAuth 1.0a: the request token travels as the
+PKCE-style verifier, `oauth_verifier` is the code, and the user's token secret is sealed in
+`token_secret_enc`. Each account's ads run as an identity the admin picks after connecting
+(`PATCH /ads/accounts/:id { metadata }`, only the keys that platform uses): Meta `pageId`
+(+ optional `instagramUserId`, and `pixelId`, required for leads/sales), LinkedIn
+`organizationUrn`, TikTok `identityId` (+ `identityType`), Pinterest `boardId`, X
+`fundingInstrumentId`. `GET /accounts/:id/identities` offers Meta pages from connect time
+plus the organization's Facebook/Instagram channels, and LinkedIn company pages from its
+`linkedin_page` channels; other fields are typed in (the ads contract has no identity
+listing call). Disconnecting is refused (409 `ad_account_in_use`) while a campaign on the
+account exists or may exist on the platform — SocialFly could no longer pause it.
+
+### AI ad copy
+
+`writeAdCopy` (`packages/ai/src/ads.ts`) writes 1–3 variants for the account's platform and
+format plus targeting ideas, with the brand profile and the latest research brief (value
+proposition, audience, buyer questions) as context. Documented per-platform limits are
+enforced after the call (Meta primary text 125 / headline 40; Google RSA headlines 30 ×
+3–15 and descriptions 90 × 2–4; LinkedIn 150 / 70; TikTok 100; Pinterest 500 / 100; X 280).
+Every sentence that makes a price, percentage, discount, "free" offer, guarantee or ranking
+claim not present in the input — or addresses a personal attribute of the reader ("Are you
+depressed?", which the platforms' policies forbid) — is removed deterministically; a
+variant with nothing safe left is dropped. Budgeted and metered like every text task
+(`ai_generations` kind `ad_copy`).
+
+API (`/ads`; every member reads; editors draft, submit, pause, retry and use AI copy and
+targeting search; admins/owners connect accounts, approve, activate, archive and set the
+ceiling):
+
+| Route | Returns |
+|---|---|
+| `GET /providers` | `[{ id, displayName, configured, objectives, formats, textLimits, minDailyBudgetUsd }]` |
+| `POST /connect/:provider` → `GET /callback/:provider` (browser) | `{ url }`; the callback redirects to `WEB_URL/ads/connect?pending=<key>` (or `?error=`) |
+| `GET /pending/:key`, `POST /accounts { pendingKey, externalIds }` | accounts to choose (`alreadyConnected`); 201 `AccountDto[]`; 410 `connect_expired` |
+| `GET /accounts`, `PATCH /accounts/:id { metadata }`, `DELETE /accounts/:id` | `AccountDto { id, provider, name, currency, timezone, status, metadata (identity only), lastError, identityRequired, createdAt }`; 422 `invalid_metadata`; 409 `ad_account_in_use` |
+| `GET /accounts/:id/identities` | `{ fields: [{ key, label, required, hint, value, options }] }` (`options: null` = typed in) |
+| `GET /accounts/:id/targeting?type&q` | `TargetingOption[]`; 30/min per organization (429 with `retryAfterSeconds`) |
+| `POST /copy` | `{ variants, targetingSuggestions, generationId }`; 503 without a text model, 429 over budget |
+| `GET /campaigns?status&adAccountId&before&limit`, `GET /campaigns/:id` | `{ items: CampaignDto[], nextCursor }`; the detail adds `draft`, `declarations` and `metrics { totals { spend, impressions, clicks, conversions, ctr, cpc, cpm }, daily[] }` |
+| `POST /campaigns`, `PATCH /campaigns/:id`, `DELETE /campaigns/:id` | the workflow above; 422 `ads_invalid`; 409 `campaign_not_editable` / `campaign_not_deletable` / `campaign_changed` |
+| `POST /campaigns/:id/approve` · `/reject` · `/activate { confirmBudget }` · `/pause` · `/archive` · `/retry { confirmNotCreated }` | the campaign; 409 `not_pending` / `not_paused` / `not_active` / `not_archivable` / `confirm_required` / `already_created`; 422 `confirm_mismatch`; 503 `queue_unavailable` |
+| `GET/PATCH /settings` | `{ maxDailyBudget (effective), serverCeiling, orgCeiling }`; 422 `ceiling_too_high` |
+| `GET /overview?from&to` | `{ from, to, totals[] (per currency, each with a zero-filled daily[] for every day of the range), byCampaign[], byProvider[], currencyNote }` — money never summed across currencies |
+
 ## Observability
 
 - **Logs**: pino JSON to stdout, secrets/PII redacted, `trace_id` on every line, mirrored to OTel logs.
 - **Traces**: one server span per request named by route; W3C context propagates app → api.
-- **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`, `socialfly.analytics.snapshots{provider,kind}`, `socialfly.engagement.items{provider,kind}`, `socialfly.engagement.replies{provider,outcome}`.
+- **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`, `socialfly.analytics.snapshots{provider,kind}`, `socialfly.engagement.items{provider,kind}`, `socialfly.engagement.replies{provider,outcome}`, `socialfly.ads.writes{provider,action,outcome}`.
 - **Errors**: Sentry (optional, via `SENTRY_DSN`).
 - **Probes**: `/health` (process alive, never touches dependencies) and `/ready` (checks Postgres/Redis/queue — used by the deploy smoke test).
 - Local: Grafana LGTM. Production: services → OTel Collector (`infra/otel/collector.yaml`) → backend of choice.
@@ -460,4 +613,4 @@ API (`/inbox`; every member reads, editors triage, draft and reply, admins appro
 | 4 | Analytics: platform adapters, collector, reports API, dashboards, best times | ✅ (adapters not yet verified against live accounts) |
 | 5 | Research + SEO/AEO + AI-visibility: crawler, brand briefs, competitors, keywords & rankings, AI-engine citation tracking | ✅ (backend; engines and DataForSEO not yet exercised against live accounts) |
 | 6 | Engagement inbox: comments, mentions, listening, AI triage & reply drafts, approval, reply sending | ✅ (backend; adapters not yet exercised against live accounts) |
-| 7 | Ads: campaign drafts, Meta/Google/LinkedIn/TikTok/X/Pinterest sync | |
+| 7 | Ads: ad-account connections, AI ad copy, campaign drafts with approval, paused creation, typed-budget activation, status & spend sync (Meta/Google/LinkedIn/TikTok/Pinterest/X) | ✅ (backend; adapters not yet exercised against live ad accounts) |

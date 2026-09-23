@@ -1,4 +1,5 @@
 import type {
+	AdCampaignsQuery,
 	AnalyticsOverviewQuery,
 	AnalyticsPostsQuery,
 	GenerationsQuery,
@@ -69,4 +70,20 @@ export const qk = {
 	inboxApprovals: (orgId: string) => ["org", orgId, "inbox", "approvals"] as const,
 	inboxListening: (orgId: string) => ["org", orgId, "inbox", "listening"] as const,
 	inboxSettings: (orgId: string) => ["org", orgId, "inbox", "settings"] as const,
+	adsAll: (orgId: string) => ["org", orgId, "ads"] as const,
+	adsProviders: (orgId: string) => ["org", orgId, "ads", "providers"] as const,
+	adAccounts: (orgId: string) => ["org", orgId, "ads", "accounts"] as const,
+	adPending: (orgId: string, key: string) => ["org", orgId, "ads", "pending", key] as const,
+	adIdentities: (orgId: string, accountId: string) =>
+		["org", orgId, "ads", "accounts", accountId, "identities"] as const,
+	adTargeting: (orgId: string, accountId: string, type: string, q: string) =>
+		["org", orgId, "ads", "targeting", accountId, type, q] as const,
+	adCampaignsAll: (orgId: string) => ["org", orgId, "ads", "campaigns"] as const,
+	adCampaigns: (orgId: string, query: Omit<AdCampaignsQuery, "before">) =>
+		["org", orgId, "ads", "campaigns", "list", query] as const,
+	adCampaign: (orgId: string, id: string) =>
+		["org", orgId, "ads", "campaigns", "detail", id] as const,
+	adsSettings: (orgId: string) => ["org", orgId, "ads", "settings"] as const,
+	adsOverview: (orgId: string, from: string, to: string) =>
+		["org", orgId, "ads", "overview", from, to] as const,
 };

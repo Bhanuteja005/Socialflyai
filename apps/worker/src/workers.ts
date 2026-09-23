@@ -1,5 +1,8 @@
 import { workerEnv as env } from "@socialfly/config";
 import {
+	adsJobSchema,
+	adsWriteJobSchema,
+	adsWriteQueueName,
 	aiMediaJobSchema,
 	analyticsJobSchema,
 	engagementJobSchema,
@@ -20,6 +23,9 @@ import { DelayedError, type Processor, Queue, Worker } from "bullmq";
 import { CallBudgetExhausted } from "#src/analytics/call-budget.ts";
 import { ChannelNeedsReauthError } from "#src/channels/channel-tokens.ts";
 import {
+	adsProviders,
+	adsSync,
+	adsWriter,
 	aiMedia,
 	analytics,
 	channelTokens,
@@ -53,6 +59,10 @@ const ANALYTICS_CONCURRENCY = 2;
 const ENGAGEMENT_PLAN_EVERY_MS = 10 * 60_000;
 /** Low for the same reason as analytics: every job is platform reads sharing publishing's limits. */
 const ENGAGEMENT_CONCURRENCY = 2;
+/** Ads sync cadence: spend and status changes made in the ads managers show up within ~30 minutes. */
+const ADS_SYNC_PLAN_EVERY_MS = 30 * 60_000;
+/** Reads that share the platforms' limits with the writes that start and stop spend. */
+const ADS_SYNC_CONCURRENCY = 2;
 /** Each research job is many slow paid calls; two at a time keeps provider limits and spend smooth. */
 const RESEARCH_CONCURRENCY = 2;
 
@@ -112,6 +122,40 @@ export async function startWorkers() {
 			},
 		);
 	}
+
+	// Ad campaign mutations (create, activate, pause, archive): one queue per ads platform,
+	// limited to that platform's declared write rate, one attempt per job (the writer decides
+	// what is safe to retry).
+	for (const provider of adsProviders.available()) {
+		start(
+			adsWriteQueueName(provider.id),
+			async (job) => adsWriter.run(adsWriteJobSchema.parse(job.data)),
+			{
+				concurrency: 2,
+				limiter: {
+					max: provider.writeRateLimit.max,
+					duration: provider.writeRateLimit.durationMs,
+				},
+			},
+		);
+	}
+
+	start(
+		QUEUES.ads,
+		async (job, token) => {
+			try {
+				return await adsSync.run(adsJobSchema.parse(job.data));
+			} catch (error) {
+				if (error instanceof CallBudgetExhausted) {
+					// Same as analytics: wait for the next budget window without using a retry.
+					await job.moveToDelayed(Date.now() + error.retryInMs, token);
+					throw new DelayedError();
+				}
+				throw error;
+			}
+		},
+		{ concurrency: ADS_SYNC_CONCURRENCY },
+	);
 
 	start(QUEUES.publishStatus, async (job) =>
 		engine.checkStatus(publishStatusJobSchema.parse(job.data)),
@@ -241,6 +285,16 @@ export async function startWorkers() {
 			"engagement-plan",
 			{ every: ENGAGEMENT_PLAN_EVERY_MS },
 			{ name: "plan", data: { task: "plan" } },
+		);
+		await q.close();
+	}
+
+	if (wanted(QUEUES.ads)) {
+		const q = new Queue(QUEUES.ads, { connection: queueConnection, prefix: QUEUE_PREFIX });
+		await q.upsertJobScheduler(
+			"ads-sync-plan",
+			{ every: ADS_SYNC_PLAN_EVERY_MS },
+			{ name: "sync-plan", data: { task: "sync-plan" } },
 		);
 		await q.close();
 	}

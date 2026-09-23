@@ -2,8 +2,12 @@ import { type JobsOptions, Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import { QUEUE_PREFIX } from "./connection";
 import {
+	ADS_SYNC_BUCKET_MS,
+	type AdsJob,
+	type AdsWriteJob,
 	type AiMediaJob,
 	type AnalyticsJob,
+	adsWriteQueueName,
 	ENGAGEMENT_BUCKET_MS,
 	type EngagementJob,
 	type EngagementReplyJob,
@@ -320,6 +324,50 @@ export class JobProducer {
 			await this.enqueueEngagement({ task: "sync-channel", channelId }, { now, forced: true });
 		}
 		return channelIds.length;
+	}
+
+	// ── ads ──────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Create, activate, pause or archive one campaign on its platform. One BullMQ attempt
+	 * (like publishing): the worker decides whether a retry is safe. Idempotent per
+	 * (campaign, version).
+	 */
+	async enqueueAdsWrite(provider: string, job: AdsWriteJob, delayMs = 0) {
+		await this.queue(adsWriteQueueName(provider)).add(job.action, job, {
+			...publishJobDefaults,
+			jobId: jobIds.adsWrite(job.campaignId, job.version),
+			delay: Math.max(0, delayMs),
+		});
+	}
+
+	/**
+	 * Safety-net enqueue for a campaign left `approved` without a live create job (see
+	 * ensurePublish: a finished copy under the same id would otherwise block it forever).
+	 */
+	async ensureAdsWrite(provider: string, job: AdsWriteJob) {
+		const q = this.queue(adsWriteQueueName(provider));
+		const existing = await q.getJob(jobIds.adsWrite(job.campaignId, job.version));
+		if (existing) {
+			const state = await existing.getState();
+			if (state !== "completed" && state !== "failed") return false;
+			await existing.remove();
+		}
+		await this.enqueueAdsWrite(provider, job);
+		return true;
+	}
+
+	/** Planner → one status + spend sync per ad account, collapsed per 30-minute bucket. */
+	async enqueueAdsSync(adAccountId: string, now = Date.now()) {
+		await this.queue(QUEUES.ads).add(
+			"sync-account",
+			{ task: "sync-account", adAccountId } satisfies AdsJob,
+			{
+				// Reads: a queue-level retry is safe, exactly like analytics.
+				...analyticsJobDefaults,
+				jobId: jobIds.adsSync(adAccountId, Math.floor(now / ADS_SYNC_BUCKET_MS)),
+			},
+		);
 	}
 
 	/** Readiness probe: the queue Redis answers. */

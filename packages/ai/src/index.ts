@@ -3,6 +3,7 @@ import { GeminiImageModel, ImageModelChain, OpenAiImageModel } from "./images";
 import { OpenAiSpeechModel, type SpeechModel } from "./speech";
 import type { ImageModel, TextModel } from "./types";
 
+export * from "./ads";
 export { AnthropicTextModel } from "./anthropic";
 export * from "./engagement";
 export { AiError, type AiErrorKind, isAiError } from "./errors";

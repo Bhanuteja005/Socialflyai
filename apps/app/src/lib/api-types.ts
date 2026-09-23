@@ -153,3 +153,37 @@ export type ListeningQuery = ListeningPage["items"][number];
 export type ListeningInput = InferRequestType<typeof api.inbox.listening.$post>["json"];
 export type InboxSettings = InferResponseType<typeof api.inbox.settings.$get, 200>;
 export type InboxChannelCapability = InboxSettings["channels"][number];
+
+// ── Ads (Phase 7) ───────────────────────────────────────────────────────────
+type Ads = typeof api.ads;
+export type AdsProvider = InferResponseType<Ads["providers"]["$get"], 200>[number];
+export type AdsProviderId = AdsProvider["id"];
+export type AdFormat = AdsProvider["formats"][number];
+export type AdObjective = AdsProvider["objectives"][number];
+export type AdAccount = InferResponseType<Ads["accounts"]["$get"], 200>[number];
+export type AdAccountStatus = AdAccount["status"];
+export type PendingAdAccounts = InferResponseType<Ads["pending"][":key"]["$get"], 200>;
+export type PendingAdAccount = PendingAdAccounts["accounts"][number];
+export type AdIdentities = InferResponseType<Ads["accounts"][":id"]["identities"]["$get"], 200>;
+export type TargetingQuery = InferRequestType<Ads["accounts"][":id"]["targeting"]["$get"]>["query"];
+export type TargetingType = TargetingQuery["type"];
+export type TargetingOption = InferResponseType<
+	Ads["accounts"][":id"]["targeting"]["$get"],
+	200
+>[number];
+export type AdCampaignsQuery = InferRequestType<Ads["campaigns"]["$get"]>["query"];
+export type AdCampaignsPage = InferResponseType<Ads["campaigns"]["$get"], 200>;
+export type AdCampaign = AdCampaignsPage["items"][number];
+export type AdCampaignStatus = AdCampaign["status"];
+export type AdCampaignDetail = InferResponseType<Ads["campaigns"][":id"]["$get"], 200>;
+export type AdMetricsDay = AdCampaignDetail["metrics"]["daily"][number];
+export type CreateCampaignInput = InferRequestType<Ads["campaigns"]["$post"]>["json"];
+export type UpdateCampaignInput = InferRequestType<Ads["campaigns"][":id"]["$patch"]>["json"];
+export type AdInput = CreateCampaignInput["ads"][number];
+export type AdCallToAction = NonNullable<AdInput["callToAction"]>;
+export type AdCopyInput = InferRequestType<Ads["copy"]["$post"]>["json"];
+export type AdCopyResult = InferResponseType<Ads["copy"]["$post"], 200>;
+export type AdCopyVariant = AdCopyResult["variants"][number];
+export type AdsSettings = InferResponseType<Ads["settings"]["$get"], 200>;
+export type AdsOverview = InferResponseType<Ads["overview"]["$get"], 200>;
+export type AdsCurrencyTotals = AdsOverview["totals"][number];

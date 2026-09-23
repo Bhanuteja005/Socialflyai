@@ -17,7 +17,8 @@ export const adsEnv = {
 	GOOGLE_ADS_DEVELOPER_TOKEN: z.string().default(""),
 	/** Manager (MCC) account id without dashes, when accounts are accessed through one. */
 	GOOGLE_ADS_LOGIN_CUSTOMER_ID: z.string().default(""),
-	GOOGLE_ADS_API_VERSION: z.string().default("v21"),
+	// Google sunsets versions roughly yearly; v21 and v22 are gone as of Sept 2026.
+	GOOGLE_ADS_API_VERSION: z.string().default("v23"),
 
 	TIKTOK_ADS_APP_ID: z.string().default(""),
 	TIKTOK_ADS_APP_SECRET: z.string().default(""),

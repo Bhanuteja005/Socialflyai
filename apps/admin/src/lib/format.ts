@@ -74,3 +74,19 @@ export const humanize = (value: string) => {
 	const text = value.replace(/[_-]+/g, " ").trim();
 	return text.charAt(0).toUpperCase() + text.slice(1);
 };
+
+const moneyCache = new Map<string, Intl.NumberFormat | null>();
+
+/** "$1,234.50" in the given ISO currency; amounts in different currencies are never summed. */
+export function formatMoney(value: number, currency: string) {
+	let f = moneyCache.get(currency);
+	if (f === undefined) {
+		try {
+			f = new Intl.NumberFormat(undefined, { style: "currency", currency });
+		} catch {
+			f = null;
+		}
+		moneyCache.set(currency, f);
+	}
+	return f ? f.format(value) : `${value.toFixed(2)} ${currency}`;
+}

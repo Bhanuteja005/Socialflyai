@@ -32,5 +32,6 @@ export const config = {
 		"/analytics/:path*",
 		"/research/:path*",
 		"/inbox/:path*",
+		"/ads/:path*",
 	],
 };

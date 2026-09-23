@@ -52,7 +52,20 @@ export const QUEUES = {
 	 * (Sending replies uses the per-provider engagement-reply queues.)
 	 */
 	engagement: "engagement",
+	/**
+	 * Ads reads: the 30-minute sync of campaign statuses and spend. Mutations (create,
+	 * activate, pause, archive) go through the per-provider ads-write queues instead.
+	 */
+	ads: "ads",
 } as const;
+
+/**
+ * Anything that changes an ad campaign on a platform — creating it, and above all
+ * starting or stopping spend — is one queue per ads provider, rate limited with the
+ * provider's `writeRateLimit`, and gets one BullMQ attempt: whether a retry is safe is
+ * decided by the worker, which knows whether the platform may already have acted.
+ */
+export const adsWriteQueueName = (provider: string) => `ads-write-${provider}` as const;
 
 export const publishJobSchema = z.object({
 	targetId: z.uuid(),
@@ -149,6 +162,30 @@ export const engagementReplyJobSchema = z.object({
 });
 export type EngagementReplyJob = z.infer<typeof engagementReplyJobSchema>;
 
+/** `sync-plan` (on a job scheduler) enqueues one `sync-account` per active ad account. */
+export const adsJobSchema = z.discriminatedUnion("task", [
+	z.object({ task: z.literal("sync-plan") }),
+	z.object({ task: z.literal("sync-account"), adAccountId: z.uuid() }),
+]);
+export type AdsJob = z.infer<typeof adsJobSchema>;
+
+export const ADS_WRITE_ACTIONS = ["create", "activate", "pause", "archive"] as const;
+export type AdsWriteAction = (typeof ADS_WRITE_ACTIONS)[number];
+
+export const adsWriteJobSchema = z.object({
+	campaignId: z.uuid(),
+	organizationId: z.uuid(),
+	/** Must equal ad_campaigns.version when the job runs, or the job is stale. */
+	version: z.number().int().nonnegative(),
+	action: z.enum(ADS_WRITE_ACTIONS),
+	/**
+	 * Automatic attempts so far (a rate limit or outage BEFORE anything was sent puts the
+	 * job back with a delay). Bounds those requeues; absent on the first attempt.
+	 */
+	attempt: z.number().int().min(1).optional(),
+});
+export type AdsWriteJob = z.infer<typeof adsWriteJobSchema>;
+
 /**
  * Deterministic job ids make enqueueing idempotent: scheduling the same target
  * twice (double click, API retry, sweep racing the original job) is a no-op in
@@ -200,7 +237,17 @@ export const jobIds = {
 	engagementListen: (queryId: string, bucket: number) => `engagement.listen.${queryId}.${bucket}`,
 	engagementTriage: (organizationId: string, bucket: number) =>
 		`engagement.triage.${organizationId}.${bucket}`,
+	/**
+	 * Per campaign and version: a double click or a replayed enqueue is a no-op, and every
+	 * new request (approve, activate, pause…) bumps the version so older jobs go stale.
+	 */
+	adsWrite: (campaignId: string, version: number) => `ads.${campaignId}.${version}`,
+	/** One sync per ad account per 30-minute bucket, whatever the replica count. */
+	adsSync: (adAccountId: string, bucket: number) => `ads.sync.${adAccountId}.${bucket}`,
 };
+
+/** Bucket width for ads sync job ids: the sync cadence. */
+export const ADS_SYNC_BUCKET_MS = 30 * 60_000;
 
 /** Bucket width for engagement job ids (see jobIds.engagementSync). */
 export const ENGAGEMENT_BUCKET_MS = 10 * 60_000;

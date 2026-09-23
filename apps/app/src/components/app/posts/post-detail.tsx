@@ -6,11 +6,12 @@ import { ConfirmDialog } from "@socialfly/ui/components/dialog";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { toast } from "@socialfly/ui/components/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarX2, Clock, Pencil, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarX2, Clock, Megaphone, Pencil, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { usePost } from "@/hooks/queries";
+import { useAdAccounts } from "@/hooks/use-ads";
 import { api, call, callVoid } from "@/lib/api-client";
 import type { PostDetail } from "@/lib/api-types";
 import { errorMessage, isApiError } from "@/lib/errors";
@@ -90,6 +91,9 @@ export function PostDetailView({ id }: { id: string }) {
 	const { data: post, isPending, isError, error } = usePost(id);
 	const actions = usePostMutations(post);
 	const [confirmDelete, setConfirmDelete] = useState(false);
+	// Boosting needs an ad account; ask only when the viewer could boost at all.
+	const adAccounts = useAdAccounts(can("editor"));
+	const canBoost = adAccounts.data?.some((a) => a.status === "active") ?? false;
 
 	if (isPending) {
 		return (
@@ -164,6 +168,14 @@ export function PostDetailView({ id }: { id: string }) {
 								>
 									<CalendarX2 />
 									Unschedule
+								</Button>
+							) : null}
+							{anyPublished && canBoost ? (
+								<Button variant="outline" asChild>
+									<Link href={`/ads/campaigns/new?post=${post.id}`}>
+										<Megaphone />
+										Boost this post
+									</Link>
 								</Button>
 							) : null}
 							{canPublishNow ? (

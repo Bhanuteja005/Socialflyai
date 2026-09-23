@@ -22,6 +22,7 @@ export const GENERATION_KIND: Record<GenerationKind, string> = {
 	seo: "Keyword data",
 	triage: "Inbox triage",
 	reply_draft: "Reply draft",
+	ad_copy: "Ad copy",
 };
 
 export const GENERATION_STATUS: Record<GenerationStatus, { label: string; tone: BadgeTone }> = {

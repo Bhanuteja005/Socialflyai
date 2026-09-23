@@ -30,6 +30,11 @@ export const organizations = pgTable(
 		 * admin must approve every reply an editor writes before it is sent.
 		 */
 		replyApprovalRequired: boolean().notNull().default(true),
+		/**
+		 * Ads: this organization's ceiling on any campaign's daily budget (account currency).
+		 * Can only be LOWER than ADS_MAX_DAILY_BUDGET; null = the server ceiling applies.
+		 */
+		adsMaxDailyBudget: numeric({ precision: 12, scale: 2, mode: "number" }),
 		deletedAt: timestamp({ withTimezone: true }),
 		...timestamps(),
 	},

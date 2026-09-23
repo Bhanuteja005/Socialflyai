@@ -11,6 +11,7 @@ import {
 	DollarSign,
 	FileText,
 	type LucideIcon,
+	Megaphone,
 	Radio,
 	Users,
 	XCircle,
@@ -18,7 +19,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useOverview } from "@/hooks/use-admin";
-import { formatDate, formatNumber, formatRelative, formatUsd } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { GENERATION_STATUS, POST_STATUS, statusMeta } from "@/lib/status";
 import { PageHeader, QueryError } from "../common";
 
@@ -105,6 +106,79 @@ function Breakdown({
 						})}
 					</ul>
 				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+type AdsOverview = {
+	accounts: number;
+	campaignsActive: number;
+	spend7dByCurrency: Record<string, number>;
+	unconfirmed: number;
+};
+
+/**
+ * Paid ads across every tenant. Spend stays per currency (never converted or summed);
+ * unconfirmed campaigns — created-or-not unknown — are what staff should chase.
+ */
+function AdsCard({ ads }: { ads: AdsOverview }) {
+	const spend = Object.entries(ads.spend7dByCurrency).sort((a, b) => b[1] - a[1]);
+	return (
+		<Card className={cn(ads.unconfirmed > 0 && "border-warning/50")}>
+			<CardHeader className="flex-row items-center gap-2">
+				<Megaphone className="size-4 text-muted-foreground" aria-hidden="true" />
+				<CardTitle>Ads</CardTitle>
+			</CardHeader>
+			<CardContent className="grid gap-4">
+				<dl className="grid grid-cols-3 gap-3">
+					<div className="grid gap-0.5">
+						<dt className="text-muted-foreground text-xs">Ad accounts</dt>
+						<dd className="font-semibold text-xl tabular-nums">{formatNumber(ads.accounts)}</dd>
+					</div>
+					<div className="grid gap-0.5">
+						<dt className="text-muted-foreground text-xs">Active campaigns</dt>
+						<dd className="font-semibold text-xl tabular-nums">
+							{formatNumber(ads.campaignsActive)}
+						</dd>
+					</div>
+					<div
+						className={cn(
+							"grid gap-0.5 rounded-md",
+							ads.unconfirmed > 0 && "-m-1.5 bg-warning-soft p-1.5 text-warning",
+						)}
+					>
+						<dt className={cn("text-xs", ads.unconfirmed > 0 ? "" : "text-muted-foreground")}>
+							Unconfirmed
+						</dt>
+						<dd className="flex items-center gap-1.5 font-semibold text-xl tabular-nums">
+							{ads.unconfirmed > 0 ? <CircleHelp className="size-4" aria-hidden="true" /> : null}
+							{formatNumber(ads.unconfirmed)}
+							{ads.unconfirmed > 0 ? <span className="sr-only"> (needs attention)</span> : null}
+						</dd>
+					</div>
+				</dl>
+				<div className="grid gap-1.5">
+					<p className="text-muted-foreground text-xs">Spend, last 7 days (per currency)</p>
+					{spend.length === 0 ? (
+						<p className="text-sm">No spend.</p>
+					) : (
+						<ul className="flex flex-wrap gap-x-5 gap-y-1">
+							{spend.map(([currency, amount]) => (
+								<li key={currency} className="text-sm">
+									<span className="font-medium tabular-nums">{formatMoney(amount, currency)}</span>{" "}
+									<span className="text-muted-foreground text-xs">{currency}</span>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+				{ads.unconfirmed > 0 ? (
+					<p className="text-warning text-xs">
+						Campaign creation outcome unknown — the customer must check their ads manager before
+						retrying.
+					</p>
+				) : null}
 			</CardContent>
 		</Card>
 	);
@@ -211,6 +285,7 @@ export function OverviewView() {
 							/>
 						</div>
 					</section>
+					{data.ads ? <AdsCard ads={data.ads} /> : null}
 					<div className="grid gap-6 lg:grid-cols-2">
 						<Breakdown
 							title="Posts by status"

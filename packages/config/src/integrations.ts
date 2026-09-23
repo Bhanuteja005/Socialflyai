@@ -9,7 +9,7 @@ export const integrationsEnv = {
 	LINKEDIN_CLIENT_ID: z.string().default(""),
 	LINKEDIN_CLIENT_SECRET: z.string().default(""),
 	/** LinkedIn versioned REST API header (YYYYMM). */
-	LINKEDIN_API_VERSION: z.string().default("202509"),
+	LINKEDIN_API_VERSION: z.string().default("202609"),
 
 	/** One Meta app serves Facebook Pages and Instagram (via Facebook Login). */
 	META_APP_ID: z.string().default(""),

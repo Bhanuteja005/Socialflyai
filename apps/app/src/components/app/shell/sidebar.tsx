@@ -11,6 +11,7 @@ import {
 	LayoutDashboard,
 	type LucideIcon,
 	Megaphone,
+	MessageSquareQuote,
 	PenSquare,
 	Radio,
 	Rows3,
@@ -121,6 +122,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 			badgeTone: "primary",
 		},
 		{ href: "/analytics", label: "Analytics", icon: BarChart3 },
+		{ href: "/ads", label: "Ads", icon: Megaphone },
 		{ href: "/research", label: "Research", icon: Telescope },
 		{ href: "/create", label: "Create", icon: Sparkles },
 		{ href: "/media", label: "Media", icon: Images },
@@ -129,7 +131,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 	const settings: NavItem[] = [
 		{ href: "/settings/organization", label: "Organization", icon: Building2 },
 		{ href: "/settings/team", label: "Team", icon: Users },
-		{ href: "/settings/brand", label: "Brand voice", icon: Megaphone },
+		{ href: "/settings/brand", label: "Brand voice", icon: MessageSquareQuote },
 		{ href: "/settings/account", label: "Account", icon: UserRound },
 	];
 

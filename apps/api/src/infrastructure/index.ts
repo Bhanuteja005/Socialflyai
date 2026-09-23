@@ -5,8 +5,14 @@ import { createLogger } from "@socialfly/core/logger";
 import { createMailer } from "@socialfly/core/mail";
 import { createRedis } from "@socialfly/core/redis";
 import { createDb } from "@socialfly/db";
-import { createProviderRegistry, type ProviderRegistry } from "@socialfly/integrations";
 import {
+	type AdsRegistry,
+	createAdsRegistry,
+	createProviderRegistry,
+	type ProviderRegistry,
+} from "@socialfly/integrations";
+import {
+	adsWriteQueueName,
 	createQueueConnection,
 	engagementReplyQueueName,
 	JobProducer,
@@ -51,6 +57,14 @@ export const tokenCipher = new TokenCipher(
 export const providers = createProviderRegistry(env);
 
 /**
+ * Ad platforms (Phase 7). Mutable (like `ai` and `inboxTools`) so tests can swap in a fake
+ * registry; everything reads `adsTools.providers` at call time.
+ */
+export const adsTools: { providers: Pick<AdsRegistry, "all" | "get"> } = {
+	providers: createAdsRegistry(env),
+};
+
+/**
  * Every queue the worker consumes. Publish queues come from the registry (configured or
  * not), so a newly registered platform shows up in the admin console without an edit here.
  */
@@ -60,6 +74,7 @@ export const queueStats = new QueueStats(queueConnection, () => [
 		.all()
 		.filter((p) => p.engagement)
 		.map((p) => engagementReplyQueueName(p.id)),
+	...adsTools.providers.all().map((p) => adsWriteQueueName(p.id)),
 	...Object.values(QUEUES),
 ]);
 

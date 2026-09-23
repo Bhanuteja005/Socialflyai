@@ -1,5 +1,6 @@
 import { cn } from "@socialfly/ui/utils";
 import type { ReactNode } from "react";
+import { ADS_PROVIDERS } from "@/lib/ads";
 import { providerMeta } from "@/lib/providers";
 
 const glyphs: Record<string, ReactNode> = {
@@ -66,8 +67,10 @@ export function ProviderIcon({
 	size?: keyof typeof sizes;
 	className?: string;
 }) {
-	const meta = providerMeta(provider);
-	const glyph = glyphs[provider];
+	// Ad platforms (meta_ads, x_ads…) reuse the organic brand's mark where there is one.
+	const ads = ADS_PROVIDERS[provider as keyof typeof ADS_PROVIDERS];
+	const meta = ads ?? providerMeta(provider);
+	const glyph = glyphs[provider] ?? (ads?.glyph ? glyphs[ads.glyph] : undefined);
 	return (
 		<span
 			className={cn(

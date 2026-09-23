@@ -14,6 +14,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { openAPIRouteHandler } from "hono-openapi";
 import { database, jobs, logger, redis } from "#src/infrastructure/index.ts";
 import { adminRoutes } from "#src/modules/admin/admin.routes.ts";
+import { adsCallbackRoutes, adsRoutes } from "#src/modules/ads/ads.routes.ts";
 import { aiRoutes } from "#src/modules/ai/ai.routes.ts";
 import { analyticsRoutes } from "#src/modules/analytics/analytics.routes.ts";
 import { channelCallbackRoutes, channelsRoutes } from "#src/modules/channels/channels.routes.ts";
@@ -57,7 +58,8 @@ const base = new Hono()
 		}),
 	)
 	// The platform → browser OAuth redirect: a top-level GET, outside CSRF.
-	.route("/channels", channelCallbackRoutes);
+	.route("/channels", channelCallbackRoutes)
+	.route("/ads", adsCallbackRoutes);
 
 /**
  * The typed API surface. Chained so `AppType` carries every route's input and
@@ -74,6 +76,7 @@ const api = new Hono()
 	.route("/analytics", analyticsRoutes)
 	.route("/research", researchRoutes)
 	.route("/inbox", inboxRoutes)
+	.route("/ads", adsRoutes)
 	.route("/admin", adminRoutes);
 
 export const app = base.route("/", api);

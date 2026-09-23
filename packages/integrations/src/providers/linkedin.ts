@@ -129,6 +129,147 @@ type TokenResponse = {
 	scope?: string;
 };
 
+// ---------------------------------------------------------------------------
+// OAuth, headers and media uploads (shared with the LinkedIn Ads adapter)
+// ---------------------------------------------------------------------------
+
+export const LINKEDIN_API = API;
+
+export const linkedInHeaders = (
+	accessToken: string,
+	apiVersion: string,
+	json = true,
+): Record<string, string> => ({
+	Authorization: `Bearer ${accessToken}`,
+	"LinkedIn-Version": apiVersion,
+	"X-Restli-Protocol-Version": "2.0.0",
+	...(json ? { "Content-Type": "application/json" } : {}),
+});
+
+/** https://learn.microsoft.com/linkedin/shared/authentication/authorization-code-flow */
+export function linkedInAuthorizationUrl(
+	clientId: string,
+	scopes: string[],
+	{ redirectUri, state }: { redirectUri: string; state: string },
+) {
+	const url = new URL(AUTH_URL);
+	url.search = form({
+		response_type: "code",
+		client_id: clientId,
+		redirect_uri: redirectUri,
+		state,
+		scope: scopes.join(" "),
+	});
+	return { url: url.toString() };
+}
+
+export async function requestLinkedInToken(
+	provider: string,
+	client: { clientId: string; clientSecret: string },
+	params: Record<string, string>,
+) {
+	return providerJson<TokenResponse>(provider, TOKEN_URL, {
+		method: "POST",
+		headers: { "Content-Type": "application/x-www-form-urlencoded" },
+		body: form({
+			...params,
+			client_id: client.clientId,
+			client_secret: client.clientSecret,
+		}),
+	});
+}
+
+export function linkedInTokenSet(t: TokenResponse, requestedScopes: string[]): TokenSet {
+	return {
+		accessToken: t.access_token,
+		refreshToken: t.refresh_token ?? null,
+		expiresAt: expiresAtFrom(t.expires_in),
+		scopes: t.scope?.split(/[ ,]/).filter(Boolean) ?? requestedScopes,
+	};
+}
+
+/** Images API: initializeUpload → PUT bytes. Returns the image URN. */
+export async function uploadLinkedInImage(
+	provider: string,
+	apiVersion: string,
+	accessToken: string,
+	owner: string,
+	image: MediaItem,
+): Promise<string> {
+	const init = await providerJson<{ value: { uploadUrl: string; image: string } }>(
+		provider,
+		`${API}/rest/images?action=initializeUpload`,
+		{
+			method: "POST",
+			headers: linkedInHeaders(accessToken, apiVersion),
+			body: JSON.stringify({ initializeUploadRequest: { owner } }),
+		},
+	);
+	await providerFetch(provider, init.value.uploadUrl, {
+		method: "PUT",
+		headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": image.mimeType },
+		body: await fetchMediaBytes(provider, image.url),
+		timeoutMs: 120_000,
+	});
+	return init.value.image;
+}
+
+/** Multi-part upload: LinkedIn hands back byte ranges; each PUT returns an ETag we must echo on finalize. */
+export async function uploadLinkedInVideo(
+	provider: string,
+	apiVersion: string,
+	accessToken: string,
+	owner: string,
+	video: MediaItem,
+): Promise<string> {
+	const bytes = await fetchMediaBytes(provider, video.url);
+	const init = await providerJson<{
+		value: {
+			video: string;
+			uploadToken: string;
+			uploadInstructions: { uploadUrl: string; firstByte: number; lastByte: number }[];
+		};
+	}>(provider, `${API}/rest/videos?action=initializeUpload`, {
+		method: "POST",
+		headers: linkedInHeaders(accessToken, apiVersion),
+		body: JSON.stringify({
+			initializeUploadRequest: {
+				owner,
+				fileSizeBytes: bytes.byteLength,
+				uploadCaptions: false,
+				uploadThumbnail: false,
+			},
+		}),
+	});
+
+	const partIds: string[] = [];
+	for (const part of init.value.uploadInstructions) {
+		const res = await providerFetch(provider, part.uploadUrl, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream" },
+			body: bytes.subarray(part.firstByte, part.lastByte + 1),
+			timeoutMs: 300_000,
+		});
+		const etag = res.headers.get("etag");
+		if (!etag)
+			throw new ProviderError("transient", provider, "LinkedIn video part upload returned no ETag");
+		partIds.push(etag);
+	}
+
+	await providerFetch(provider, `${API}/rest/videos?action=finalizeUpload`, {
+		method: "POST",
+		headers: linkedInHeaders(accessToken, apiVersion),
+		body: JSON.stringify({
+			finalizeUploadRequest: {
+				video: init.value.video,
+				uploadToken: init.value.uploadToken,
+				uploadedPartIds: partIds,
+			},
+		}),
+	});
+	return init.value.video;
+}
+
 /**
  * LinkedIn comments are limited to 1,250 characters (product limit; the Comments
  * API reference does not state a number).
@@ -209,45 +350,19 @@ abstract class LinkedInBase implements SocialProvider<Settings> {
 	}
 
 	protected headers(accessToken: string, json = true): Record<string, string> {
-		return {
-			Authorization: `Bearer ${accessToken}`,
-			"LinkedIn-Version": this.config.apiVersion,
-			"X-Restli-Protocol-Version": "2.0.0",
-			...(json ? { "Content-Type": "application/json" } : {}),
-		};
+		return linkedInHeaders(accessToken, this.config.apiVersion, json);
 	}
 
 	async getAuthorizationUrl({ redirectUri, state }: { redirectUri: string; state: string }) {
-		const url = new URL(AUTH_URL);
-		url.search = form({
-			response_type: "code",
-			client_id: this.config.clientId,
-			redirect_uri: redirectUri,
-			state,
-			scope: this.scopes.join(" "),
-		});
-		return { url: url.toString() };
+		return linkedInAuthorizationUrl(this.config.clientId, this.scopes, { redirectUri, state });
 	}
 
 	protected toTokens(t: TokenResponse): TokenSet {
-		return {
-			accessToken: t.access_token,
-			refreshToken: t.refresh_token ?? null,
-			expiresAt: expiresAtFrom(t.expires_in),
-			scopes: t.scope?.split(/[ ,]/).filter(Boolean) ?? this.scopes,
-		};
+		return linkedInTokenSet(t, this.scopes);
 	}
 
 	protected async requestToken(params: Record<string, string>) {
-		return providerJson<TokenResponse>(this.id, TOKEN_URL, {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: form({
-				...params,
-				client_id: this.config.clientId,
-				client_secret: this.config.clientSecret,
-			}),
-		});
+		return requestLinkedInToken(this.id, this.config, params);
 	}
 
 	async exchangeCode({
@@ -338,85 +453,12 @@ abstract class LinkedInBase implements SocialProvider<Settings> {
 				};
 	}
 
-	private async uploadImage(
-		channel: ChannelContext,
-		owner: string,
-		image: MediaItem,
-	): Promise<string> {
-		const init = await providerJson<{ value: { uploadUrl: string; image: string } }>(
-			this.id,
-			`${API}/rest/images?action=initializeUpload`,
-			{
-				method: "POST",
-				headers: this.headers(channel.accessToken),
-				body: JSON.stringify({ initializeUploadRequest: { owner } }),
-			},
-		);
-		await providerFetch(this.id, init.value.uploadUrl, {
-			method: "PUT",
-			headers: { Authorization: `Bearer ${channel.accessToken}`, "Content-Type": image.mimeType },
-			body: await fetchMediaBytes(this.id, image.url),
-			timeoutMs: 120_000,
-		});
-		return init.value.image;
+	private uploadImage(channel: ChannelContext, owner: string, image: MediaItem) {
+		return uploadLinkedInImage(this.id, this.config.apiVersion, channel.accessToken, owner, image);
 	}
 
-	/** Multi-part upload: LinkedIn hands back byte ranges; each PUT returns an ETag we must echo on finalize. */
-	private async uploadVideo(
-		channel: ChannelContext,
-		owner: string,
-		video: MediaItem,
-	): Promise<string> {
-		const bytes = await fetchMediaBytes(this.id, video.url);
-		const init = await providerJson<{
-			value: {
-				video: string;
-				uploadToken: string;
-				uploadInstructions: { uploadUrl: string; firstByte: number; lastByte: number }[];
-			};
-		}>(this.id, `${API}/rest/videos?action=initializeUpload`, {
-			method: "POST",
-			headers: this.headers(channel.accessToken),
-			body: JSON.stringify({
-				initializeUploadRequest: {
-					owner,
-					fileSizeBytes: bytes.byteLength,
-					uploadCaptions: false,
-					uploadThumbnail: false,
-				},
-			}),
-		});
-
-		const partIds: string[] = [];
-		for (const part of init.value.uploadInstructions) {
-			const res = await providerFetch(this.id, part.uploadUrl, {
-				method: "PUT",
-				headers: { "Content-Type": "application/octet-stream" },
-				body: bytes.subarray(part.firstByte, part.lastByte + 1),
-				timeoutMs: 300_000,
-			});
-			const etag = res.headers.get("etag");
-			if (!etag)
-				throw new ProviderError(
-					"transient",
-					this.id,
-					"LinkedIn video part upload returned no ETag",
-				);
-			partIds.push(etag);
-		}
-
-		await providerFetch(this.id, `${API}/rest/videos?action=finalizeUpload`, {
-			method: "POST",
-			headers: this.headers(channel.accessToken),
-			body: JSON.stringify({
-				finalizeUploadRequest: {
-					video: init.value.video,
-					uploadToken: init.value.uploadToken,
-					uploadedPartIds: partIds,
-				},
-			}),
-		});
-		return init.value.video;
+	private uploadVideo(channel: ChannelContext, owner: string, video: MediaItem) {
+		return uploadLinkedInVideo(this.id, this.config.apiVersion, channel.accessToken, owner, video);
 	}
 }
 

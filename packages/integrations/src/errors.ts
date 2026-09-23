@@ -34,6 +34,12 @@ export class ProviderError extends Error {
 			retryAfterMs?: number;
 			/** Truncated response body; never contains our tokens. */
 			body?: string;
+			/**
+			 * Ads (multi-step campaign creation): platform ids the adapter created but
+			 * could not clean up after a later step failed. They exist PAUSED on the
+			 * platform and need a human (or a later sweep) to remove them.
+			 */
+			orphanedExternalIds?: string[];
 		} = {},
 		options?: { cause?: unknown },
 	) {
