@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { compact, num } from "../analytics";
 import { ProviderError } from "../errors";
 import { expiresAtFrom, form, providerJson } from "../http";
 import type {
+	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
+	PostMetrics,
 	PublishInput,
 	PublishOutcome,
 	SocialProvider,
@@ -141,6 +144,32 @@ export function redditErrorsToProviderError(
 	return new ProviderError("invalid_request", provider, message, { platformCode });
 }
 
+/** /api/info takes up to 100 fullnames — Reddit's listing page size. */
+const REDDIT_INFO_MAX_IDS = 100;
+
+type RedditLink = {
+	name: string;
+	score?: number;
+	num_comments?: number;
+	author?: string;
+	removed_by_category?: string | null;
+};
+
+/**
+ * A post its author deleted still comes back from /api/info (author "[deleted]",
+ * removed_by_category "deleted"); for our purposes it no longer exists.
+ * Moderator-removed posts keep their author and still count.
+ */
+export const isDeletedRedditPost = (p: RedditLink) =>
+	p.removed_by_category === "deleted" || p.author === "[deleted]";
+
+/**
+ * Reddit only exposes the net vote `score` (upvotes minus downvotes, fuzzed) —
+ * the nearest thing to likes. No views, impressions or shares via the API.
+ */
+export const mapRedditLink = (p: RedditLink): PostMetrics =>
+	compact({ likes: num(p.score), comments: num(p.num_comments) });
+
 /** Token endpoint: a dead refresh token is `invalid_grant` (sometimes with HTTP 200). */
 const classifyToken = (provider: string) => (status: number, body: string) =>
 	status === 400 && body.includes("invalid_grant")
@@ -162,6 +191,33 @@ export class RedditProvider implements SocialProvider<Settings> {
 
 	isConfigured() {
 		return Boolean(this.config.clientId && this.config.clientSecret && this.config.userAgent);
+	}
+
+	/** Uses the `read` scope, already requested. Reddit has no account-level analytics API. */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: REDDIT_INFO_MAX_IDS,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+	};
+
+	/**
+	 * publish() stores the `t3_…` fullname, exactly what /api/info takes.
+	 * https://www.reddit.com/dev/api#GET_api_info
+	 */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		if (ids.length === 0) return {};
+		const res = await providerJson<{ data?: { children?: { data: RedditLink }[] } }>(
+			this.id,
+			`${API}/api/info?${form({ id: ids.join(","), raw_json: "1" })}`,
+			{ headers: this.headers(channel.accessToken) },
+		);
+		const out: Record<string, PostMetrics> = {};
+		for (const { data } of res.data?.children ?? []) {
+			if (!isDeletedRedditPost(data)) out[data.name] = mapRedditLink(data);
+		}
+		return out;
 	}
 
 	validate(input: PublishInput<Settings>): string[] {

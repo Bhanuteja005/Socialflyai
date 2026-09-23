@@ -123,6 +123,54 @@ export type PublishOutcome =
 	 */
 	| { status: "processing"; pendingData: Record<string, unknown>; pollAfterMs: number };
 
+/**
+ * Normalised engagement numbers. Every field is optional: platforms expose
+ * different metrics (X has no "saves", LinkedIn pages no "video views") and a
+ * missing number must stay "unknown", never become 0.
+ */
+export type PostMetrics = {
+	impressions?: number;
+	reach?: number;
+	likes?: number;
+	comments?: number;
+	shares?: number;
+	saves?: number;
+	clicks?: number;
+	videoViews?: number;
+};
+
+export type AccountMetricsDay = {
+	/** UTC calendar day, YYYY-MM-DD. */
+	date: string;
+	followers?: number;
+	impressions?: number;
+	reach?: number;
+	profileViews?: number;
+};
+
+/**
+ * Read-only analytics. Optional per provider: a platform (or a scope we do not
+ * hold) without an analytics API simply lacks this and is skipped. Stateless
+ * like publishing: token in, numbers out, typed ProviderError on failure.
+ */
+export interface AnalyticsSupport {
+	/**
+	 * Metrics for published posts, keyed by the externalId publish() returned.
+	 * Posts the platform no longer knows (deleted) are omitted from the result.
+	 * Callers pass at most `maxPostsPerCall` ids.
+	 */
+	getPostMetrics(
+		channel: ChannelContext,
+		externalIds: string[],
+	): Promise<Record<string, PostMetrics>>;
+	readonly maxPostsPerCall: number;
+	/** Daily account-level numbers for [since, until] (UTC days, inclusive). */
+	getAccountMetrics?(
+		channel: ChannelContext,
+		range: { since: string; until: string },
+	): Promise<AccountMetricsDay[]>;
+}
+
 export interface SocialProvider<
 	TSettings extends Record<string, unknown> = Record<string, unknown>,
 > {
@@ -154,6 +202,9 @@ export interface SocialProvider<
 	validate?(input: PublishInput<TSettings>): string[];
 
 	publish(channel: ChannelContext, input: PublishInput<TSettings>): Promise<PublishOutcome>;
+
+	/** Present when the platform exposes analytics we can read with the granted scopes. */
+	readonly analytics?: AnalyticsSupport;
 	checkStatus?(
 		channel: ChannelContext,
 		pendingData: Record<string, unknown>,

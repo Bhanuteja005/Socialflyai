@@ -1,6 +1,7 @@
 import { workerEnv as env } from "@socialfly/config";
 import {
 	aiMediaJobSchema,
+	analyticsJobSchema,
 	type MaintenanceJob,
 	maintenanceJobSchema,
 	publishJobSchema,
@@ -10,10 +11,12 @@ import {
 	QUEUES,
 	tokenRefreshJobSchema,
 } from "@socialfly/queue";
-import { type Processor, Queue, Worker } from "bullmq";
+import { DelayedError, type Processor, Queue, Worker } from "bullmq";
+import { CallBudgetExhausted } from "#src/analytics/call-budget.ts";
 import { ChannelNeedsReauthError } from "#src/channels/channel-tokens.ts";
 import {
 	aiMedia,
+	analytics,
 	channelTokens,
 	database,
 	engine,
@@ -30,6 +33,14 @@ const SCHEDULES: { id: MaintenanceJob["task"]; everyMs: number }[] = [
 	{ id: "recover-stuck-targets", everyMs: 5 * 60_000 },
 	{ id: "schedule-token-refresh", everyMs: 60 * 60_000 },
 ];
+
+/**
+ * The planner is a few indexed queries; the 15-minute cadence only bounds how late
+ * a due collection starts (the shortest collection interval is an hour).
+ */
+const ANALYTICS_PLAN_EVERY_MS = 15 * 60_000;
+/** Low on purpose: each job is a platform read that competes with publishing for budget. */
+const ANALYTICS_CONCURRENCY = 2;
 
 const wanted = (queue: string) =>
 	env.WORKER_QUEUES.length === 0 || env.WORKER_QUEUES.includes(queue);
@@ -117,6 +128,35 @@ export async function startWorkers() {
 	start(QUEUES.maintenance, async (job) => maintenance.run(maintenanceJobSchema.parse(job.data)), {
 		concurrency: 1,
 	});
+
+	// Analytics reads share the platforms' rate limits with publishing, so they get a
+	// small, separate concurrency and a per-provider call budget (see call-budget.ts).
+	start(
+		QUEUES.analytics,
+		async (job, token) => {
+			try {
+				return await analytics.run(analyticsJobSchema.parse(job.data));
+			} catch (error) {
+				if (error instanceof CallBudgetExhausted) {
+					// Budget spent: wait for the next window without using up a retry attempt.
+					await job.moveToDelayed(Date.now() + error.retryInMs, token);
+					throw new DelayedError();
+				}
+				throw error;
+			}
+		},
+		{ concurrency: ANALYTICS_CONCURRENCY },
+	);
+
+	if (wanted(QUEUES.analytics)) {
+		const q = new Queue(QUEUES.analytics, { connection: queueConnection, prefix: QUEUE_PREFIX });
+		await q.upsertJobScheduler(
+			"analytics-plan",
+			{ every: ANALYTICS_PLAN_EVERY_MS },
+			{ name: "plan", data: { task: "plan" } },
+		);
+		await q.close();
+	}
 
 	if (wanted(QUEUES.maintenance)) {
 		const q = new Queue(QUEUES.maintenance, { connection: queueConnection, prefix: QUEUE_PREFIX });

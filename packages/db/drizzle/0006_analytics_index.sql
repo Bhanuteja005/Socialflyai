@@ -1,0 +1,1 @@
+CREATE INDEX "post_targets_published_idx" ON "post_targets" USING btree ("channel_id","published_at") WHERE "post_targets"."status" = 'published';

@@ -105,62 +105,83 @@ export class AdminService {
 		const since24h = new Date(now - DAY_MS).toISOString();
 		const monthStart = budgetPeriodStart();
 
-		const [userCounts, orgCounts, channelCounts, postRows, targetCounts, aiSpend, aiRows] =
-			await Promise.all([
-				this.db
-					.select({
-						total: countWhere(),
-						new7d: countWhere(sql`${users.createdAt} >= ${since7d}`),
-						disabled: countWhere(sql`${users.status} = 'disabled'`),
-					})
-					.from(users),
-				this.db
-					.select({
-						total: countWhere(sql`${organizations.deletedAt} is null`),
-						new7d: countWhere(
-							sql`${organizations.deletedAt} is null and ${organizations.createdAt} >= ${since7d}`,
-						),
-						deleted: countWhere(sql`${organizations.deletedAt} is not null`),
-					})
-					.from(organizations),
-				this.db
-					.select({
-						// Disconnected channels are history, not something anyone can publish to.
-						total: countWhere(sql`${channels.status} <> 'disconnected'`),
-						active: countWhere(sql`${channels.status} = 'active'`),
-						needsReauth: countWhere(sql`${channels.status} = 'needs_reauth'`),
-					})
-					.from(channels),
-				this.db
-					.select({ status: posts.status, n: countWhere() })
-					.from(posts)
-					.where(isNull(posts.deletedAt))
-					.groupBy(posts.status),
-				this.db
-					.select({
-						failed24h: countWhere(
-							sql`${postTargets.status} = 'failed' and ${postTargets.updatedAt} >= ${since24h}`,
-						),
-						unconfirmed24h: countWhere(
-							sql`${postTargets.status} = 'unconfirmed' and ${postTargets.updatedAt} >= ${since24h}`,
-						),
-						published24h: countWhere(
-							sql`${postTargets.status} = 'published' and ${postTargets.publishedAt} >= ${since24h}`,
-						),
-					})
-					.from(postTargets),
-				this.db
-					.select({
-						micros: sql<number>`coalesce(sum(${aiGenerations.costMicros}), 0)`.mapWith(Number),
-					})
-					.from(aiGenerations)
-					.where(sql`${aiGenerations.createdAt} >= ${monthStart.toISOString()}`),
-				this.db
-					.select({ status: aiGenerations.status, n: countWhere() })
-					.from(aiGenerations)
-					.where(sql`${aiGenerations.createdAt} >= ${monthStart.toISOString()}`)
-					.groupBy(aiGenerations.status),
-			]);
+		const [
+			userCounts,
+			orgCounts,
+			channelCounts,
+			postRows,
+			targetCounts,
+			aiSpend,
+			aiRows,
+			analyticsCounts,
+		] = await Promise.all([
+			this.db
+				.select({
+					total: countWhere(),
+					new7d: countWhere(sql`${users.createdAt} >= ${since7d}`),
+					disabled: countWhere(sql`${users.status} = 'disabled'`),
+				})
+				.from(users),
+			this.db
+				.select({
+					total: countWhere(sql`${organizations.deletedAt} is null`),
+					new7d: countWhere(
+						sql`${organizations.deletedAt} is null and ${organizations.createdAt} >= ${since7d}`,
+					),
+					deleted: countWhere(sql`${organizations.deletedAt} is not null`),
+				})
+				.from(organizations),
+			this.db
+				.select({
+					// Disconnected channels are history, not something anyone can publish to.
+					total: countWhere(sql`${channels.status} <> 'disconnected'`),
+					active: countWhere(sql`${channels.status} = 'active'`),
+					needsReauth: countWhere(sql`${channels.status} = 'needs_reauth'`),
+				})
+				.from(channels),
+			this.db
+				.select({ status: posts.status, n: countWhere() })
+				.from(posts)
+				.where(isNull(posts.deletedAt))
+				.groupBy(posts.status),
+			this.db
+				.select({
+					failed24h: countWhere(
+						sql`${postTargets.status} = 'failed' and ${postTargets.updatedAt} >= ${since24h}`,
+					),
+					unconfirmed24h: countWhere(
+						sql`${postTargets.status} = 'unconfirmed' and ${postTargets.updatedAt} >= ${since24h}`,
+					),
+					published24h: countWhere(
+						sql`${postTargets.status} = 'published' and ${postTargets.publishedAt} >= ${since24h}`,
+					),
+				})
+				.from(postTargets),
+			this.db
+				.select({
+					micros: sql<number>`coalesce(sum(${aiGenerations.costMicros}), 0)`.mapWith(Number),
+				})
+				.from(aiGenerations)
+				.where(sql`${aiGenerations.createdAt} >= ${monthStart.toISOString()}`),
+			this.db
+				.select({ status: aiGenerations.status, n: countWhere() })
+				.from(aiGenerations)
+				.where(sql`${aiGenerations.createdAt} >= ${monthStart.toISOString()}`)
+				.groupBy(aiGenerations.status),
+			// Is the analytics collector alive? Raw SQL: the channel count spans two tables.
+			this.db.execute(sql`
+					select
+						(select count(*) from post_target_metrics m where m.captured_at >= ${since24h})::int
+							as "snapshots24h",
+						(select count(distinct x.channel_id) from (
+							select t.channel_id from post_target_metrics m
+							join post_targets t on t.id = m.target_id
+							where m.captured_at >= ${since24h}
+							union
+							select d.channel_id from channel_metrics_daily d where d.updated_at >= ${since24h}
+						) x)::int as "channelsCollected24h"
+				`) as unknown as Promise<{ snapshots24h: number; channelsCollected24h: number }[]>,
+		]);
 
 		const zero = { total: 0, new7d: 0 };
 		return {
@@ -180,6 +201,10 @@ export class AdminService {
 					total: aiRows.reduce((sum, r) => sum + r.n, 0),
 					byStatus: byStatus(schema.aiGenerationStatus.enumValues, aiRows),
 				},
+			},
+			analytics: {
+				snapshots24h: Number(analyticsCounts[0]?.snapshots24h ?? 0),
+				channelsCollected24h: Number(analyticsCounts[0]?.channelsCollected24h ?? 0),
 			},
 		};
 	}

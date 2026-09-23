@@ -103,7 +103,12 @@ describe("overview", () => {
 		const org = await createOrg(owner, "Overview Org");
 		await createTarget(org.id, "failed");
 		await createTarget(org.id, "unconfirmed");
-		await createTarget(org.id, "published", { publishedAt: new Date() });
+		const live = await createTarget(org.id, "published", { publishedAt: new Date() });
+		await db.insert(schema.postTargetMetrics).values({
+			organizationId: org.id,
+			targetId: live.target.id,
+			likes: 1,
+		});
 		const reauth = await createChannel(org.id, "x", "Needs reauth");
 		await db
 			.update(schema.channels)
@@ -137,6 +142,8 @@ describe("overview", () => {
 		grew((o) => o.publishing.published24h, 1);
 		grew((o) => o.ai.spendUsd, 1.5);
 		grew((o) => o.ai.generations.byStatus.succeeded, 1);
+		grew((o) => o.analytics.snapshots24h, 1);
+		grew((o) => o.analytics.channelsCollected24h, 1);
 		expect(Object.keys(after.ai.generations.byStatus).sort()).toEqual([
 			"failed",
 			"pending",

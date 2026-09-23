@@ -15,6 +15,7 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { database, jobs, logger, redis } from "#src/infrastructure/index.ts";
 import { adminRoutes } from "#src/modules/admin/admin.routes.ts";
 import { aiRoutes } from "#src/modules/ai/ai.routes.ts";
+import { analyticsRoutes } from "#src/modules/analytics/analytics.routes.ts";
 import { channelCallbackRoutes, channelsRoutes } from "#src/modules/channels/channels.routes.ts";
 import { mediaRoutes } from "#src/modules/media/media.routes.ts";
 import {
@@ -68,6 +69,7 @@ const api = new Hono()
 	.route("/media", mediaRoutes)
 	.route("/posts", postsRoutes)
 	.route("/ai", aiRoutes)
+	.route("/analytics", analyticsRoutes)
 	.route("/admin", adminRoutes);
 
 export const app = base.route("/", api);

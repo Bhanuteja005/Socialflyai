@@ -1,5 +1,6 @@
 export * from "./admin";
 export * from "./ai";
+export * from "./analytics";
 export * from "./auth";
 export * from "./channels";
 export * from "./media";

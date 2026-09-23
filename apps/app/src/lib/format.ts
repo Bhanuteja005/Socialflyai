@@ -93,3 +93,40 @@ const usd =
 
 /** "$1.23": AI spend is small, so always two decimals. */
 export const formatUsd = (value: number) => usd?.format(value) ?? `$${value.toFixed(2)}`;
+
+/** Shown wherever a platform did not report a number — never 0, which would be a claim. */
+export const UNKNOWN = "—";
+
+const compact =
+	typeof Intl !== "undefined"
+		? new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 })
+		: null;
+const whole = typeof Intl !== "undefined" ? new Intl.NumberFormat() : null;
+
+/** "1.2K", "3.4M"; "—" for unknown. */
+export function formatCompact(value: number | null | undefined) {
+	if (value === null || value === undefined || Number.isNaN(value)) return UNKNOWN;
+	return compact?.format(value) ?? String(value);
+}
+
+/** "1,284" — for tooltips and tables where the exact value matters. */
+export function formatNumber(value: number | null | undefined) {
+	if (value === null || value === undefined || Number.isNaN(value)) return UNKNOWN;
+	return whole?.format(value) ?? String(value);
+}
+
+/** A 0–1 ratio as "3.4%"; "—" for unknown. */
+export function formatPercent(ratio: number | null | undefined) {
+	if (ratio === null || ratio === undefined || Number.isNaN(ratio)) return UNKNOWN;
+	return `${(ratio * 100).toFixed(1)}%`;
+}
+
+/** A calendar day ("2026-09-22") as "Sep 22" — no zone shift, the day is already local. */
+export function formatDay(day: string, withYear = false) {
+	const [y, m, d] = day.split("-").map(Number) as [number, number, number];
+	return formatter("UTC", {
+		month: "short",
+		day: "numeric",
+		...(withYear ? { year: "numeric" } : {}),
+	}).format(new Date(Date.UTC(y, m - 1, d)));
+}

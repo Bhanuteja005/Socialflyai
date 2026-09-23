@@ -1,10 +1,14 @@
 import { z } from "zod";
+import { compact, type DayRange, num, todayInRange } from "../analytics";
 import { ProviderError } from "../errors";
 import { expiresAtFrom, fetchMediaBytes, form, providerFetch, providerJson } from "../http";
 import type {
+	AccountMetricsDay,
+	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
+	PostMetrics,
 	PublishInput,
 	PublishOutcome,
 	SocialProvider,
@@ -176,6 +180,21 @@ type TokenResponse = {
 	scope?: string;
 };
 
+/** videos.list `id` accepts up to 50 comma-separated ids. */
+const YOUTUBE_MAX_IDS = 50;
+
+export function mapYouTubeStatistics(s: {
+	viewCount?: string;
+	likeCount?: string;
+	commentCount?: string;
+}): PostMetrics {
+	return compact({
+		videoViews: num(s.viewCount),
+		likes: num(s.likeCount),
+		comments: num(s.commentCount),
+	});
+}
+
 export class YouTubeProvider implements SocialProvider<Settings> {
 	readonly id = "youtube" as const;
 	readonly displayName = "YouTube";
@@ -194,6 +213,68 @@ export class YouTubeProvider implements SocialProvider<Settings> {
 
 	validate(input: PublishInput<Settings>): string[] {
 		return validateYouTube(input);
+	}
+
+	/**
+	 * Data API reads with youtube.readonly (already requested); 1 quota unit per
+	 * call, so analytics barely dents the upload budget. The Data API has no
+	 * impressions or reach — those live in the YouTube Analytics API, which needs
+	 * the separate yt-analytics.readonly scope we do not request.
+	 */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: YOUTUBE_MAX_IDS,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+		getAccountMetrics: (channel, range) => this.getAccountMetrics(channel, range),
+	};
+
+	/**
+	 * Deleted or private-to-someone-else videos are simply absent from `items`.
+	 * Counts arrive as strings; likeCount is absent when the owner hid it.
+	 * https://developers.google.com/youtube/v3/docs/videos/list
+	 */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		if (ids.length === 0) return {};
+		const res = await providerJson<{
+			items?: {
+				id: string;
+				statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
+			}[];
+		}>(this.id, `${API}/videos?${form({ part: "statistics", id: ids.join(",") })}`, {
+			headers: { Authorization: `Bearer ${channel.accessToken}` },
+			classify: this.classify,
+		});
+		const out: Record<string, PostMetrics> = {};
+		for (const item of res.items ?? []) {
+			out[item.id] = mapYouTubeStatistics(item.statistics ?? {});
+		}
+		return out;
+	}
+
+	/**
+	 * Current subscriber count only (no history in the Data API), dated today.
+	 * YouTube rounds public subscriber counts to three significant figures.
+	 * https://developers.google.com/youtube/v3/docs/channels/list
+	 */
+	private async getAccountMetrics(
+		channel: ChannelContext,
+		range: DayRange,
+	): Promise<AccountMetricsDay[]> {
+		const today = todayInRange(range);
+		if (!today) return [];
+		const res = await providerJson<{
+			items?: {
+				statistics?: { subscriberCount?: string; hiddenSubscriberCount?: boolean };
+			}[];
+		}>(this.id, `${API}/channels?${form({ part: "statistics", id: channel.externalId })}`, {
+			headers: { Authorization: `Bearer ${channel.accessToken}` },
+			classify: this.classify,
+		});
+		const stats = res.items?.[0]?.statistics;
+		const followers = stats?.hiddenSubscriberCount ? undefined : num(stats?.subscriberCount);
+		return followers === undefined ? [] : [{ date: today, followers }];
 	}
 
 	/**

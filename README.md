@@ -54,7 +54,7 @@ team runs every week:
 6. **Measure** — impressions, engagement, mentions and AI citations.
 7. **Advertise** — turn winning posts into ad campaigns.
 
-Steps 3 and 4 and the foundations under them are built today; the rest is the [roadmap](#-roadmap).
+Steps 3, 4 and 6 (measure) and the foundations under them are built today; the rest is the [roadmap](#-roadmap).
 
 ## 🚀 Features available now
 
@@ -68,6 +68,9 @@ Steps 3 and 4 and the foundations under them are built today; the rest is the [r
   platform's length and style), rewrite in one click, suggest hashtags, generate images and
   render LinkedIn/Instagram carousels and short vertical videos with voiceover. A brand-voice profile keeps everything on brand, and a
   monthly budget per workspace keeps AI spend predictable.
+- **Analytics** — impressions, reach and engagement per post and per channel (X, Facebook,
+  Instagram, Threads, YouTube, Reddit, LinkedIn pages), follower growth, top posts, and a
+  best-time-to-post heatmap from your own results.
 - **Operations built in** — OpenTelemetry traces, logs and metrics, Bull Board for jobs,
   health checks, a developer CLI and production Dockerfiles.
 
@@ -159,8 +162,8 @@ docs/           architecture, platform setup, deployment, runbooks
 | 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice | ✅ Done |
 | 3b | AI short videos / reels (script → scenes → voiceover → MP4) | ✅ Done |
 | — | Split into site / app / admin console; Jenkins CI/CD | ✅ Done |
-| 4 | Analytics: per-post and per-account metrics, dashboards | 🚧 Next |
-| 5 | Research, SEO/AEO and AI-visibility tracking | Planned |
+| 4 | Analytics: per-post and per-account metrics, dashboards, best time to post | ✅ Done |
+| 5 | Research, SEO/AEO and AI-visibility tracking | 🚧 Next |
 | 6 | Engagement inbox: listening, reply drafts, approval | Planned |
 | 7 | Ads: campaign drafts, Meta / Google / LinkedIn / TikTok / X / Pinterest sync | Planned |
 

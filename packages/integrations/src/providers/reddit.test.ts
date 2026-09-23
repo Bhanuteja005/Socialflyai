@@ -1,7 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { channel, header, jsonResponse, mockFetch } from "../testing/fetch-mock";
 import {
+	isDeletedRedditPost,
+	mapRedditLink,
 	normalizeSubreddit,
 	parseRedditRetryMs,
+	RedditProvider,
 	redditErrorsToProviderError,
 	settingsSchema,
 } from "./reddit";
@@ -112,5 +116,69 @@ describe("settingsSchema", () => {
 		});
 		expect(ok.success).toBe(true);
 		expect(bad.success).toBe(false);
+	});
+});
+
+describe("Reddit analytics", () => {
+	const reddit = new RedditProvider({
+		clientId: "id",
+		clientSecret: "secret",
+		userAgent: "web:socialfly:test (by /u/test)",
+	});
+	let fetchMock: ReturnType<typeof mockFetch> | undefined;
+	afterEach(() => fetchMock?.restore());
+
+	const link = (name: string, extra: Record<string, unknown> = {}) => ({
+		kind: "t3",
+		data: { name, score: 42, num_comments: 5, author: "someone", ...extra },
+	});
+
+	test("score maps to likes, num_comments to comments; nothing else is invented", () => {
+		expect(mapRedditLink({ name: "t3_a", score: 42, num_comments: 5 })).toEqual({
+			likes: 42,
+			comments: 5,
+		});
+		expect(mapRedditLink({ name: "t3_a" })).toEqual({});
+	});
+
+	test("author-deleted posts count as gone; moderator removals do not", () => {
+		expect(isDeletedRedditPost({ name: "a", author: "[deleted]" })).toBe(true);
+		expect(isDeletedRedditPost({ name: "a", removed_by_category: "deleted" })).toBe(true);
+		expect(isDeletedRedditPost({ name: "a", author: "x", removed_by_category: "moderator" })).toBe(
+			false,
+		);
+	});
+
+	test("/api/info with fullnames, User-Agent and bearer; deleted/unknown omitted", async () => {
+		fetchMock = mockFetch(() =>
+			jsonResponse({
+				kind: "Listing",
+				data: {
+					children: [
+						link("t3_a"),
+						link("t3_b", { author: "[deleted]", removed_by_category: "deleted" }),
+					],
+				},
+			}),
+		);
+		const out = await reddit.analytics.getPostMetrics(channel(), ["t3_a", "t3_b", "t3_c"]);
+		expect(out).toEqual({ t3_a: { likes: 42, comments: 5 } });
+		const [call] = fetchMock.calls;
+		expect(`${call?.url.origin}${call?.url.pathname}`).toBe("https://oauth.reddit.com/api/info");
+		expect(call?.url.searchParams.get("id")).toBe("t3_a,t3_b,t3_c");
+		expect(header(call?.init ?? {}, "user-agent")).toBe("web:socialfly:test (by /u/test)");
+		expect(header(call?.init ?? {}, "authorization")).toBe("Bearer tok-123");
+		expect(reddit.analytics.maxPostsPerCall).toBe(100);
+		expect(reddit.analytics.getAccountMetrics).toBeUndefined();
+	});
+
+	test("429 honours Retry-After", async () => {
+		fetchMock = mockFetch(
+			() => new Response("", { status: 429, headers: { "retry-after": "12" } }),
+		);
+		await expect(reddit.analytics.getPostMetrics(channel(), ["t3_a"])).rejects.toMatchObject({
+			kind: "rate_limited",
+			details: { retryAfterMs: 12_000 },
+		});
 	});
 });

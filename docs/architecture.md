@@ -28,8 +28,8 @@ which run on Node. Every service exports OpenTelemetry traces, metrics and logs;
 | Service | Responsibility | Talks to | Local port |
 |---|---|---|---|
 | `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP | 4800 |
-| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice | Postgres, Redis, storage, SMTP, Anthropic | 4400 |
-| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs | 4500 |
+| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports | Postgres, Redis, storage, SMTP, Anthropic | 4400 |
+| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs | 4500 |
 | `apps/app` | The product UI: sign-in/sign-up, onboarding, dashboard, composer, calendar, channels, media, settings. `/` redirects to `/dashboard` | auth, api | 4700 |
 | `apps/site` | Public marketing site: landing, features, solutions, comparisons, free tools, blog, legal. Statically rendered; no API client, no auth. "Log in"/"Get started" link to the app | — | 4701 |
 | `apps/admin` | Internal admin console for staff (see `docs/admin-console.md`) | auth, api | 4702 |
@@ -91,7 +91,9 @@ users ─┬─ auth_sessions (refresh hash + previous hash for reuse detection)
                                         ├─ media_assets (source: upload | ai)
                                         ├─ brand_profiles, ai_generations
                                         └─ posts ─┬─ post_media
-                                                  └─ post_targets ── post_target_events
+                                                  └─ post_targets ─┬─ post_target_events
+                                                                   └─ post_target_metrics (engagement snapshots)
+channels ── channel_metrics_daily (account numbers per UTC day)
 ```
 
 - **Post vs target.** A post is written once; a target is that post on one channel,
@@ -185,11 +187,69 @@ content + what it cost out. Persistence, budgets and retries live in the callers
   never declared stalled.
 - **Missing keys hide features** (`GET /ai/capabilities`), exactly like platform credentials.
 
+## Analytics
+
+Read-only engagement numbers from the platforms, collected by the worker and reported
+by the API. Adapters expose them through the optional `SocialProvider.analytics`
+(`getPostMetrics`, `maxPostsPerCall`, optional `getAccountMetrics`); a platform without
+it is simply skipped.
+
+```
+job scheduler (15 min) ─▶ plan ─┬─▶ collect-posts   <channel>  ─▶ post_target_metrics (append a snapshot)
+   (analytics queue)            └─▶ collect-account <channel>  ─▶ channel_metrics_daily (upsert per day)
+```
+
+- **Due by age.** A published target is collected hourly while < 48 h old, every 6 h
+  until 7 days, daily until 30 days, then never again (its last numbers are final).
+  "Last collected" is the target's newest `captured_at`. Account numbers: once a day
+  per channel, re-reading the last 3 UTC days because platforms revise them late.
+- **One job per channel**, not per post: platforms answer several posts per call
+  (`maxPostsPerCall`). Job ids carry a time bucket (`analytics.posts.<channel>.<hour>`,
+  `analytics.account.<channel>.<utc-day>`), so planner runs on any number of replicas
+  collapse onto one job per bucket.
+- **Never starve publishing.** Its own queue (concurrency 2) plus a per-provider call
+  budget in Redis (30 calls/min by default, shared by all replicas). A spent budget
+  delays the job without using a retry. Platforms meter the app, and late numbers cost
+  nothing while a throttled app cannot publish.
+- **Failures.** Reads are safe to retry: `rate_limited`/`transient` → BullMQ retries
+  (3 attempts, backoff), and batches already stored are no longer due, so a retry
+  resumes. `auth` → one token refresh through `ChannelTokens` (same locked path as
+  publishing), then give up for this run *without* flagging the channel (usually a
+  missing analytics scope, and publishing still works). `invalid_request` → skip that
+  batch. A post the platform no longer returns (deleted there) gets no row.
+- **Unknown ≠ zero.** Metrics are nullable columns; a metric a platform does not report
+  stays null all the way to the API.
+- **Channels** that need reauth, are disconnected, or belong to a deleted organization
+  are skipped (checked again when the job runs).
+
+API (`/analytics`, every member can read; refresh needs editor):
+
+| Route | Returns |
+|---|---|
+| `GET /overview?from&to&channelIds` | totals, previous-period totals, daily series, per-channel numbers (+ followers), top 5 posts, last collection time |
+| `GET /posts?from&to&channelIds&sort&before&limit` | published targets with latest metrics; keyset cursor for `sort=publishedAt`, top-N (no cursor) for metric sorts, whose values move between pages |
+| `GET /posts/:postId` | per target: latest metrics + up to 200 snapshots (oldest first) |
+| `GET /channels/:channelId?from&to` | account numbers per day |
+| `GET /best-times?channelIds&weeks` | weekday×hour heatmap; recommendations from the org's own data (≥ 20 measured posts) or from general per-platform guidance |
+| `POST /refresh` | 202 `{ queued }`; one per organization per 10 minutes (Redis `SET NX EX`), else 429 with `retryAfterSeconds` |
+
+- **Semantics.** Each target counts with its LATEST snapshot. `engagements` = likes +
+  comments + shares + saves (a missing one counts 0; all missing → null).
+  `engagementRate` = engagements / impressions over targets reporting both (a platform
+  that hides impressions would otherwise inflate it). "posts" counts publications
+  (targets), so one post on three channels is 3. Deleted posts are left out.
+- **Dates** are calendar days in the organization's timezone (`organizations.timezone`);
+  ranges default to the last 28 days and may span at most 366. Account numbers are
+  stored per UTC day, as the platforms report them.
+- **Queries** are raw SQL with explicit table aliases (latest snapshot via `LATERAL …
+  LIMIT 1` on the `(target_id, captured_at)` index): drizzle leaves columns unqualified
+  in single-table queries, which silently breaks correlated subqueries.
+
 ## Observability
 
 - **Logs**: pino JSON to stdout, secrets/PII redacted, `trace_id` on every line, mirrored to OTel logs.
 - **Traces**: one server span per request named by route; W3C context propagates app → api.
-- **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`.
+- **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`, `socialfly.analytics.snapshots{provider,kind}`.
 - **Errors**: Sentry (optional, via `SENTRY_DSN`).
 - **Probes**: `/health` (process alive, never touches dependencies) and `/ready` (checks Postgres/Redis/queue — used by the deploy smoke test).
 - Local: Grafana LGTM. Production: services → OTel Collector (`infra/otel/collector.yaml`) → backend of choice.
@@ -212,7 +272,7 @@ content + what it cost out. Persistence, budgets and retries live in the callers
 | 2 | Media, composer, scheduling, publishing engine (8 platforms) | ✅ (platform calls not yet exercised against live accounts) |
 | 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice, budgets | ✅ |
 | 3b | AI short videos: scripts, AI/library/theme backgrounds, voiceover, ffmpeg render | ✅ (backend; not yet rendered against live OpenAI TTS) |
-| 4 | Analytics: per-post and per-account metrics, dashboards | |
+| 4 | Analytics: platform adapters, collector, reports API, dashboards, best times | ✅ (adapters not yet verified against live accounts) |
 | 5 | Research + SEO/AEO + AI-visibility (pgvector, crawler, LLM citation tracking) | |
 | 6 | Engagement inbox: listening, reply drafts, approval | |
 | 7 | Ads: campaign drafts, Meta/Google/LinkedIn/TikTok/X/Pinterest sync | |

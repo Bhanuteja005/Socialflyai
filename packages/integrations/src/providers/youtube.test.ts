@@ -1,9 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { addDays, utcDay } from "../analytics";
+import { channel, header, jsonResponse, mockFetch } from "../testing/fetch-mock";
 import {
 	classifyGoogleError,
+	mapYouTubeStatistics,
 	msUntilPacificMidnight,
 	settingsSchema,
 	validateYouTube,
+	YouTubeProvider,
 } from "./youtube";
 
 const apiError = (status: number, reason: string) =>
@@ -93,5 +97,64 @@ describe("settingsSchema / validateYouTube", () => {
 		expect(validateYouTube({ text: "é".repeat(2600), media: [], settings })).toEqual([
 			"YouTube descriptions are limited to 5000 bytes",
 		]);
+	});
+});
+
+describe("YouTube analytics", () => {
+	const youtube = new YouTubeProvider({ clientId: "id", clientSecret: "secret" });
+	let fetchMock: ReturnType<typeof mockFetch> | undefined;
+	afterEach(() => fetchMock?.restore());
+
+	test("viewCount is video views; the Data API has no impressions or reach", () => {
+		expect(mapYouTubeStatistics({ viewCount: "1000", likeCount: "50", commentCount: "7" })).toEqual(
+			{ videoViews: 1000, likes: 50, comments: 7 },
+		);
+		// A hidden like count stays unknown.
+		expect(mapYouTubeStatistics({ viewCount: "3" })).toEqual({ videoViews: 3 });
+	});
+
+	test("videos.list part=statistics for all ids; deleted videos are simply absent", async () => {
+		fetchMock = mockFetch(() =>
+			jsonResponse({
+				items: [{ id: "v1", statistics: { viewCount: "10", likeCount: "2", commentCount: "0" } }],
+			}),
+		);
+		const out = await youtube.analytics.getPostMetrics(channel(), ["v1", "gone"]);
+		expect(out).toEqual({ v1: { videoViews: 10, likes: 2, comments: 0 } });
+		const [call] = fetchMock.calls;
+		expect(call?.url.pathname).toBe("/youtube/v3/videos");
+		expect(call?.url.searchParams.get("part")).toBe("statistics");
+		expect(call?.url.searchParams.get("id")).toBe("v1,gone");
+		expect(header(call?.init ?? {}, "authorization")).toBe("Bearer tok-123");
+		expect(youtube.analytics.maxPostsPerCall).toBe(50);
+	});
+
+	test("quotaExceeded on a read is rate_limited until the quota resets", async () => {
+		fetchMock = mockFetch(() => new Response(apiError(403, "quotaExceeded"), { status: 403 }));
+		await expect(youtube.analytics.getPostMetrics(channel(), ["v1"])).rejects.toMatchObject({
+			kind: "rate_limited",
+		});
+	});
+
+	test("subscriber count for today; a hidden count stays unknown", async () => {
+		const today = utcDay(new Date());
+		const range = { since: addDays(today, -1), until: today };
+		fetchMock = mockFetch(() =>
+			jsonResponse({
+				items: [{ statistics: { subscriberCount: "1230", hiddenSubscriberCount: false } }],
+			}),
+		);
+		expect(
+			await youtube.analytics.getAccountMetrics?.(channel({ externalId: "UC1" }), range),
+		).toEqual([{ date: today, followers: 1230 }]);
+		expect(fetchMock.calls[0]?.url.searchParams.get("id")).toBe("UC1");
+		fetchMock.restore();
+
+		fetchMock = mockFetch(() =>
+			jsonResponse({
+				items: [{ statistics: { subscriberCount: "0", hiddenSubscriberCount: true } }],
+			}),
+		);
+		expect(await youtube.analytics.getAccountMetrics?.(channel(), range)).toEqual([]);
 	});
 });

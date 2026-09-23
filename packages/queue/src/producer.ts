@@ -3,6 +3,7 @@ import type { Redis } from "ioredis";
 import { QUEUE_PREFIX } from "./connection";
 import {
 	type AiMediaJob,
+	type AnalyticsJob,
 	jobIds,
 	type PublishJob,
 	type PublishStatusJob,
@@ -21,6 +22,18 @@ const publishJobDefaults: JobsOptions = {
 	attempts: 1,
 	removeOnComplete: { age: 7 * 24 * 3600, count: 10_000 },
 	removeOnFail: { age: 30 * 24 * 3600 },
+};
+
+/**
+ * Analytics calls are reads, so a queue-level retry is safe. Three attempts with
+ * backoff ride out a platform's throttling or a blip; after that the next planner
+ * run picks the channel up again anyway.
+ */
+const analyticsJobDefaults: JobsOptions = {
+	attempts: 3,
+	backoff: { type: "exponential", delay: 60_000 },
+	removeOnComplete: { age: 24 * 3600 },
+	removeOnFail: { age: 7 * 24 * 3600 },
 };
 
 /**
@@ -115,6 +128,74 @@ export class JobProducer {
 			removeOnComplete: { age: 24 * 3600 },
 			removeOnFail: { age: 7 * 24 * 3600 },
 		});
+	}
+
+	/**
+	 * Planner → collect jobs. The bucketed id is a no-op while the previous job of
+	 * the same bucket is retained (waiting, active or completed), which is what
+	 * limits a channel to one posts collection per hour and one account collection
+	 * per UTC day, whatever the planner cadence or replica count.
+	 */
+	async enqueueAnalyticsPosts(channelId: string, now = Date.now()) {
+		await this.queue(QUEUES.analytics).add(
+			"collect-posts",
+			{ task: "collect-posts", channelId } satisfies AnalyticsJob,
+			{
+				...analyticsJobDefaults,
+				jobId: jobIds.analyticsPosts(channelId, Math.floor(now / 3600_000)),
+			},
+		);
+	}
+
+	async enqueueAnalyticsAccount(channelId: string, now = Date.now()) {
+		await this.queue(QUEUES.analytics).add(
+			"collect-account",
+			{ task: "collect-account", channelId } satisfies AnalyticsJob,
+			{
+				...analyticsJobDefaults,
+				jobId: jobIds.analyticsAccount(channelId, new Date(now).toISOString().slice(0, 10)),
+				// Kept past the end of the UTC day so a replan later that day stays a no-op.
+				removeOnComplete: { age: 26 * 3600 },
+			},
+		);
+	}
+
+	/**
+	 * "Refresh now" from the API: forced post collection plus account numbers for
+	 * each channel, immediately. Returns the number of collect jobs queued (bucketed
+	 * ids collapse a repeat within the same 10 minutes onto the same jobs).
+	 */
+	async refreshAnalytics(
+		channels: { channelId: string; account: boolean }[],
+		now = Date.now(),
+	): Promise<number> {
+		const bucket = Math.floor(now / 600_000);
+		const q = this.queue(QUEUES.analytics);
+		const added = await q.addBulk(
+			channels.flatMap(({ channelId, account }) => [
+				{
+					name: "collect-posts",
+					data: { task: "collect-posts", channelId, force: true } satisfies AnalyticsJob,
+					opts: {
+						...analyticsJobDefaults,
+						jobId: jobIds.analyticsRefresh("posts", channelId, bucket),
+					},
+				},
+				...(account
+					? [
+							{
+								name: "collect-account",
+								data: { task: "collect-account", channelId } satisfies AnalyticsJob,
+								opts: {
+									...analyticsJobDefaults,
+									jobId: jobIds.analyticsRefresh("account", channelId, bucket),
+								},
+							},
+						]
+					: []),
+			]),
+		);
+		return added.length;
 	}
 
 	/** Readiness probe: the queue Redis answers. */

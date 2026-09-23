@@ -3,6 +3,7 @@
 import { Button } from "@socialfly/ui/components/button";
 import { cn } from "@socialfly/ui/utils";
 import {
+	BarChart3,
 	Building2,
 	CalendarDays,
 	Images,
@@ -92,6 +93,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 		{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 		{ href: "/calendar", label: "Calendar", icon: CalendarDays },
 		{ href: "/posts", label: "Posts", icon: Rows3 },
+		{ href: "/analytics", label: "Analytics", icon: BarChart3 },
 		{ href: "/create", label: "Create", icon: Sparkles },
 		{ href: "/media", label: "Media", icon: Images },
 		{ href: "/channels", label: "Channels", icon: Radio, badge: needsReauth },

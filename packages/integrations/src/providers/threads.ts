@@ -1,10 +1,23 @@
 import { z } from "zod";
+import {
+	addDays,
+	compact,
+	DayAccumulator,
+	type DayRange,
+	dayStartSeconds,
+	mapLimit,
+	sumKnown,
+	todayInRange,
+} from "../analytics";
 import { expiresAtFrom, form, providerJson } from "../http";
 import type {
+	AccountMetricsDay,
+	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
 	MediaItem,
+	PostMetrics,
 	PublishInput,
 	PublishOutcome,
 	SocialProvider,
@@ -15,7 +28,11 @@ import {
 	type ContainerApi,
 	type ContainerPending,
 	classifyMetaError,
+	collectDailySeries,
 	graphHeaders,
+	type InsightEntry,
+	insightTotals,
+	isMissingGraphObject,
 	parseContainerPending,
 	toContainerState,
 } from "./meta";
@@ -69,6 +86,26 @@ const SCOPES = [
 	"threads_manage_replies",
 ];
 
+/**
+ * Threads has no multiple-ID insights read: one request per post. The cap and
+ * the small concurrency keep a collector run well inside the per-profile quota.
+ */
+const THREADS_MAX_POSTS_PER_CALL = 25;
+const THREADS_INSIGHTS_CONCURRENCY = 4;
+/** "The earliest Unix timestamp that can be used is 1712991600" (2024-04-13 07:00 UTC). */
+const THREADS_EARLIEST_SECONDS = 1_712_991_600;
+
+export function mapThreadsInsights(totals: Record<string, number>): PostMetrics {
+	return compact({
+		impressions: totals.views,
+		likes: totals.likes,
+		comments: totals.replies,
+		// Reposts, quotes and off-platform shares all spread the post further — the
+		// same notion as X's reposts+quotes.
+		shares: sumKnown(totals.reposts, totals.quotes, totals.shares),
+	});
+}
+
 export class ThreadsProvider implements SocialProvider<Settings> {
 	readonly id = "threads" as const;
 	readonly displayName = "Threads";
@@ -86,6 +123,75 @@ export class ThreadsProvider implements SocialProvider<Settings> {
 
 	private classify(mutating = false) {
 		return (status: number, body: string) => classifyMetaError(this.id, status, body, mutating);
+	}
+
+	/** Needs threads_basic + threads_manage_insights, both already requested. */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: THREADS_MAX_POSTS_PER_CALL,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+		getAccountMetrics: (channel, range) => this.getAccountMetrics(channel, range),
+	};
+
+	/** https://developers.facebook.com/docs/threads/insights */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		const rows = await mapLimit(ids, THREADS_INSIGHTS_CONCURRENCY, async (id) => {
+			try {
+				const res = await providerJson<{ data?: InsightEntry[] }>(
+					this.id,
+					`${API}/${encodeURIComponent(id)}/insights?${form({
+						metric: "views,likes,replies,reposts,quotes,shares",
+					})}`,
+					{ headers: graphHeaders(channel.accessToken, false), classify: this.classify() },
+				);
+				return [id, mapThreadsInsights(insightTotals(res.data))] as const;
+			} catch (error) {
+				// Deleted post: drop it, as the contract asks.
+				if (isMissingGraphObject(error)) return undefined;
+				throw error;
+			}
+		});
+		return Object.fromEntries(rows.filter((r) => r !== undefined));
+	}
+
+	/**
+	 * Daily `views` (time series) plus today's `followers_count`, which is a
+	 * current total and does not accept since/until, hence the second request.
+	 * https://developers.facebook.com/docs/threads/insights
+	 */
+	private async getAccountMetrics(
+		channel: ChannelContext,
+		range: DayRange,
+	): Promise<AccountMetricsDay[]> {
+		const days = new DayAccumulator(range);
+		const since = Math.max(dayStartSeconds(range.since), THREADS_EARLIEST_SECONDS);
+		const until = dayStartSeconds(addDays(range.until, 1));
+		const headers = graphHeaders(channel.accessToken, false);
+		const insightsUrl = `${API}/${channel.externalId}/threads_insights`;
+
+		if (since < until) {
+			const res = await providerJson<{ data?: InsightEntry[] }>(
+				this.id,
+				`${insightsUrl}?${form({ metric: "views", since: String(since), until: String(until) })}`,
+				{ headers, classify: this.classify() },
+			);
+			for (const entry of res.data ?? []) {
+				if (entry.name === "views") collectDailySeries(days, entry, "impressions");
+			}
+		}
+
+		const today = todayInRange(range);
+		if (today) {
+			const res = await providerJson<{ data?: InsightEntry[] }>(
+				this.id,
+				`${insightsUrl}?${form({ metric: "followers_count" })}`,
+				{ headers, classify: this.classify() },
+			);
+			days.set(today, { followers: insightTotals(res.data).followers_count });
+		}
+		return days.result();
 	}
 
 	/** https://developers.facebook.com/docs/threads/get-started/get-access-tokens-and-permissions */

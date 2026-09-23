@@ -1,3 +1,43 @@
 @import "tailwindcss";
 /* Shared tokens, theme and base styles (also scans packages/ui for utility classes). */
 @import "@socialfly/ui/theme.css";
+
+/*
+ * Chart tokens (analytics). Categorical slots follow a fixed order (impressions,
+ * engagements, posts) validated for colour-vision deficiency on both surfaces; the
+ * dark steps are chosen for the dark surface, not flipped. Slot 3 sits under 3:1 on
+ * light, which is why every chart also ships a data-table view.
+ */
+:root {
+	--chart-1: #2a78d6;
+	--chart-2: #eb6834;
+	--chart-3: #1baf7a;
+	--chart-grid: #ececef;
+	--chart-axis: #d4d4da;
+	/* Sequential (heatmap) ramp: near-zero recedes toward the surface. */
+	--chart-seq-0: var(--muted);
+	--chart-seq-1: #cde2fb;
+	--chart-seq-2: #9ec5f4;
+	--chart-seq-3: #5598e7;
+	--chart-seq-4: #256abf;
+	--chart-seq-5: #104281;
+}
+
+.dark {
+	--chart-1: #3987e5;
+	--chart-2: #d95926;
+	--chart-3: #199e70;
+	--chart-grid: #1f1f25;
+	--chart-axis: #303038;
+	--chart-seq-1: #0d366b;
+	--chart-seq-2: #184f95;
+	--chart-seq-3: #256abf;
+	--chart-seq-4: #3987e5;
+	--chart-seq-5: #86b6ef;
+}
+
+@theme inline {
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+}

@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useChannels, usePosts } from "@/hooks/queries";
 import { useCurrentUser } from "@/hooks/use-session";
+import { AnalyticsSnapshot } from "../analytics/analytics-snapshot";
 import { useOrg } from "../org-provider";
 import { PageHeader } from "../page-header";
 import { PostRow } from "../posts/post-row";
@@ -226,7 +227,10 @@ export function DashboardView() {
 						</Card>
 					) : null}
 				</div>
-				<ChannelHealth />
+				<div className="grid gap-6">
+					{channels.isSuccess && !noChannels ? <AnalyticsSnapshot /> : null}
+					<ChannelHealth />
+				</div>
 			</div>
 		</>
 	);

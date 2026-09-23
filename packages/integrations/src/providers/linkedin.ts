@@ -1,12 +1,25 @@
 import { z } from "zod";
+import {
+	addDays,
+	compact,
+	DayAccumulator,
+	type DayRange,
+	dayStartMs,
+	num,
+	todayInRange,
+	utcDay,
+} from "../analytics";
 import { ProviderError } from "../errors";
 import { expiresAtFrom, fetchMediaBytes, form, providerFetch, providerJson } from "../http";
 import type {
+	AccountMetricsDay,
+	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
 	DiscoveredAccount,
 	MediaItem,
+	PostMetrics,
 	PublishInput,
 	PublishOutcome,
 	SocialProvider,
@@ -59,6 +72,44 @@ type Settings = z.infer<typeof settingsSchema>;
  */
 export const escapeLittleText = (text: string) =>
 	text.replace(/[\\|{}@[\]()<>#*_~]/g, (c) => `\\${c}`);
+
+/**
+ * Organization share statistics. The docs name no id cap for `shares=List(...)`;
+ * 50 keeps the URL comfortably short.
+ * https://learn.microsoft.com/linkedin/marketing/community-management/organizations/share-statistics
+ */
+const LINKEDIN_STATS_MAX_POSTS = 50;
+/** "Returns share data only within the past 12 months, using a rolling 12-month window." */
+const LINKEDIN_STATS_WINDOW_DAYS = 365;
+
+type ShareStatistics = {
+	impressionCount?: number;
+	uniqueImpressionsCount?: number;
+	/** Spelled this way in LinkedIn's time-bound sample response; read defensively. */
+	uniqueImpressionsCounts?: number;
+	clickCount?: number;
+	likeCount?: number;
+	commentCount?: number;
+	shareCount?: number;
+};
+
+export function mapLinkedInShareStatistics(s: ShareStatistics): PostMetrics {
+	return compact({
+		impressions: num(s.impressionCount),
+		reach: num(s.uniqueImpressionsCount ?? s.uniqueImpressionsCounts),
+		clicks: num(s.clickCount),
+		likes: num(s.likeCount),
+		comments: num(s.commentCount),
+		shares: num(s.shareCount),
+	});
+}
+
+/**
+ * Rest.li 2.0 list parameter: `List(urn%3Ali%3Ashare%3A1,urn%3Ali%3Ashare%3A2)`.
+ * The URNs are encoded, the List(...) syntax is not.
+ */
+export const restliList = (values: string[]) =>
+	`List(${values.map((v) => encodeURIComponent(v)).join(",")})`;
 
 type TokenResponse = {
 	access_token: string;
@@ -295,6 +346,11 @@ abstract class LinkedInBase implements SocialProvider<Settings> {
 	}
 }
 
+/**
+ * No `analytics` here on purpose: member post analytics need the
+ * r_member_postAnalytics scope, which LinkedIn grants only to approved partners
+ * (Community Management API for members). See docs/platforms.md → Analytics.
+ */
 export class LinkedInProfileProvider extends LinkedInBase {
 	readonly id = "linkedin" as const;
 	readonly displayName = "LinkedIn";
@@ -350,5 +406,112 @@ export class LinkedInPageProvider extends LinkedInBase {
 
 	protected authorUrn(channel: ChannelContext) {
 		return `urn:li:organization:${channel.externalId}`;
+	}
+
+	/** Organic statistics via rw_organization_admin, already requested. */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: LINKEDIN_STATS_MAX_POSTS,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+		getAccountMetrics: (channel, range) => this.getAccountMetrics(channel, range),
+	};
+
+	/**
+	 * Lifetime statistics for specific posts. The Posts API hands back either a
+	 * `urn:li:share:` or a `urn:li:ugcPost:` id, which go in different parameters.
+	 *
+	 * LinkedIn leaves out posts "with no actions or impressions" and says they
+	 * "can be assumed to have counts of 0", so those get explicit zeros — LinkedIn's
+	 * own statement, not an invented value. The flip side: a deleted post, or one
+	 * older than the 12-month statistics window, is indistinguishable and also
+	 * reads as zeros. Callers should stop polling posts older than a year.
+	 * https://learn.microsoft.com/linkedin/marketing/community-management/organizations/share-statistics
+	 */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		const shares = ids.filter((id) => id.startsWith("urn:li:share:"));
+		const ugcPosts = ids.filter((id) => id.startsWith("urn:li:ugcPost:"));
+		if (shares.length === 0 && ugcPosts.length === 0) return {};
+
+		const params = [
+			"q=organizationalEntity",
+			`organizationalEntity=${encodeURIComponent(this.authorUrn(channel))}`,
+			...(shares.length ? [`shares=${restliList(shares)}`] : []),
+			...(ugcPosts.length ? [`ugcPosts=${restliList(ugcPosts)}`] : []),
+		];
+		const res = await providerJson<{
+			elements?: { share?: string; ugcPost?: string; totalShareStatistics?: ShareStatistics }[];
+		}>(this.id, `${API}/rest/organizationalEntityShareStatistics?${params.join("&")}`, {
+			headers: this.headers(channel.accessToken, false),
+		});
+
+		const zero = mapLinkedInShareStatistics({
+			impressionCount: 0,
+			uniqueImpressionsCount: 0,
+			clickCount: 0,
+			likeCount: 0,
+			commentCount: 0,
+			shareCount: 0,
+		});
+		const out: Record<string, PostMetrics> = {};
+		for (const id of [...shares, ...ugcPosts]) out[id] = { ...zero };
+		for (const el of res.elements ?? []) {
+			const id = el.share ?? el.ugcPost;
+			if (id && id in out) out[id] = mapLinkedInShareStatistics(el.totalShareStatistics ?? {});
+		}
+		return out;
+	}
+
+	/**
+	 * Daily organic impressions/reach of the page's posts (time-bound share
+	 * statistics, DAY granularity, clamped to the 12-month window) plus today's
+	 * follower count from networkSizes. LinkedIn days are UTC midnight-aligned.
+	 * https://learn.microsoft.com/linkedin/marketing/community-management/organizations/share-statistics
+	 * https://learn.microsoft.com/linkedin/marketing/community-management/organizations/organization-lookup-api
+	 */
+	private async getAccountMetrics(
+		channel: ChannelContext,
+		range: DayRange,
+	): Promise<AccountMetricsDay[]> {
+		const days = new DayAccumulator(range);
+		const org = encodeURIComponent(this.authorUrn(channel));
+		const oldest = addDays(utcDay(new Date()), -(LINKEDIN_STATS_WINDOW_DAYS - 1));
+		const since = range.since < oldest ? oldest : range.since;
+
+		if (since <= range.until) {
+			const start = dayStartMs(since);
+			const end = dayStartMs(addDays(range.until, 1));
+			// Rest.li 2.0 object syntax, encoded as in LinkedIn's own sample request.
+			const intervals = `(timeRange:(start:${start},end:${end}),timeGranularityType:DAY)`
+				.replaceAll(":", "%3A")
+				.replaceAll(",", "%2C");
+			const res = await providerJson<{
+				elements?: { timeRange?: { start?: number }; totalShareStatistics?: ShareStatistics }[];
+			}>(
+				this.id,
+				`${API}/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${org}&timeIntervals=${intervals}`,
+				{ headers: this.headers(channel.accessToken, false) },
+			);
+			for (const el of res.elements ?? []) {
+				if (el.timeRange?.start === undefined) continue;
+				const stats = mapLinkedInShareStatistics(el.totalShareStatistics ?? {});
+				days.set(utcDay(new Date(el.timeRange.start)), {
+					impressions: stats.impressions,
+					reach: stats.reach,
+				});
+			}
+		}
+
+		const today = todayInRange(range);
+		if (today) {
+			const size = await providerJson<{ firstDegreeSize?: number }>(
+				this.id,
+				`${API}/rest/networkSizes/${this.authorUrn(channel)}?${form({ edgeType: "COMPANY_FOLLOWED_BY_MEMBER" })}`,
+				{ headers: this.headers(channel.accessToken, false) },
+			);
+			days.set(today, { followers: num(size.firstDegreeSize) });
+		}
+		return days.result();
 	}
 }

@@ -67,3 +67,20 @@ export type VideoScript = InferResponseType<typeof api.ai.videos.script.$post, 2
 export type VideoScene = VideoScript["scenes"][number];
 export type VideoInput = InferRequestType<typeof api.ai.videos.$post>["json"];
 export type VideoVoice = NonNullable<NonNullable<VideoInput["voiceover"]>["voice"]>;
+
+// ── Analytics (Phase 4) ─────────────────────────────────────────────────────
+export type AnalyticsOverviewQuery = InferRequestType<typeof api.analytics.overview.$get>["query"];
+export type AnalyticsOverview = InferResponseType<typeof api.analytics.overview.$get, 200>;
+export type AnalyticsTotals = AnalyticsOverview["totals"];
+export type AnalyticsDay = AnalyticsOverview["daily"][number];
+export type AnalyticsChannelRow = AnalyticsOverview["byChannel"][number];
+export type AnalyticsTopPost = AnalyticsOverview["topPosts"][number];
+export type AnalyticsPostsQuery = InferRequestType<typeof api.analytics.posts.$get>["query"];
+export type AnalyticsPostsPage = InferResponseType<typeof api.analytics.posts.$get, 200>;
+export type AnalyticsPostItem = AnalyticsPostsPage["items"][number];
+export type AnalyticsMetrics = AnalyticsPostItem["metrics"];
+export type AnalyticsSort = NonNullable<AnalyticsPostsQuery["sort"]>;
+export type PostAnalytics = InferResponseType<(typeof api.analytics.posts)[":postId"]["$get"], 200>;
+export type PostAnalyticsTarget = PostAnalytics["targets"][number];
+export type BestTimes = InferResponseType<(typeof api.analytics)["best-times"]["$get"], 200>;
+export type BestTimeCell = BestTimes["cells"][number];

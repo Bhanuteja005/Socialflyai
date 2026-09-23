@@ -1,5 +1,8 @@
 import type {
+	AccountMetricsDay,
+	AnalyticsSupport,
 	ChannelContext,
+	PostMetrics,
 	PublishOutcome,
 	SocialProvider,
 	TokenSet,
@@ -38,6 +41,49 @@ export class FakeProvider implements SocialProvider {
 	publishCalls: { token: string; text: string }[] = [];
 	statusCalls = 0;
 	refreshCalls = 0;
+
+	/** Absent until a test calls `withAnalytics`, so publishing tests see a provider without it. */
+	analytics?: AnalyticsSupport;
+	/** What the "platform" knows, by external id; ids missing here were deleted on the platform. */
+	platformMetrics = new Map<string, PostMetrics>();
+	accountDays: AccountMetricsDay[] = [];
+	/** Consumed one per analytics call: an error is thrown, null (or none left) answers normally. */
+	analyticsErrors: (Error | null)[] = [];
+	metricsCalls: { token: string; ids: string[] }[] = [];
+	accountCalls: { token: string; since: string; until: string }[] = [];
+
+	withAnalytics(opts: { maxPostsPerCall?: number; account?: boolean } = {}) {
+		const fail = () => {
+			const error = this.analyticsErrors.shift();
+			if (error) throw error;
+		};
+		this.analytics = {
+			maxPostsPerCall: opts.maxPostsPerCall ?? 2,
+			getPostMetrics: async (channel, ids) => {
+				this.metricsCalls.push({ token: channel.accessToken, ids });
+				fail();
+				const out: Record<string, PostMetrics> = {};
+				for (const id of ids) {
+					const m = this.platformMetrics.get(id);
+					if (m) out[id] = m;
+				}
+				return out;
+			},
+			...(opts.account === false
+				? {}
+				: {
+						getAccountMetrics: async (
+							channel: ChannelContext,
+							range: { since: string; until: string },
+						) => {
+							this.accountCalls.push({ token: channel.accessToken, ...range });
+							fail();
+							return this.accountDays;
+						},
+					}),
+		};
+		return this;
+	}
 
 	isConfigured() {
 		return true;

@@ -1,12 +1,27 @@
 import { z } from "zod";
-import { ProviderError } from "../errors";
+import {
+	addDays,
+	chunk,
+	compact,
+	DayAccumulator,
+	type DayRange,
+	dayStartSeconds,
+	metaEndTimeToDay,
+	num,
+	splitRange,
+	todayInRange,
+} from "../analytics";
+import { isProviderError, ProviderError } from "../errors";
 import { expiresAtFrom, form, providerJson } from "../http";
 import type {
+	AccountMetricsDay,
+	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
 	DiscoveredAccount,
 	MediaItem,
+	PostMetrics,
 	PublishInput,
 	PublishOutcome,
 	SocialProvider,
@@ -150,6 +165,108 @@ async function graphPages<T>(
 		next = res.paging?.next;
 	}
 	return out;
+}
+
+// ---------------------------------------------------------------------------
+// Read-only analytics helpers (also used by threads.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Graph caps a multiple-ID read (`?ids=a,b,c`) at 50 ids.
+ * https://developers.facebook.com/docs/apps/upgrading (v2.x notes: "limited to requesting only 50 IDs")
+ */
+export const GRAPH_MAX_IDS = 50;
+
+/**
+ * "Object does not exist" as Graph reports it for a deleted post/media: 100/33
+ * on a single-object read, 803 ("some of the aliases you requested do not
+ * exist") on a multiple-ID read.
+ */
+export const isMissingGraphObject = (error: unknown): boolean =>
+	isProviderError(error) &&
+	error.kind === "invalid_request" &&
+	(error.details.platformCode === "100/33" || error.details.platformCode === "803");
+
+export type Classify = (status: number, body: string) => ProviderError | undefined;
+
+/**
+ * Reads `fields` for many Graph objects with as few requests as possible.
+ *
+ * A multiple-ID read fails as a whole if ANY id is gone (a deleted post), so on
+ * a content-level rejection we fall back to one read per id and drop the ids
+ * Graph says no longer exist. With `skipRejected`, any other per-id rejection
+ * also just drops that id (used for insights, which Meta refuses per media for
+ * reasons that say nothing about the others, e.g. "not enough viewers").
+ */
+export async function graphObjects<T>(
+	provider: string,
+	graphBase: string,
+	ids: string[],
+	fields: string,
+	accessToken: string,
+	opts: { classify?: Classify; skipRejected?: boolean } = {},
+): Promise<Record<string, T>> {
+	const classify: Classify = opts.classify ?? ((s, b) => classifyMetaError(provider, s, b));
+	const get = <R>(url: string) =>
+		providerJson<R>(provider, url, { headers: graphHeaders(accessToken, false), classify });
+
+	const out: Record<string, T> = {};
+	for (const batch of chunk(ids, GRAPH_MAX_IDS)) {
+		if (batch.length > 1) {
+			try {
+				Object.assign(
+					out,
+					await get<Record<string, T>>(`${graphBase}/?${form({ ids: batch.join(","), fields })}`),
+				);
+				continue;
+			} catch (error) {
+				if (!(isProviderError(error) && error.kind === "invalid_request")) throw error;
+			}
+		}
+		for (const id of batch) {
+			try {
+				out[id] = await get<T>(`${graphBase}/${encodeURIComponent(id)}?${form({ fields })}`);
+			} catch (error) {
+				if (isMissingGraphObject(error)) continue;
+				if (opts.skipRejected && isProviderError(error) && error.kind === "invalid_request") {
+					continue;
+				}
+				throw error;
+			}
+		}
+	}
+	return out;
+}
+
+/** One entry of an `insights` edge. Lifetime metrics use `values[0]`, newer ones `total_value`. */
+export type InsightEntry = {
+	name: string;
+	period?: string;
+	values?: { value?: unknown; end_time?: string }[];
+	total_value?: { value?: unknown };
+};
+
+/** name → number for lifetime/total insights; non-numeric (breakdown) values are ignored. */
+export function insightTotals(entries: InsightEntry[] | undefined): Record<string, number> {
+	const out: Record<string, number> = {};
+	for (const e of entries ?? []) {
+		const value = num(e.total_value?.value ?? e.values?.[0]?.value);
+		if (value !== undefined) out[e.name] = value;
+	}
+	return out;
+}
+
+/** Feeds a daily insight series (values[].end_time) into the accumulator under `key`. */
+export function collectDailySeries(
+	days: DayAccumulator,
+	entry: InsightEntry,
+	key: keyof Omit<AccountMetricsDay, "date">,
+) {
+	for (const v of entry.values ?? []) {
+		const value = num(v.value);
+		if (value === undefined || !v.end_time) continue;
+		days.set(metaEndTimeToDay(v.end_time), { [key]: value });
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -395,6 +512,9 @@ const facebookCapabilities: Capabilities = {
 	maxVideoDurationSeconds: 20 * 60,
 };
 
+/** "Only 90 days of insights can be viewed at one time." (insights reference) */
+const FACEBOOK_INSIGHTS_MAX_DAYS = 90;
+
 const facebookSettingsSchema = z.object({});
 type FacebookSettings = z.infer<typeof facebookSettingsSchema>;
 
@@ -413,6 +533,112 @@ export class FacebookProvider extends MetaBase<FacebookSettings> {
 		"read_insights",
 		"business_management",
 	];
+
+	/**
+	 * Uses read_insights + pages_read_engagement, both already requested.
+	 * Metric names follow the November 2025 Page Insights change: `impressions`
+	 * metrics were replaced by `media_view` ("views") ones and `page_fans` by
+	 * `page_follows`; `*_impressions_unique` is deprecated above v25.
+	 * https://developers.facebook.com/blog/post/2025/08/15/page-insights-api-updates/
+	 * https://developers.facebook.com/docs/graph-api/reference/insights
+	 */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: GRAPH_MAX_IDS,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+		getAccountMetrics: (channel, range) => this.getAccountMetrics(channel, range),
+	};
+
+	/**
+	 * publish() returns `{page}_{post}` ids for feed/photo posts and a bare VIDEO id
+	 * for videos. Post insights only exist on the post; for videos we read the
+	 * reaction/comment counts (video insights need pages_manage_engagement, which
+	 * we do not request).
+	 * https://developers.facebook.com/docs/graph-api/reference/post/
+	 */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		type Counted = { summary?: { total_count?: number } };
+		type Row = {
+			insights?: { data?: InsightEntry[] };
+			reactions?: Counted;
+			comments?: Counted;
+			shares?: { count?: number };
+		};
+		const counts = "reactions.limit(0).summary(total_count),comments.limit(0).summary(total_count)";
+		const posts = await graphObjects<Row>(
+			this.id,
+			this.graph,
+			ids.filter((id) => id.includes("_")),
+			`insights.metric(post_media_view,post_total_media_view_unique,post_clicks),${counts},shares`,
+			channel.accessToken,
+		);
+		const objects = await graphObjects<Row>(
+			this.id,
+			this.graph,
+			ids.filter((id) => !id.includes("_")),
+			counts,
+			channel.accessToken,
+		);
+
+		const out: Record<string, PostMetrics> = {};
+		for (const [id, row] of Object.entries(posts)) {
+			const insights = insightTotals(row.insights?.data);
+			out[id] = compact({
+				impressions: insights.post_media_view,
+				reach: insights.post_total_media_view_unique,
+				clicks: insights.post_clicks,
+				likes: num(row.reactions?.summary?.total_count),
+				comments: num(row.comments?.summary?.total_count),
+				// Graph omits `shares` on a post nobody shared; since we asked for it on a
+				// post that exists, absence is Graph's way of saying 0 — not "unknown".
+				shares: num(row.shares?.count) ?? 0,
+			});
+		}
+		for (const [id, row] of Object.entries(objects)) {
+			out[id] = compact({
+				likes: num(row.reactions?.summary?.total_count),
+				comments: num(row.comments?.summary?.total_count),
+			});
+		}
+		return out;
+	}
+
+	/**
+	 * Daily Page insights. Graph returns at most 90 days per request, so wider
+	 * ranges are split. `until` is exclusive on Meta's side, hence the +1 day.
+	 * https://developers.facebook.com/docs/graph-api/reference/insights
+	 */
+	private async getAccountMetrics(
+		channel: ChannelContext,
+		range: DayRange,
+	): Promise<AccountMetricsDay[]> {
+		const days = new DayAccumulator(range);
+		const keys: Record<string, keyof Omit<AccountMetricsDay, "date">> = {
+			page_follows: "followers",
+			page_media_view: "impressions",
+			page_total_media_view_unique: "reach",
+			page_views_total: "profileViews",
+		};
+		for (const part of splitRange(range, FACEBOOK_INSIGHTS_MAX_DAYS)) {
+			const res = await providerJson<{ data?: InsightEntry[] }>(
+				this.id,
+				`${this.graph}/${channel.externalId}/insights?${form({
+					metric: Object.keys(keys).join(","),
+					period: "day",
+					since: String(dayStartSeconds(part.since)),
+					until: String(dayStartSeconds(addDays(part.until, 1))),
+				})}`,
+				{ headers: graphHeaders(channel.accessToken, false), classify: this.classify() },
+			);
+			for (const entry of res.data ?? []) {
+				const key = keys[entry.name];
+				if (key && (entry.period ?? "day") === "day") collectDailySeries(days, entry, key);
+			}
+		}
+		return days.result();
+	}
 
 	protected async discoverAccounts(userToken: string): Promise<DiscoveredAccount[]> {
 		const pages = await this.listPages(userToken, "id,name,access_token,tasks,link,picture{url}");
@@ -529,6 +755,18 @@ const instagramCapabilities: Capabilities = {
 	maxVideoDurationSeconds: 15 * 60,
 };
 
+/**
+ * Instagram rejects user-insights requests spanning more than 30 days. Not stated
+ * on the current reference page; long-standing API behaviour, so we stay under it.
+ */
+const INSTAGRAM_INSIGHTS_MAX_DAYS = 30;
+
+/** Metric set per media product type: every metric must apply to every media in one request. */
+export function instagramInsightMetrics(productType: string | undefined): string {
+	// Stories report reach/views/shares but not saves.
+	return productType === "STORY" ? "reach,views,shares" : "reach,views,saved,shares";
+}
+
 const instagramSettingsSchema = z.object({
 	postType: z.enum(["feed", "reel", "story"]).default("feed"),
 });
@@ -596,6 +834,126 @@ export class InstagramProvider extends MetaBase<InstagramSettings> {
 
 	validate(input: PublishInput<InstagramSettings>): string[] {
 		return validateInstagram(input);
+	}
+
+	/** Uses instagram_basic + instagram_manage_insights + pages_read_engagement, already requested. */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: GRAPH_MAX_IDS,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+		getAccountMetrics: (channel, range) => this.getAccountMetrics(channel, range),
+	};
+
+	/**
+	 * Counts from the media fields (one multiple-ID read), then insights grouped
+	 * by media type, because Graph rejects the whole request if one metric does
+	 * not apply to one media (stories have no `saved`). `impressions`, `plays` and
+	 * `video_views` are deprecated (v22, April 2025) in favour of `views`.
+	 * https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/insights
+	 */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		type Media = { media_product_type?: string; like_count?: number; comments_count?: number };
+		const media = await graphObjects<Media>(
+			this.id,
+			this.graph,
+			ids,
+			"media_product_type,like_count,comments_count",
+			channel.accessToken,
+		);
+
+		const groups = new Map<string, string[]>();
+		for (const [id, m] of Object.entries(media)) {
+			const metrics = instagramInsightMetrics(m.media_product_type);
+			groups.set(metrics, [...(groups.get(metrics) ?? []), id]);
+		}
+		const insights: Record<string, Record<string, number>> = {};
+		for (const [metrics, groupIds] of groups) {
+			const rows = await graphObjects<{ insights?: { data?: InsightEntry[] } }>(
+				this.id,
+				this.graph,
+				groupIds,
+				`insights.metric(${metrics})`,
+				channel.accessToken,
+				// A media Meta will not report on (too few viewers, posted before the
+				// business conversion) keeps its like/comment counts, just no insights.
+				{ classify: this.insightsClassify, skipRejected: true },
+			);
+			for (const [id, row] of Object.entries(rows))
+				insights[id] = insightTotals(row.insights?.data);
+		}
+
+		const out: Record<string, PostMetrics> = {};
+		for (const [id, m] of Object.entries(media)) {
+			const i = insights[id] ?? {};
+			out[id] = compact({
+				likes: num(m.like_count),
+				comments: num(m.comments_count),
+				reach: i.reach,
+				// `views` replaced `impressions`: times the media was displayed or played.
+				impressions: i.views,
+				// For reels a view IS a play — the closest thing IG still reports to video views.
+				videoViews: m.media_product_type === "REELS" ? i.views : undefined,
+				saves: i.saved,
+				shares: i.shares,
+			});
+		}
+		return out;
+	}
+
+	/**
+	 * Code 10 normally means a missing permission (→ auth), but IG also uses it
+	 * for "Not enough viewers for the media to show insights", which concerns that
+	 * one media and must not push the channel into needs_reauth.
+	 */
+	private insightsClassify: Classify = (status, body) => {
+		const err = classifyMetaError(this.id, status, body);
+		if (err?.kind === "auth" && err.details.platformCode === "10" && /viewers/i.test(err.message)) {
+			return new ProviderError("invalid_request", this.id, err.message, err.details);
+		}
+		return err;
+	};
+
+	/**
+	 * Daily `reach` (time series, requested in ≤30-day windows) plus the current
+	 * `followers_count` for today. The `follower_count` insight counts NEW followers
+	 * per day, not a total, and `profile_views` is no longer in the documented
+	 * metric list, so neither is used.
+	 * https://developers.facebook.com/docs/instagram-platform/api-reference/instagram-user/insights
+	 * https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user
+	 */
+	private async getAccountMetrics(
+		channel: ChannelContext,
+		range: DayRange,
+	): Promise<AccountMetricsDay[]> {
+		const days = new DayAccumulator(range);
+		for (const part of splitRange(range, INSTAGRAM_INSIGHTS_MAX_DAYS)) {
+			const res = await providerJson<{ data?: InsightEntry[] }>(
+				this.id,
+				`${this.graph}/${channel.externalId}/insights?${form({
+					metric: "reach",
+					period: "day",
+					metric_type: "time_series",
+					since: String(dayStartSeconds(part.since)),
+					until: String(dayStartSeconds(addDays(part.until, 1))),
+				})}`,
+				{ headers: graphHeaders(channel.accessToken, false), classify: this.classify() },
+			);
+			for (const entry of res.data ?? []) {
+				if (entry.name === "reach") collectDailySeries(days, entry, "reach");
+			}
+		}
+		const today = todayInRange(range);
+		if (today) {
+			const user = await providerJson<{ followers_count?: number }>(
+				this.id,
+				`${this.graph}/${channel.externalId}?fields=followers_count`,
+				{ headers: graphHeaders(channel.accessToken, false), classify: this.classify() },
+			);
+			days.set(today, { followers: num(user.followers_count) });
+		}
+		return days.result();
 	}
 
 	protected async discoverAccounts(userToken: string): Promise<DiscoveredAccount[]> {

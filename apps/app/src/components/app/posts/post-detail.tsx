@@ -17,6 +17,7 @@ import { errorMessage, isApiError } from "@/lib/errors";
 import { formatDateTime, formatRelative, zoneLabel } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
 import { isPostEditable } from "@/lib/status";
+import { PostPerformance } from "../analytics/post-performance";
 import { MediaThumb } from "../media/media-thumb";
 import { useOrg } from "../org-provider";
 import { PageHeader } from "../page-header";
@@ -247,6 +248,7 @@ export function PostDetailView({ id }: { id: string }) {
 							))}
 						</ul>
 					</Card>
+					{anyPublished ? <PostPerformance postId={post.id} /> : null}
 				</div>
 				<Card className="lg:sticky lg:top-6">
 					<CardHeader>

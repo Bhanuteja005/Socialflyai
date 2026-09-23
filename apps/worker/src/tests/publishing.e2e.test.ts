@@ -6,7 +6,7 @@ import { ProviderError, ProviderRegistry } from "@socialfly/integrations";
 import { jobIds, publishQueueName, QUEUE_PREFIX, QUEUES } from "@socialfly/queue";
 import { Queue } from "bullmq";
 import { ChannelTokens } from "#src/channels/channel-tokens.ts";
-import { database, db, jobs, queueConnection, tokenCipher } from "#src/infrastructure/index.ts";
+import { db, jobs, queueConnection, tokenCipher } from "#src/infrastructure/index.ts";
 import { Maintenance } from "#src/maintenance/maintenance.ts";
 import { PublishingEngine } from "#src/publishing/publishing-engine.ts";
 import { TargetState } from "#src/publishing/target-state.ts";
@@ -47,9 +47,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-	await Promise.all([publishQueue.close(), statusQueue.close(), jobs.close()]);
-	await queueConnection.quit();
-	await database.close();
+	await Promise.all([publishQueue.close(), statusQueue.close()]);
 });
 
 /** An org, a channel and one post with one target scheduled at `scheduleVersion` 1. */

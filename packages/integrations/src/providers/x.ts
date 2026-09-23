@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { compact, type DayRange, num, sumKnown, todayInRange } from "../analytics";
 import { ProviderError } from "../errors";
 import {
 	createPkce,
@@ -9,10 +10,13 @@ import {
 	providerJson,
 } from "../http";
 import type {
+	AccountMetricsDay,
+	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
 	MediaItem,
+	PostMetrics,
 	PublishInput,
 	PublishOutcome,
 	SocialProvider,
@@ -135,6 +139,36 @@ export function classifyXError(
 	return undefined;
 }
 
+/**
+ * `public_metrics` of a post. The data dictionary names the repost counter
+ * `retweet_count`; the newer endpoint reference calls it `repost_count`. Both
+ * are read so the rename cannot silently drop shares.
+ * https://docs.x.com/x-api/fundamentals/data-dictionary
+ */
+type XPublicMetrics = {
+	impression_count?: number;
+	like_count?: number;
+	reply_count?: number;
+	retweet_count?: number;
+	repost_count?: number;
+	quote_count?: number;
+	bookmark_count?: number;
+};
+
+export function mapXPublicMetrics(m: XPublicMetrics): PostMetrics {
+	return compact({
+		impressions: num(m.impression_count),
+		likes: num(m.like_count),
+		comments: num(m.reply_count),
+		// Reposts and quote posts both re-share the post to other timelines.
+		shares: sumKnown(num(m.retweet_count ?? m.repost_count), num(m.quote_count)),
+		saves: num(m.bookmark_count),
+	});
+}
+
+/** Max ids per posts lookup. https://docs.x.com/x-api/posts/get-posts-by-ids */
+const X_LOOKUP_MAX_IDS = 100;
+
 const mediaCategory = (m: MediaItem) =>
 	m.kind === "video" ? "tweet_video" : m.mimeType === "image/gif" ? "tweet_gif" : "tweet_image";
 
@@ -156,6 +190,61 @@ export class XProvider implements SocialProvider<Settings> {
 	}
 
 	private classify = (status: number, body: string) => classifyXError(this.id, status, body);
+
+	/**
+	 * Needs tweet.read + users.read, which publishing already requests. Reads count
+	 * against the app's paid-tier monthly post-read cap, so the collector should
+	 * poll sparingly.
+	 */
+	readonly analytics: AnalyticsSupport = {
+		maxPostsPerCall: X_LOOKUP_MAX_IDS,
+		getPostMetrics: (channel, ids) => this.getPostMetrics(channel, ids),
+		getAccountMetrics: (channel, range) => this.getAccountMetrics(channel, range),
+	};
+
+	/**
+	 * Posts lookup with public_metrics. Deleted or protected posts come back in
+	 * `errors` (resource-not-found), not `data`, so they are simply absent here.
+	 * https://docs.x.com/x-api/posts/get-posts-by-ids
+	 */
+	private async getPostMetrics(
+		channel: ChannelContext,
+		ids: string[],
+	): Promise<Record<string, PostMetrics>> {
+		if (ids.length === 0) return {};
+		const res = await providerJson<{
+			data?: { id: string; public_metrics?: XPublicMetrics }[];
+		}>(this.id, `${API}/tweets?${form({ ids: ids.join(","), "tweet.fields": "public_metrics" })}`, {
+			headers: { Authorization: `Bearer ${channel.accessToken}` },
+			classify: this.classify,
+		});
+		const out: Record<string, PostMetrics> = {};
+		for (const post of res.data ?? []) {
+			out[post.id] = post.public_metrics ? mapXPublicMetrics(post.public_metrics) : {};
+		}
+		return out;
+	}
+
+	/**
+	 * X exposes no follower history, only the current count, so the result is at
+	 * most one row: today, if it is inside the range.
+	 * https://docs.x.com/x-api/users/get-my-user
+	 */
+	private async getAccountMetrics(
+		channel: ChannelContext,
+		range: DayRange,
+	): Promise<AccountMetricsDay[]> {
+		const today = todayInRange(range);
+		if (!today) return [];
+		const me = await providerJson<{
+			data?: { public_metrics?: { followers_count?: number } };
+		}>(this.id, `${API}/users/me?${form({ "user.fields": "public_metrics" })}`, {
+			headers: { Authorization: `Bearer ${channel.accessToken}` },
+			classify: this.classify,
+		});
+		const followers = num(me.data?.public_metrics?.followers_count);
+		return followers === undefined ? [] : [{ date: today, followers }];
+	}
 
 	/** https://docs.x.com/resources/fundamentals/authentication/oauth-2-0/authorization-code */
 	async getAuthorizationUrl({ redirectUri, state }: { redirectUri: string; state: string }) {

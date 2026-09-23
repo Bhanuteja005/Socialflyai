@@ -144,6 +144,10 @@ export const postTargets = pgTable(
 			.on(t.scheduledAt)
 			.where(sql`${t.status} in ('scheduled', 'queued')`),
 		index("post_targets_channel_idx").on(t.channelId),
+		// The analytics collector's due-selection: a channel's published targets by age.
+		index("post_targets_published_idx")
+			.on(t.channelId, t.publishedAt)
+			.where(sql`${t.status} = 'published'`),
 	],
 );
 

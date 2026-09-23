@@ -27,6 +27,11 @@ export const QUEUES = {
 	maintenance: "maintenance",
 	/** AI image generation and carousel rendering: slow, paid calls kept off the request path. */
 	aiMedia: "ai-media",
+	/**
+	 * Read-only metrics collection. Its own queue (and concurrency) so a backlog of
+	 * analytics reads can never delay a publish, which has a user-visible deadline.
+	 */
+	analytics: "analytics",
 } as const;
 
 export const publishJobSchema = z.object({
@@ -61,6 +66,26 @@ export const maintenanceJobSchema = z.object({
 export type MaintenanceJob = z.infer<typeof maintenanceJobSchema>;
 
 /**
+ * `plan` (on a job scheduler) finds channels with metrics due and enqueues one
+ * collect job per channel; the collect jobs call the platform. Per channel rather
+ * than per target because platforms answer several posts in one call.
+ */
+export const analyticsJobSchema = z.discriminatedUnion("task", [
+	z.object({ task: z.literal("plan") }),
+	z.object({
+		task: z.literal("collect-posts"),
+		channelId: z.uuid(),
+		/**
+		 * Set by a user's "refresh now": collect every post still in the collection
+		 * window (not only those due by age), skipping ones captured minutes ago.
+		 */
+		force: z.boolean().optional(),
+	}),
+	z.object({ task: z.literal("collect-account"), channelId: z.uuid() }),
+]);
+export type AnalyticsJob = z.infer<typeof analyticsJobSchema>;
+
+/**
  * Deterministic job ids make enqueueing idempotent: scheduling the same target
  * twice (double click, API retry, sweep racing the original job) is a no-op in
  * BullMQ instead of a double post. The schedule version is part of the id so a
@@ -72,4 +97,16 @@ export const jobIds = {
 	aiMedia: (generationId: string) => `ai-media.${generationId}`,
 	tokenRefresh: (channelId: string, expiresAtEpoch: number) =>
 		`refresh.${channelId}.${expiresAtEpoch}`,
+	/**
+	 * Analytics ids carry a time bucket: every planner run within the bucket (and
+	 * every replica) maps to the same id, so duplicates collapse while the finished
+	 * job is retained, and the next bucket gets a fresh job.
+	 */
+	analyticsPosts: (channelId: string, hourBucket: number) =>
+		`analytics.posts.${channelId}.${hourBucket}`,
+	analyticsAccount: (channelId: string, utcDay: string) =>
+		`analytics.account.${channelId}.${utcDay}`,
+	/** User-requested refresh: its own 10-minute bucket so it is not swallowed by the hourly job. */
+	analyticsRefresh: (kind: "posts" | "account", channelId: string, tenMinuteBucket: number) =>
+		`analytics.refresh.${kind}.${channelId}.${tenMinuteBucket}`,
 };

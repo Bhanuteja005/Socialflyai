@@ -7,6 +7,8 @@ import { createProviderRegistry } from "@socialfly/integrations";
 import { createQueueConnection, JobProducer } from "@socialfly/queue";
 import { S3Client } from "bun";
 import { AiMediaProcessor } from "#src/ai/ai-media.ts";
+import { AnalyticsCollector } from "#src/analytics/analytics-collector.ts";
+import { RedisCallBudget } from "#src/analytics/call-budget.ts";
 import { ChannelTokens } from "#src/channels/channel-tokens.ts";
 import { Maintenance } from "#src/maintenance/maintenance.ts";
 import { PublishingEngine } from "#src/publishing/publishing-engine.ts";
@@ -48,6 +50,15 @@ export const engine = new PublishingEngine({
 	publicMediaUrl: env.S3_PUBLIC_URL,
 });
 export const maintenance = new Maintenance(db, jobs, targetState, logger);
+
+export const analytics = new AnalyticsCollector({
+	db,
+	providers,
+	tokens: channelTokens,
+	budget: new RedisCallBudget(queueConnection),
+	jobs,
+	logger,
+});
 
 /** Same bucket as the API: it presigns user uploads there, the worker writes AI output there. */
 export const storage = new S3Client({
