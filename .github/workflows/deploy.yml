@@ -51,8 +51,8 @@ jobs:
           - { app: worker, port: "4500", dockerfile: infra/docker/service.Dockerfile }
           - { app: web, port: "3000", dockerfile: infra/docker/web.Dockerfile }
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/login@v2
+      - uses: actions/checkout@v7
+      - uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -101,8 +101,8 @@ jobs:
       APP_WEB: ${{ vars.ACA_WEB_APP }}
       JOB_MIGRATE: ${{ vars.ACA_MIGRATE_JOB }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/login@v2
+      - uses: actions/checkout@v7
+      - uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
