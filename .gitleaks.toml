@@ -23,6 +23,16 @@ paths = ['''bun\.lock''']
 regexes = [
   '''socialfly-dev-secret''',
   '''dev-only-jwt-secret-do-not-use-in-production''',
+  # The worked example from X's public OAuth 1.0a "Creating a signature" docs
+  # (developer.x.com). Not credentials for any real account: packages/integrations
+  # uses them to prove our request signing matches the spec byte for byte.
+  '''xvz1evFS4wEEPTGEFPHBog''',
+  '''kAcSOqF21Fu85e7zjz7ZN2U4ZRhfV3WpwPAoE3Z7kBw''',
+  '''370773112-GmHxMAgYyLbNEtIKZeRNFsMKPR9EyMZeS9weJAEb''',
+  '''LswwdoUaIvS8ltyTt5jkRh4J50vUPVVHtR2YPi5kE''',
+  '''kYjzVBB8Y0ZFabxSWbWovY3uYSQ2pTgmZeNu2VS4cg''',
+  # ...and the signature that example produces (plain and URL-encoded).
+  '''Ls93hJiZbQ3akF3HF3x1Bz8''',
   # packages/config's dev-only TOKEN_ENCRYPTION_KEY default — production refuses to boot on it.
   '''ZGV2LW9ubHktdG9rZW4ta2V5LTMyLWJ5dGVzLWxvbmc=''',
 ]
