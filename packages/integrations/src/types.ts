@@ -171,6 +171,91 @@ export interface AnalyticsSupport {
 	): Promise<AccountMetricsDay[]>;
 }
 
+/** Someone on the platform. Never trusted for anything but display. */
+export type EngagementAuthor = {
+	externalId: string | null;
+	name: string | null;
+	/** @handle / username without the @. */
+	handle: string | null;
+	avatarUrl: string | null;
+	profileUrl: string | null;
+};
+
+/**
+ * One thing a person said that the brand may want to answer: a comment on our
+ * post, a reply in a thread under it, or a public mention of the account.
+ */
+export type EngagementItem = {
+	/** Platform id of the comment/reply/mention — what `reply()` answers. */
+	externalId: string;
+	kind: "comment" | "reply" | "mention";
+	/** externalId of OUR post it belongs to (as publish() returned it); null for mentions. */
+	postExternalId: string | null;
+	/** Direct parent (a comment id for replies); null for top-level comments and mentions. */
+	parentExternalId: string | null;
+	author: EngagementAuthor;
+	/** True when the author is the channel itself (our own replies) — shown, never answered. */
+	fromSelf: boolean;
+	text: string;
+	url: string | null;
+	createdAt: string; // ISO
+};
+
+/** A public post found by keyword listening (not addressed to us). */
+export type DiscussionItem = {
+	externalId: string;
+	author: EngagementAuthor;
+	title: string | null;
+	text: string;
+	url: string | null;
+	/** Where it was found, e.g. "r/marketing". */
+	community: string | null;
+	createdAt: string;
+	score: number | null;
+	commentCount: number | null;
+};
+
+/**
+ * Comments, mentions, replies and listening. Optional per provider, like
+ * analytics. `reply` creates a VISIBLE public post: it is mutating, and an
+ * unknown outcome must be reported as ProviderError kind `unknown_outcome` so
+ * the caller marks it unconfirmed instead of retrying into a double reply.
+ */
+export interface EngagementSupport {
+	/** OAuth scopes needed (checked against channels.scopes to explain what a reconnect unlocks). */
+	readonly requiredScopes: { read: string[]; reply: string[] };
+	/**
+	 * Comments/replies on the given posts newer than `since`. Posts the platform no
+	 * longer knows are skipped silently.
+	 */
+	listComments(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]>;
+	readonly maxPostsPerCall: number;
+	/** Public mentions of the account newer than `since` (where the platform exposes them). */
+	listMentions?(
+		channel: ChannelContext,
+		input: { since: string | null },
+	): Promise<EngagementItem[]>;
+	/** Post a public reply. Returns the new item's id and link. */
+	reply(
+		channel: ChannelContext,
+		input: {
+			toExternalId: string;
+			kind: EngagementItem["kind"];
+			postExternalId: string | null;
+			text: string;
+		},
+	): Promise<{ externalId: string; url: string | null }>;
+	readonly maxReplyLength: number;
+	/** Keyword listening across the platform's public content (Reddit search, X recent search). */
+	searchDiscussions?(
+		channel: ChannelContext,
+		input: { query: string; since: string | null; limit: number },
+	): Promise<DiscussionItem[]>;
+}
+
 export interface SocialProvider<
 	TSettings extends Record<string, unknown> = Record<string, unknown>,
 > {
@@ -205,6 +290,9 @@ export interface SocialProvider<
 
 	/** Present when the platform exposes analytics we can read with the granted scopes. */
 	readonly analytics?: AnalyticsSupport;
+
+	/** Present when the platform lets us read and answer comments/mentions. */
+	readonly engagement?: EngagementSupport;
 	checkStatus?(
 		channel: ChannelContext,
 		pendingData: Record<string, unknown>,

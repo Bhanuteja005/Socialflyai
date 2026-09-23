@@ -1,9 +1,10 @@
 import type { Logger } from "@socialfly/core/logger";
 import { and, type Database, eq, inArray, isNotNull, lt, lte, schema, sql } from "@socialfly/db";
 import type { JobProducer, MaintenanceJob } from "@socialfly/queue";
+import { ReplyState } from "#src/engagement/reply-state.ts";
 import type { TargetState } from "#src/publishing/target-state.ts";
 
-const { postTargets, channels, aiGenerations, researchRuns } = schema;
+const { postTargets, channels, aiGenerations, researchRuns, engagementReplies } = schema;
 
 /** A target left in `publishing` this long means its worker died mid-attempt. */
 const STUCK_PUBLISHING_MS = 15 * 60_000;
@@ -11,6 +12,8 @@ const STUCK_PUBLISHING_MS = 15 * 60_000;
 const STUCK_PROCESSING_MS = 2 * 3600_000;
 /** Far beyond any real image call (providers time out at ~3 min, with one retry). */
 const STUCK_AI_GENERATION_MS = 30 * 60_000;
+/** A queued reply with no job this long: its enqueue was lost (the job is normally instant). */
+const ORPHANED_REPLY_MS = 2 * 60_000;
 /** A crawl is capped at 8 minutes and one analysis call; 30 minutes means the job was lost. */
 const STUCK_RESEARCH_RUN_MS = 30 * 60_000;
 
@@ -25,12 +28,16 @@ export class Maintenance {
 		private readonly jobs: JobProducer,
 		private readonly state: TargetState,
 		private readonly logger: Logger,
+		private readonly replies: ReplyState = new ReplyState(db),
 	) {}
 
 	async run(job: MaintenanceJob) {
 		switch (job.task) {
-			case "sweep-due-targets":
-				return this.sweepDueTargets();
+			case "sweep-due-targets": {
+				const targets = await this.sweepDueTargets();
+				const replies = await this.sweepQueuedReplies();
+				return { ...targets, replies: replies.recovered };
+			}
 			case "recover-stuck-targets": {
 				// AI media recovery rides on this schedule because the task enum lives in
 				// packages/queue; a separate task id would need a queue-package change for
@@ -38,8 +45,10 @@ export class Maintenance {
 				const targets = await this.recoverStuckTargets();
 				const aiGenerations = await this.recoverStuckAiGenerations();
 				const researchRuns = await this.recoverStuckResearchRuns();
+				const replies = await this.recoverStuckReplies();
 				return {
 					...targets,
+					replies: replies.recovered,
 					aiGenerations: aiGenerations.recovered,
 					researchRuns: researchRuns.recovered,
 				};
@@ -104,6 +113,52 @@ export class Maintenance {
 		}
 		if (stuck.length > 0)
 			this.logger.error({ count: stuck.length }, "stuck targets marked unconfirmed");
+		return { recovered: stuck.length };
+	}
+
+	/**
+	 * Inbox replies whose job was lost between the API committing `queued` and the
+	 * enqueue (or a requeue after a rate limit). Re-enqueueing is safe: the job id and the
+	 * claim both carry the reply's version, so at most one job can ever send it.
+	 */
+	async sweepQueuedReplies() {
+		const rows = await this.db
+			.select({ reply: engagementReplies, provider: channels.provider })
+			.from(engagementReplies)
+			.innerJoin(schema.engagementItems, eq(schema.engagementItems.id, engagementReplies.itemId))
+			.innerJoin(channels, eq(channels.id, schema.engagementItems.channelId))
+			.where(
+				and(
+					eq(engagementReplies.status, "queued"),
+					lt(
+						engagementReplies.updatedAt,
+						sql`now() - make_interval(secs => ${ORPHANED_REPLY_MS / 1000})`,
+					),
+				),
+			)
+			.limit(500);
+		let recovered = 0;
+		for (const { reply, provider } of rows) {
+			const added = await this.jobs.ensureReply(provider, {
+				replyId: reply.id,
+				organizationId: reply.organizationId,
+				version: reply.attempts,
+			});
+			if (added) recovered++;
+		}
+		if (recovered > 0)
+			this.logger.warn({ recovered }, "sweep re-enqueued replies with no live job");
+		return { checked: rows.length, recovered };
+	}
+
+	/**
+	 * Replies stuck in `sending` become `unconfirmed`, never retried: the platform may
+	 * have posted the reply before the worker died.
+	 */
+	async recoverStuckReplies() {
+		const stuck = await this.replies.recoverStuck();
+		if (stuck.length > 0)
+			this.logger.error({ count: stuck.length }, "stuck replies marked unconfirmed");
 		return { recovered: stuck.length };
 	}
 

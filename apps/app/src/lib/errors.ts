@@ -69,6 +69,15 @@ const FRIENDLY: Record<string, string> = {
 		"Your website's robots.txt asks crawlers not to read these pages, so we stopped. Allow our crawler (SocialFlyBot) or research a different URL.",
 	seo_not_configured:
 		"Keyword data isn't set up on this server. Ask whoever runs SocialFly to add DataForSEO credentials.",
+	reply_in_progress:
+		"Another reply to this is already waiting for approval or being sent. Wait for it to finish first.",
+	reply_not_editable: "This reply is already on its way and can no longer be changed.",
+	reply_not_deletable: "Only drafts and rejected replies can be deleted.",
+	reply_changed: "Someone changed this reply meanwhile. Reload and try again.",
+	query_limit:
+		"You can have up to 10 active listening queries. Pause or delete one to add another.",
+	provider_unavailable:
+		"Listening needs a connected channel on a platform that supports search, like Reddit or X.",
 	network_error: "Can't reach SocialFly right now. Check your connection and try again.",
 };
 

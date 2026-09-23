@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { compact, type DayRange, num, sumKnown, todayInRange } from "../analytics";
+import { chunk, compact, type DayRange, num, sumKnown, todayInRange } from "../analytics";
+import {
+	checkReplyText,
+	decodeEntities,
+	finalizeItems,
+	MAX_PAGES_PER_POST,
+	toIso,
+	xWeightedLength,
+} from "../engagement";
 import { ProviderError } from "../errors";
 import {
 	createPkce,
@@ -15,6 +23,9 @@ import type {
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
+	DiscussionItem,
+	EngagementItem,
+	EngagementSupport,
 	MediaItem,
 	PostMetrics,
 	PublishInput,
@@ -40,8 +51,9 @@ const API = "https://api.x.com/2";
 
 /**
  * 280 is the limit for non-Premium accounts. X counts WEIGHTED characters (URLs
- * are always 23, CJK/emoji count 2) — that counting is not implemented yet, so
- * the composer's plain count can accept a post X then rejects, or vice versa.
+ * are always 23, CJK/emoji count 2). Replies are checked with that weighting
+ * (`xWeightedLength` in engagement.ts); the composer still uses a plain count, so
+ * it can accept a post X then rejects, or vice versa.
  * https://docs.x.com/resources/fundamentals/counting-characters
  *
  * Media: 4 images or 1 video/GIF, never mixed; images 5 MB, video 512 MB / 140 s.
@@ -169,6 +181,107 @@ export function mapXPublicMetrics(m: XPublicMetrics): PostMetrics {
 /** Max ids per posts lookup. https://docs.x.com/x-api/posts/get-posts-by-ids */
 const X_LOOKUP_MAX_IDS = 100;
 
+/**
+ * Engagement reads. Recent search only reaches back 7 days; `start_time` older
+ * than that is rejected, so it is clamped (a minute of slack for clock skew).
+ * https://docs.x.com/x-api/posts/search-recent-posts
+ */
+const X_SEARCH_WINDOW_MS = 7 * 86_400_000 - 60_000;
+/** Conversations ORed into one search query: ~40 chars each keeps well under the 512-char query cap of the smaller tiers. */
+const X_CONVERSATIONS_PER_QUERY = 10;
+const X_PAGE_SIZE = 100;
+/** Post ids are numeric strings (up to 19 digits); anything else never reaches the URL. */
+const X_ID = /^\d{1,19}$/;
+
+const X_TWEET_FIELDS = "created_at,author_id,conversation_id,referenced_tweets,public_metrics";
+const X_USER_FIELDS = "name,username,profile_image_url";
+
+type XTweet = {
+	id: string;
+	text?: string;
+	created_at?: string;
+	author_id?: string;
+	conversation_id?: string;
+	referenced_tweets?: { type: string; id: string }[];
+	public_metrics?: XPublicMetrics;
+};
+type XUser = { id: string; name?: string; username?: string; profile_image_url?: string };
+type XSearchPage = {
+	data?: XTweet[];
+	includes?: { users?: XUser[] };
+	meta?: { next_token?: string };
+};
+
+const xAuthor = (user: XUser | undefined, authorId: string | undefined) => ({
+	externalId: authorId ?? null,
+	name: user?.name ?? null,
+	handle: user?.username ?? null,
+	avatarUrl: user?.profile_image_url ?? null,
+	profileUrl: user?.username ? `https://x.com/${user.username}` : null,
+});
+
+const xPostUrl = (id: string, username: string | null | undefined) =>
+	username ? `https://x.com/${username}/status/${id}` : `https://x.com/i/web/status/${id}`;
+
+/**
+ * A post from a conversation (or the mentions timeline) → inbox item. A reply
+ * whose parent is the root of one of our posts is a "comment"; anything deeper
+ * is a "reply" under its direct parent.
+ */
+export function mapXEngagement(
+	t: XTweet,
+	users: Map<string, XUser>,
+	selfId: string,
+	kind: "conversation" | "mention",
+): EngagementItem | null {
+	const createdAt = toIso(t.created_at);
+	if (!createdAt) return null;
+	const user = t.author_id ? users.get(t.author_id) : undefined;
+	const parent = t.referenced_tweets?.find((r) => r.type === "replied_to")?.id ?? null;
+	const base = {
+		externalId: t.id,
+		author: xAuthor(user, t.author_id),
+		fromSelf: t.author_id === selfId,
+		// X escapes &, < and > in post text.
+		text: decodeEntities(t.text ?? ""),
+		url: xPostUrl(t.id, user?.username),
+		createdAt,
+	};
+	if (kind === "mention") {
+		return { ...base, kind: "mention", postExternalId: null, parentExternalId: null };
+	}
+	const root = t.conversation_id ?? null;
+	// Search returns the conversation's root too: that is our own post, not engagement.
+	if (root === t.id) return null;
+	const topLevel = parent === null || parent === root;
+	return {
+		...base,
+		kind: topLevel ? "comment" : "reply",
+		postExternalId: root,
+		parentExternalId: topLevel ? null : parent,
+	};
+}
+
+/**
+ * Listening defaults, added only when the query does not already decide them:
+ * no reposts (pure duplicates of the original) and English. A query that says
+ * `is:retweet` or `lang:xx` itself keeps full control.
+ */
+export function xListeningQuery(query: string): string {
+	const q = query.trim();
+	const extra: string[] = [];
+	if (!/\bis:retweet\b/i.test(q)) extra.push("-is:retweet");
+	if (!/\blang:/i.test(q)) extra.push("lang:en");
+	return [q.includes(" OR ") ? `(${q})` : q, ...extra].join(" ");
+}
+
+/** start_time for a 7-day-window endpoint: `since` clamped into the window. */
+export function xStartTime(since: string | null, now: Date = new Date()): string {
+	const floor = now.getTime() - X_SEARCH_WINDOW_MS;
+	const s = since ? Date.parse(since) : Number.NaN;
+	return new Date(Number.isNaN(s) ? floor : Math.max(s, floor)).toISOString();
+}
+
 const mediaCategory = (m: MediaItem) =>
 	m.kind === "video" ? "tweet_video" : m.mimeType === "image/gif" ? "tweet_gif" : "tweet_image";
 
@@ -190,6 +303,192 @@ export class XProvider implements SocialProvider<Settings> {
 	}
 
 	private classify = (status: number, body: string) => classifyXError(this.id, status, body);
+
+	/**
+	 * Replies to our posts, mentions, replying and keyword listening, all with
+	 * scopes publishing already requests (tweet.read users.read tweet.write).
+	 *
+	 * Needs a PAID API tier: search and the mentions timeline are not in the free
+	 * tier, and every post read counts against the app's monthly read cap. Since
+	 * February 2026, programmatic replies (Free/Basic/Pro/pay-per-use) are only
+	 * allowed when the author of the post being answered mentioned or quoted us;
+	 * X refuses others with a 403 that classifyXError maps to invalid_request.
+	 */
+	readonly engagement: EngagementSupport = {
+		requiredScopes: {
+			read: ["tweet.read", "users.read"],
+			reply: ["tweet.read", "tweet.write", "users.read"],
+		},
+		maxPostsPerCall: X_CONVERSATIONS_PER_QUERY,
+		maxReplyLength: capabilities.maxTextLength,
+		listComments: (channel, input) => this.listReplies(channel, input),
+		listMentions: (channel, input) => this.listMentions(channel, input),
+		reply: (channel, input) => this.reply(channel, input),
+		searchDiscussions: (channel, input) => this.searchDiscussions(channel, input),
+	};
+
+	/** Follows the pagination token for at most `maxPages` pages, collecting posts and expanded users. */
+	private async searchPages(
+		channel: ChannelContext,
+		path: string,
+		params: Record<string, string>,
+		opts: { maxPages?: number; maxPosts?: number; tokenParam?: string } = {},
+	): Promise<{ posts: XTweet[]; users: Map<string, XUser> }> {
+		const posts: XTweet[] = [];
+		const users = new Map<string, XUser>();
+		let token: string | undefined;
+		for (let page = 0; page < (opts.maxPages ?? MAX_PAGES_PER_POST); page++) {
+			const res = await providerJson<XSearchPage>(
+				this.id,
+				`${API}${path}?${form({
+					...params,
+					"tweet.fields": X_TWEET_FIELDS,
+					expansions: "author_id",
+					"user.fields": X_USER_FIELDS,
+					...(token ? { [opts.tokenParam ?? "next_token"]: token } : {}),
+				})}`,
+				{ headers: { Authorization: `Bearer ${channel.accessToken}` }, classify: this.classify },
+			);
+			posts.push(...(res.data ?? []));
+			for (const u of res.includes?.users ?? []) users.set(u.id, u);
+			token = res.meta?.next_token;
+			if (!token || (opts.maxPosts !== undefined && posts.length >= opts.maxPosts)) break;
+		}
+		return { posts, users };
+	}
+
+	/**
+	 * Replies to our posts via recent search on `conversation_id:` (ORed, 10 posts
+	 * per query). Only the last 7 days are searchable: older replies are never
+	 * seen. https://docs.x.com/x-api/posts/search-recent-posts
+	 */
+	private async listReplies(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]> {
+		const ids = input.postExternalIds.filter((id) => X_ID.test(id));
+		const items: (EngagementItem | null)[] = [];
+		for (const group of chunk(ids, X_CONVERSATIONS_PER_QUERY)) {
+			const { posts, users } = await this.searchPages(channel, "/tweets/search/recent", {
+				query: group.map((id) => `conversation_id:${id}`).join(" OR "),
+				start_time: xStartTime(input.since),
+				max_results: String(X_PAGE_SIZE),
+				sort_order: "recency",
+			});
+			items.push(...posts.map((t) => mapXEngagement(t, users, channel.externalId, "conversation")));
+		}
+		return finalizeItems(
+			items.filter((i) => i !== null),
+			input.since,
+		);
+	}
+
+	/**
+	 * Posts mentioning the account (reverse-chronological timeline). Replies to
+	 * our posts show up here too, since a reply mentions the author it answers;
+	 * the inbox keys items by externalId, so the overlap collapses there.
+	 * https://docs.x.com/x-api/users/get-mentions
+	 */
+	private async listMentions(
+		channel: ChannelContext,
+		input: { since: string | null },
+	): Promise<EngagementItem[]> {
+		const { posts, users } = await this.searchPages(
+			channel,
+			`/users/${encodeURIComponent(channel.externalId)}/mentions`,
+			// First poll (no `since`): the last 7 days, like replies.
+			{ start_time: input.since ?? xStartTime(null), max_results: String(X_PAGE_SIZE) },
+			{ tokenParam: "pagination_token" },
+		);
+		return finalizeItems(
+			posts
+				.map((t) => mapXEngagement(t, users, channel.externalId, "mention"))
+				.filter((i) => i !== null)
+				// Our own posts mentioning ourselves are not engagement.
+				.filter((i) => !i.fromSelf),
+			input.since,
+		);
+	}
+
+	/**
+	 * A reply is a post with `reply.in_reply_to_tweet_id`: the same mutating
+	 * create call as publish(). Length is X's weighted count (URLs = 23).
+	 * https://docs.x.com/x-api/posts/create-post
+	 */
+	private async reply(
+		channel: ChannelContext,
+		input: { toExternalId: string; kind: EngagementItem["kind"]; text: string },
+	): Promise<{ externalId: string; url: string | null }> {
+		if (!X_ID.test(input.toExternalId)) {
+			throw new ProviderError("invalid_request", this.id, "Not an X post id");
+		}
+		const text = checkReplyText(this.id, input.text, capabilities.maxTextLength, xWeightedLength);
+		const res = await providerJson<{ data?: { id: string } }>(this.id, `${API}/tweets`, {
+			method: "POST",
+			mutating: true,
+			headers: {
+				Authorization: `Bearer ${channel.accessToken}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ text, reply: { in_reply_to_tweet_id: input.toExternalId } }),
+			classify: this.classify,
+		});
+		const id = res.data?.id;
+		if (!id)
+			throw new ProviderError(
+				"unknown_outcome",
+				this.id,
+				"X accepted the reply but returned no id",
+			);
+		const username =
+			typeof channel.metadata.username === "string" ? channel.metadata.username : null;
+		return { externalId: id, url: xPostUrl(id, username) };
+	}
+
+	/**
+	 * Keyword listening over the last 7 days of public posts. The user's query is
+	 * X search syntax; see xListeningQuery for the defaults added to it.
+	 * https://docs.x.com/x-api/posts/search-recent-posts
+	 */
+	private async searchDiscussions(
+		channel: ChannelContext,
+		input: { query: string; since: string | null; limit: number },
+	): Promise<DiscussionItem[]> {
+		if (!input.query.trim())
+			throw new ProviderError("invalid_request", this.id, "Listening query is empty");
+		const limit = Math.max(1, Math.min(Math.floor(input.limit), X_PAGE_SIZE * MAX_PAGES_PER_POST));
+		const { posts, users } = await this.searchPages(
+			channel,
+			"/tweets/search/recent",
+			{
+				query: xListeningQuery(input.query),
+				start_time: xStartTime(input.since),
+				// X accepts 10..100 per page.
+				max_results: String(Math.max(10, Math.min(limit, X_PAGE_SIZE))),
+				sort_order: "recency",
+			},
+			{ maxPosts: limit },
+		);
+		const items: DiscussionItem[] = [];
+		for (const t of posts) {
+			const createdAt = toIso(t.created_at);
+			if (!createdAt) continue;
+			const user = t.author_id ? users.get(t.author_id) : undefined;
+			items.push({
+				externalId: t.id,
+				author: xAuthor(user, t.author_id),
+				title: null,
+				text: decodeEntities(t.text ?? ""),
+				url: xPostUrl(t.id, user?.username),
+				community: null,
+				createdAt,
+				score: num(t.public_metrics?.like_count) ?? null,
+				commentCount: num(t.public_metrics?.reply_count) ?? null,
+			});
+		}
+		// Newest `limit` items, oldest first like every other engagement list.
+		return finalizeItems(items, input.since).slice(-limit);
+	}
 
 	/**
 	 * Needs tweet.read + users.read, which publishing already requests. Reads count

@@ -2,6 +2,7 @@ import type {
 	AnalyticsOverviewQuery,
 	AnalyticsPostsQuery,
 	GenerationsQuery,
+	InboxItemsQuery,
 	PostsQuery,
 } from "./api-types";
 
@@ -59,4 +60,13 @@ export const qk = {
 		["org", orgId, "research", "visibility", "checks", "prompt", promptId] as const,
 	visibilityCheck: (orgId: string, id: string) =>
 		["org", orgId, "research", "visibility", "checks", id] as const,
+	inboxAll: (orgId: string) => ["org", orgId, "inbox"] as const,
+	inboxItemsAll: (orgId: string) => ["org", orgId, "inbox", "items"] as const,
+	inboxItems: (orgId: string, query: InboxItemsQuery) =>
+		["org", orgId, "inbox", "items", "list", query] as const,
+	inboxItem: (orgId: string, id: string) => ["org", orgId, "inbox", "items", "detail", id] as const,
+	inboxCounts: (orgId: string) => ["org", orgId, "inbox", "counts"] as const,
+	inboxApprovals: (orgId: string) => ["org", orgId, "inbox", "approvals"] as const,
+	inboxListening: (orgId: string) => ["org", orgId, "inbox", "listening"] as const,
+	inboxSettings: (orgId: string) => ["org", orgId, "inbox", "settings"] as const,
 };

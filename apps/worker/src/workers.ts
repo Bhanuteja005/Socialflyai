@@ -2,6 +2,9 @@ import { workerEnv as env } from "@socialfly/config";
 import {
 	aiMediaJobSchema,
 	analyticsJobSchema,
+	engagementJobSchema,
+	engagementReplyJobSchema,
+	engagementReplyQueueName,
 	type MaintenanceJob,
 	maintenanceJobSchema,
 	publishJobSchema,
@@ -21,12 +24,14 @@ import {
 	analytics,
 	channelTokens,
 	database,
+	engagement,
 	engine,
 	jobs,
 	logger,
 	maintenance,
 	providers,
 	queueConnection,
+	replySender,
 	research,
 } from "#src/infrastructure/index.ts";
 
@@ -44,6 +49,10 @@ const SCHEDULES: { id: MaintenanceJob["task"]; everyMs: number }[] = [
 const ANALYTICS_PLAN_EVERY_MS = 15 * 60_000;
 /** Low on purpose: each job is a platform read that competes with publishing for budget. */
 const ANALYTICS_CONCURRENCY = 2;
+/** Inbox planner cadence: new comments show up within ~10 minutes without hammering the platforms. */
+const ENGAGEMENT_PLAN_EVERY_MS = 10 * 60_000;
+/** Low for the same reason as analytics: every job is platform reads sharing publishing's limits. */
+const ENGAGEMENT_CONCURRENCY = 2;
 /** Each research job is many slow paid calls; two at a time keeps provider limits and spend smooth. */
 const RESEARCH_CONCURRENCY = 2;
 
@@ -79,6 +88,21 @@ export async function startWorkers() {
 		start(
 			publishQueueName(provider.id),
 			async (job) => engine.publish(publishJobSchema.parse(job.data)),
+			{
+				concurrency: env.PUBLISH_CONCURRENCY,
+				limiter: {
+					max: provider.publishRateLimit.max,
+					duration: provider.publishRateLimit.durationMs,
+				},
+			},
+		);
+	}
+
+	// Inbox replies are public posts: one queue per platform, limited like publishing.
+	for (const provider of providers.available().filter((p) => p.engagement)) {
+		start(
+			engagementReplyQueueName(provider.id),
+			async (job) => replySender.send(engagementReplyJobSchema.parse(job.data)),
 			{
 				concurrency: env.PUBLISH_CONCURRENCY,
 				limiter: {
@@ -154,6 +178,23 @@ export async function startWorkers() {
 	);
 
 	start(
+		QUEUES.engagement,
+		async (job, token) => {
+			try {
+				return await engagement.run(engagementJobSchema.parse(job.data));
+			} catch (error) {
+				if (error instanceof CallBudgetExhausted) {
+					// Same as analytics: wait for the next budget window without using a retry.
+					await job.moveToDelayed(Date.now() + error.retryInMs, token);
+					throw new DelayedError();
+				}
+				throw error;
+			}
+		},
+		{ concurrency: ENGAGEMENT_CONCURRENCY },
+	);
+
+	start(
 		QUEUES.research,
 		async (job) =>
 			research.run(researchJobSchema.parse(job.data), {
@@ -189,6 +230,16 @@ export async function startWorkers() {
 		await q.upsertJobScheduler(
 			"analytics-plan",
 			{ every: ANALYTICS_PLAN_EVERY_MS },
+			{ name: "plan", data: { task: "plan" } },
+		);
+		await q.close();
+	}
+
+	if (wanted(QUEUES.engagement)) {
+		const q = new Queue(QUEUES.engagement, { connection: queueConnection, prefix: QUEUE_PREFIX });
+		await q.upsertJobScheduler(
+			"engagement-plan",
+			{ every: ENGAGEMENT_PLAN_EVERY_MS },
 			{ name: "plan", data: { task: "plan" } },
 		);
 		await q.close();

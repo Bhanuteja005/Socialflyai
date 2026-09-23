@@ -64,6 +64,27 @@
       "when": 1790166132672,
       "tag": "0008_research_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790167034488,
+      "tag": "0009_engagement",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790167236522,
+      "tag": "0010_engagement_ai",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790167367908,
+      "tag": "0011_engagement_reply_attempts",
+      "breakpoints": true
     }
   ]
 }

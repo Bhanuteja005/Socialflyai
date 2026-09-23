@@ -35,6 +35,8 @@ const KIND_LABEL: Record<GenerationKind, string> = {
 	research: "Website research",
 	visibility: "AI visibility",
 	seo: "SEO data",
+	triage: "Inbox triage",
+	reply_draft: "Reply draft",
 };
 const KINDS = Object.keys(KIND_LABEL) as GenerationKind[];
 const STATUSES = Object.keys(GENERATION_STATUS) as GenerationStatus[];

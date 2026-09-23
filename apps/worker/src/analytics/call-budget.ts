@@ -22,12 +22,14 @@ export class RedisCallBudget implements CallBudget {
 	constructor(
 		private readonly redis: Redis,
 		private readonly limit = { max: 30, windowMs: 60_000 },
+		/** Separate budgets per feature (analytics, engagement), each well below publishing's share. */
+		private readonly namespace = "analytics",
 	) {}
 
 	async take(provider: string): Promise<number> {
 		const now = Date.now();
 		const window = Math.floor(now / this.limit.windowMs);
-		const key = `sf:analytics:budget:${provider}:${window}`;
+		const key = `sf:${this.namespace}:budget:${provider}:${window}`;
 		const [[, count]] = (await this.redis
 			.multi()
 			.incr(key)
@@ -46,6 +48,6 @@ export class CallBudgetExhausted extends Error {
 		readonly provider: string,
 		readonly retryInMs: number,
 	) {
-		super(`Analytics call budget for ${provider} is spent for this window`);
+		super(`Call budget for ${provider} is spent for this window`);
 	}
 }

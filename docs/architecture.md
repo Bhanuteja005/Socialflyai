@@ -28,8 +28,8 @@ which run on Node. Every service exports OpenTelemetry traces, metrics and logs;
 | Service | Responsibility | Talks to | Local port |
 |---|---|---|---|
 | `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP | 4800 |
-| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports, research / SEO / AI-visibility reports | Postgres, Redis, storage, SMTP, Anthropic, DataForSEO | 4400 |
-| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, website research, AI-visibility checks, SEO refresh, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs, websites, DataForSEO | 4500 |
+| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice, analytics reports, research / SEO / AI-visibility reports, engagement inbox | Postgres, Redis, storage, SMTP, Anthropic, DataForSEO | 4400 |
+| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), analytics collection, website research, AI-visibility checks, SEO refresh, inbox sync / listening / triage and reply sending, maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs, websites, DataForSEO | 4500 |
 | `apps/app` | The product UI: sign-in/sign-up, onboarding, dashboard, composer, calendar, channels, media, settings. `/` redirects to `/dashboard` | auth, api | 4700 |
 | `apps/site` | Public marketing site: landing, features, solutions, comparisons, free tools, blog, legal. Statically rendered; no API client, no auth. "Log in"/"Get started" link to the app | — | 4701 |
 | `apps/admin` | Internal admin console for staff (see `docs/admin-console.md`) | auth, api | 4702 |
@@ -93,10 +93,12 @@ users ─┬─ auth_sessions (refresh hash + previous hash for reuse detection)
                                         ├─ research_runs ── research_pages
                                         ├─ competitors, keywords ── keyword_rankings (per UTC day)
                                         ├─ visibility_prompts ── visibility_checks (one engine answer)
+                                        ├─ engagement_items ── engagement_replies, listening_queries
                                         └─ posts ─┬─ post_media
                                                   └─ post_targets ─┬─ post_target_events
                                                                    └─ post_target_metrics (engagement snapshots)
-channels ── channel_metrics_daily (account numbers per UTC day)
+channels ─┬─ channel_metrics_daily (account numbers per UTC day)
+          └─ engagement_cursors (inbox sync position)
 ```
 
 - **Post vs target.** A post is written once; a target is that post on one channel,
@@ -158,7 +160,7 @@ content + what it cost out. Persistence, budgets and retries live in the callers
 
 | Capability | Provider (official SDK) | Where it runs | Why there |
 |---|---|---|---|
-| Posts per platform, rewrites, hashtags, carousel outlines | Anthropic Claude (`AI_TEXT_MODEL`, default `claude-opus-5`) | API, synchronously | 5–20 s; the user is waiting in the composer |
+| Posts per platform, rewrites, hashtags, carousel outlines | Anthropic Claude (`AI_TEXT_MODEL`, default `claude-opus-5-5`) | API, synchronously | 5–20 s; the user is waiting in the composer |
 | Images | OpenAI `gpt-image-1`, then Gemini (fallback chain) | worker, `ai-media` queue | 10–60 s, paid per call — never on the request path |
 | Carousel slides (PNG, 1080×1350) | Satori → resvg (WebAssembly) | worker, `ai-media` queue | CPU work; no browser, no native binaries |
 | Video scripts (scenes, caption, hashtags) | Anthropic Claude | API, synchronously | same as posts |
@@ -322,11 +324,116 @@ API (`/research`; every member can read, writes and paid calls need editor):
   all brand + competitor mentions. Weeks start on Monday, in UTC. Competitors deleted
   since a check are dropped from it.
 
+## Engagement inbox
+
+Comments on our posts, replies under them, public mentions and keyword-listening
+discussions in one inbox, scored by AI and answered from SocialFly. Adapters expose it
+through the optional `SocialProvider.engagement` (`listComments`, optional
+`listMentions` / `searchDiscussions`, `reply`, `requiredScopes`, `maxReplyLength`); a
+platform without it is skipped, like analytics.
+
+```
+job scheduler (10 min) ─▶ plan ─┬─▶ sync-channel <channel> ─▶ engagement_items (insert-only) + engagement_cursors
+   (engagement queue)           ├─▶ listen <query>         ─▶ engagement_items kind=discussion (≤ 25 new per run)
+                                └─▶ triage <org>           ─▶ relevance / reason / sentiment + ai_generations (triage)
+
+user ─▶ POST /inbox/items/:id/draft   ─▶ draftReply (text model; ai_generations reply_draft) ─▶ text, not saved
+     ─▶ POST /inbox/items/:id/replies ─▶ engagement_replies ─▶ engagement-reply-<provider> queue ─▶ platform
+```
+
+- **Reads** follow analytics: one job per channel with 10-minute bucketed ids
+  (`engagement.sync.<channel>.<bucket>`; "sync now" gets `engagement.sync-now.…`), its own
+  queue (concurrency 2), and a per-provider call budget in Redis separate from analytics
+  (20 calls/min, `sf:engagement:budget:*`). `auth` → one token refresh, then give up for
+  this run without flagging the channel (usually a missing inbox scope while publishing
+  works); `invalid_request` → skip the batch; `rate_limited`/`transient` → BullMQ retry.
+- **Scopes gate everything.** A channel is synced only when `channels.scopes` holds
+  `requiredScopes.read`, and can be answered only with `requiredScopes.reply`. Channels
+  connected before the inbox existed keep publishing; `GET /inbox/settings` lists the
+  missing scopes a reconnect would grant.
+- **Sync.** Comments are read for the channel's published targets of the last 14 days
+  (batched by `maxPostsPerCall`), plus mentions. Each run asks from the cursor minus a
+  10-minute overlap (platforms index late) and moves the cursor to when the run started.
+  Items are inserted with `ON CONFLICT (channel_id, external_id) DO NOTHING`: a re-read
+  never overwrites triage, a status the user set, or an answered item. Comments link to
+  their `post_target` by the post's platform id. Our own messages (`fromSelf`) are stored
+  as `read` — thread context, never something to answer.
+- **Listening.** Each active query (≤ 10 per org) runs at most hourly, per provider with
+  `searchDiscussions`, signed in as any active channel of the org on that platform that
+  holds the read scopes.
+- **Triage.** Untriaged, non-self items, 100 per job in calls of 25 (`triageItems`): 0–100
+  relevance (questions, complaints, leads, high-intent discussions high; spam and generic
+  praise low), a one-line reason, and sentiment. Skipped when there is no text model or the
+  organization's monthly AI budget is spent (the worker's copy of the API rule). Items the
+  model skips, and batches it refuses, are marked triaged without a score so they are not
+  paid for again every 10 minutes. One `ai_generations` row (kind `triage`) per call.
+- **Drafts** (`draftReply`) get the brand profile, our post, the last 10 messages of the
+  thread, an optional tone and instruction, and the platform's reply limit (enforced with
+  `fitText`). Stranger-written text is wrapped as data; the model is told never to invent
+  prices, offers or facts, and replies carry no hashtags except where they are native.
+
+### Reply state machine
+
+```
+draft ⇄ pending_approval ──approve──▶ queued ──(claim)──▶ sending ─┬─▶ sent         (item → replied; our reply joins the thread)
+  ▲       │  (an edit keeps it pending)  ▲                          ├─▶ failed       (platform said no — fix & retry)
+  │       └──reject──▶ rejected ─resubmit┘                          └─▶ unconfirmed  (outcome unknown — never auto-retried)
+  └── submit=false                       ▲
+                                         ├── retry (failed; unconfirmed only with confirmNotSent)
+                                         └── rate_limited / transient before sending (delayed job, new version)
+```
+
+- **Ownership.** The API's inbox service writes draft, pending_approval, rejected and
+  queued (including manual retries); the worker's reply sender
+  (`apps/worker/src/engagement/`) writes sending, sent, failed, unconfirmed and automatic
+  requeues. Nobody else writes `engagement_replies.status`. Every transition is a
+  conditional UPDATE on the expected status, and an item has at most one reply in flight
+  (pending, queued or sending). `approved` exists in the enum but is not a resting state:
+  approving records who and when, and queues in the same write.
+- **Approval.** `organizations.reply_approval_required` (default on): an editor's submit
+  waits for an admin/owner; an admin's or owner's submit — or anyone's when approval is
+  off — is approved by the submitter and queued at once. Viewers read only.
+- **Sending is publishing.** A reply is a visible public post in the brand's name, so it
+  reuses the publishing rules: one queue per platform (`engagement-reply-<provider>`,
+  rate-limited with the provider's `publishRateLimit`), one BullMQ attempt, a job id
+  `engagement-reply.<reply>.<version>` where the version is `engagement_replies.attempts`,
+  and a claim (`queued → sending` only while the attempts still match, which bumps them)
+  so duplicate or stale jobs exit. Text, item, channel status, reply scopes and length are
+  re-checked at send time. Failures go through the publishing engine's own `decide()`:
+  `auth` → refresh once and resend (a 401/403 is a refusal); `rate_limited`/`transient` →
+  back to `queued` with a delayed job (up to 5 attempts); `invalid_request` → `failed`
+  with the platform's reason; `unknown_outcome` (or any error after the call went out) →
+  **`unconfirmed`**. Still refused after a refresh → `failed` (`reply_not_authorized`),
+  without flagging the channel: publishing may work fine without the reply scope.
+- **Why replies are never retried automatically.** Platforms have no idempotency keys for
+  comments. After a timeout or a dropped connection the reply may already be live, and a
+  blind retry posts it twice under the brand's name, in public, under a customer's
+  question. Only a person who has looked at the thread can say it is not there
+  (`POST /inbox/replies/:id/retry { confirmNotSent: true }`).
+- **Self-healing** (maintenance): replies `queued` for 2 minutes with no live job are
+  re-enqueued (with the due-target sweep, every minute); replies stuck in `sending` for 10
+  minutes become `unconfirmed` (with `recover-stuck-targets`).
+
+API (`/inbox`; every member reads, editors triage, draft and reply, admins approve):
+
+| Route | Returns |
+|---|---|
+| `GET /items?status&channelIds&kinds&minRelevance&sentiment&q&sort&before&limit` | items (text ≤ 2,000 chars) with `canReply` / `replyBlockedReason` and the latest reply, keyset `nextCursor`, and `counts { new, open, needsApproval }`; `status=open` (default) = new + read; our own messages are never listed |
+| `GET /items/:id` | the item (full text) + `thread` (same post, parent and answers on that channel, oldest first, ours included) + `replies` |
+| `PATCH /items`, `PATCH /items/:id` | bulk status (≤ 100 ids) → `{ updated }`; one item's status / assignee (must be a member) |
+| `POST /items/:id/draft` | `{ text, generationId }`; 503 without a text model, 429 over budget |
+| `POST /items/:id/replies { text, source, submit }` | 201 reply; 422 `reply_too_long` (`details.limit`), 409 `reply_not_possible` (`details.reason`), 409 `reply_in_progress` |
+| `PATCH /replies/:id`, `POST /replies/:id/approve` · `/reject` · `/retry`, `DELETE /replies/:id` | the workflow above; 409 `confirm_required` for an unconfirmed retry without `confirmNotSent` |
+| `GET /approvals` | pending replies with their items (admin) |
+| `GET/POST /listening`, `PATCH/DELETE /listening/:id` | queries with `newCount`, plus `availableProviders`; 409 `query_limit` past 10 active; 422 `provider_unavailable` |
+| `GET/PATCH /settings` | `replyApprovalRequired` and per channel `supportsInbox`, `canRead`, `canReply`, `missingScopes` |
+| `POST /sync` | 202 `{ queued }`; one per organization per 5 minutes, else 429 with `retryAfterSeconds` |
+
 ## Observability
 
 - **Logs**: pino JSON to stdout, secrets/PII redacted, `trace_id` on every line, mirrored to OTel logs.
 - **Traces**: one server span per request named by route; W3C context propagates app → api.
-- **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`, `socialfly.analytics.snapshots{provider,kind}`.
+- **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`, `socialfly.analytics.snapshots{provider,kind}`, `socialfly.engagement.items{provider,kind}`, `socialfly.engagement.replies{provider,outcome}`.
 - **Errors**: Sentry (optional, via `SENTRY_DSN`).
 - **Probes**: `/health` (process alive, never touches dependencies) and `/ready` (checks Postgres/Redis/queue — used by the deploy smoke test).
 - Local: Grafana LGTM. Production: services → OTel Collector (`infra/otel/collector.yaml`) → backend of choice.
@@ -352,5 +459,5 @@ API (`/research`; every member can read, writes and paid calls need editor):
 | 3b | AI short videos: scripts, AI/library/theme backgrounds, voiceover, ffmpeg render | ✅ (backend; not yet rendered against live OpenAI TTS) |
 | 4 | Analytics: platform adapters, collector, reports API, dashboards, best times | ✅ (adapters not yet verified against live accounts) |
 | 5 | Research + SEO/AEO + AI-visibility: crawler, brand briefs, competitors, keywords & rankings, AI-engine citation tracking | ✅ (backend; engines and DataForSEO not yet exercised against live accounts) |
-| 6 | Engagement inbox: listening, reply drafts, approval | |
+| 6 | Engagement inbox: comments, mentions, listening, AI triage & reply drafts, approval, reply sending | ✅ (backend; adapters not yet exercised against live accounts) |
 | 7 | Ads: campaign drafts, Meta/Google/LinkedIn/TikTok/X/Pinterest sync | |

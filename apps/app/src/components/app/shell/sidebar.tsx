@@ -7,6 +7,7 @@ import {
 	Building2,
 	CalendarDays,
 	Images,
+	Inbox,
 	LayoutDashboard,
 	type LucideIcon,
 	Megaphone,
@@ -21,11 +22,20 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChannels } from "@/hooks/queries";
+import { useInboxCounts } from "@/hooks/use-inbox";
 import { useOrg } from "../org-provider";
 import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; badge?: number };
+type NavItem = {
+	href: string;
+	label: string;
+	icon: LucideIcon;
+	badge?: number;
+	/** How the badge reads to screen readers, e.g. "unread". */
+	badgeLabel?: string;
+	badgeTone?: "warning" | "primary";
+};
 
 function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
 	const pathname = usePathname();
@@ -53,9 +63,16 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void 
 			/>
 			<span className="flex-1 truncate">{item.label}</span>
 			{item.badge ? (
-				<span className="rounded-full bg-warning-soft px-1.5 font-semibold text-[10px] text-warning leading-4">
-					{item.badge}
-					<span className="sr-only"> need attention</span>
+				<span
+					className={cn(
+						"rounded-full px-1.5 font-semibold text-[10px] tabular-nums leading-4",
+						item.badgeTone === "primary"
+							? "bg-primary-soft text-primary-text"
+							: "bg-warning-soft text-warning",
+					)}
+				>
+					{item.badge > 99 ? "99+" : item.badge}
+					<span className="sr-only"> {item.badgeLabel ?? "need attention"}</span>
 				</span>
 			) : null}
 		</Link>
@@ -89,11 +106,20 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 	const { can } = useOrg();
 	const { data: channels } = useChannels();
 	const needsReauth = channels?.filter((c) => c.status === "needs_reauth").length ?? 0;
+	const { data: inboxCounts } = useInboxCounts();
 
 	const main: NavItem[] = [
 		{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 		{ href: "/calendar", label: "Calendar", icon: CalendarDays },
 		{ href: "/posts", label: "Posts", icon: Rows3 },
+		{
+			href: "/inbox",
+			label: "Inbox",
+			icon: Inbox,
+			badge: inboxCounts?.new,
+			badgeLabel: "unread",
+			badgeTone: "primary",
+		},
 		{ href: "/analytics", label: "Analytics", icon: BarChart3 },
 		{ href: "/research", label: "Research", icon: Telescope },
 		{ href: "/create", label: "Create", icon: Sparkles },

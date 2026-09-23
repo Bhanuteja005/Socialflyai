@@ -1,12 +1,16 @@
 import { z } from "zod";
 import { compact, num } from "../analytics";
-import { ProviderError } from "../errors";
+import { checkReplyText, finalizeItems, MAX_PAGES_PER_POST, toIso } from "../engagement";
+import { isProviderError, ProviderError } from "../errors";
 import { expiresAtFrom, form, providerJson } from "../http";
 import type {
 	AnalyticsSupport,
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
+	DiscussionItem,
+	EngagementItem,
+	EngagementSupport,
 	PostMetrics,
 	PublishInput,
 	PublishOutcome,
@@ -179,6 +183,140 @@ const classifyToken = (provider: string) => (status: number, body: string) =>
 			})
 		: undefined;
 
+/** Reddit's comment box limit (same as /api/comment's `text`). */
+const REDDIT_MAX_COMMENT_CHARS = 10_000;
+/**
+ * Posts read per engagement call. One request per post against Reddit's
+ * ~100 requests/minute per OAuth client, shared with everything else.
+ */
+const REDDIT_ENGAGEMENT_MAX_POSTS = 10;
+/** /comments/{article}: comments per request (Reddit's own cap is 500) and tree depth. */
+const REDDIT_COMMENTS_LIMIT = 500;
+const REDDIT_COMMENTS_DEPTH = 10;
+const REDDIT_SEARCH_PAGE = 100;
+
+type RedditThing<T> = { kind: string; data: T };
+type RedditListing<T> = {
+	kind?: string;
+	data?: { children?: RedditThing<T>[]; after?: string | null };
+};
+
+type RedditComment = {
+	id?: string;
+	name?: string;
+	author?: string;
+	author_fullname?: string;
+	body?: string;
+	created_utc?: number;
+	parent_id?: string;
+	permalink?: string;
+	replies?: RedditListing<RedditComment> | "";
+};
+
+type RedditSearchLink = {
+	name?: string;
+	author?: string;
+	author_fullname?: string;
+	title?: string;
+	selftext?: string;
+	permalink?: string;
+	subreddit_name_prefixed?: string;
+	created_utc?: number;
+	score?: number;
+	num_comments?: number;
+};
+
+const REDDIT_WEB = "https://www.reddit.com";
+
+const redditAuthor = (name: string | undefined, fullname: string | undefined) => {
+	const known = name && name !== "[deleted]" ? name : null;
+	return {
+		externalId: fullname ?? null,
+		name: known,
+		handle: known,
+		avatarUrl: null,
+		profileUrl: known ? `${REDDIT_WEB}/user/${known}` : null,
+	};
+};
+
+/**
+ * Flattens a /comments/{article} tree into inbox items. `more` stubs (the
+ * "load more comments" placeholders) are skipped, not expanded: expanding costs
+ * a request each and the newest comments come first with sort=new anyway.
+ * Deleted/removed comments are dropped — there is nothing left to answer.
+ */
+export function flattenRedditComments(
+	listing: RedditListing<RedditComment> | "" | undefined,
+	postFullname: string,
+	ownUsername: string | null,
+): EngagementItem[] {
+	const out: EngagementItem[] = [];
+	const walk = (node: RedditListing<RedditComment> | "" | undefined) => {
+		if (!node || typeof node !== "object") return;
+		for (const child of node.data?.children ?? []) {
+			if (child.kind !== "t1") continue;
+			const c = child.data;
+			walk(c.replies);
+			const createdAt = c.created_utc !== undefined ? toIso(c.created_utc * 1000) : null;
+			const gone = c.author === "[deleted]" && (c.body === "[deleted]" || c.body === "[removed]");
+			if (!c.name || !createdAt || gone) continue;
+			const topLevel =
+				!c.parent_id || c.parent_id === postFullname || c.parent_id.startsWith("t3_");
+			out.push({
+				externalId: c.name,
+				kind: topLevel ? "comment" : "reply",
+				postExternalId: postFullname,
+				parentExternalId: topLevel ? null : (c.parent_id ?? null),
+				author: redditAuthor(c.author, c.author_fullname),
+				fromSelf: ownUsername !== null && c.author?.toLowerCase() === ownUsername.toLowerCase(),
+				text: c.body ?? "",
+				url: c.permalink ? `${REDDIT_WEB}${c.permalink}` : null,
+				createdAt,
+			});
+		}
+	};
+	walk(listing);
+	return out;
+}
+
+/** Smallest Reddit search window (`t`) that still covers `since`; a week without one. */
+export function redditSearchWindow(since: string | null, now: Date = new Date()): string {
+	const s = since ? Date.parse(since) : Number.NaN;
+	if (Number.isNaN(s)) return "week";
+	const age = now.getTime() - s;
+	const hour = 3_600_000;
+	if (age <= hour) return "hour";
+	if (age <= 24 * hour) return "day";
+	if (age <= 7 * 24 * hour) return "week";
+	if (age <= 31 * 24 * hour) return "month";
+	if (age <= 366 * 24 * hour) return "year";
+	return "all";
+}
+
+/**
+ * Reddit answers a read of a private/quarantined/banned subreddit's post with
+ * 403 + a JSON `reason`. That is about the post, not our token: invalid_request,
+ * so the post is skipped instead of the channel being sent to needs_reauth.
+ */
+export function classifyRedditRead(provider: string) {
+	return (status: number, body: string): ProviderError | undefined => {
+		if (status !== 403) return undefined;
+		try {
+			const parsed = JSON.parse(body) as { reason?: string };
+			if (typeof parsed.reason === "string") {
+				return new ProviderError("invalid_request", provider, `Reddit: ${parsed.reason}`, {
+					status,
+					body,
+					platformCode: parsed.reason,
+				});
+			}
+		} catch {
+			// Not JSON: fall through to the default mapping.
+		}
+		return undefined;
+	};
+}
+
 export class RedditProvider implements SocialProvider<Settings> {
 	readonly id = "reddit" as const;
 	readonly displayName = "Reddit";
@@ -218,6 +356,163 @@ export class RedditProvider implements SocialProvider<Settings> {
 			if (!isDeletedRedditPost(data)) out[data.name] = mapRedditLink(data);
 		}
 		return out;
+	}
+
+	/**
+	 * Comments on our submissions, replies, and keyword listening. Reading uses
+	 * `read`, replying `submit` — both already requested.
+	 *
+	 * No `listMentions`: username mentions live in /message/mentions, which needs
+	 * the `privatemessages` scope we do not request (it would also expose the
+	 * user's private messages to us, a lot to ask for a mention feed).
+	 * https://www.reddit.com/dev/api
+	 */
+	readonly engagement: EngagementSupport = {
+		requiredScopes: { read: ["read"], reply: ["submit"] },
+		maxPostsPerCall: REDDIT_ENGAGEMENT_MAX_POSTS,
+		maxReplyLength: REDDIT_MAX_COMMENT_CHARS,
+		listComments: (channel, input) => this.listComments(channel, input),
+		reply: (channel, input) => this.replyToThing(channel, input),
+		searchDiscussions: (channel, input) => this.searchDiscussions(channel, input),
+	};
+
+	/**
+	 * GET /comments/{article}?sort=new — one request per post returns the whole
+	 * tree up to `limit`/`depth`; `raw_json=1` stops Reddit HTML-escaping the text.
+	 * https://www.reddit.com/dev/api#GET_comments_{article}
+	 */
+	private async listComments(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]> {
+		const own = typeof channel.metadata.username === "string" ? channel.metadata.username : null;
+		const items: EngagementItem[] = [];
+		for (const fullname of input.postExternalIds) {
+			if (!/^t3_[a-z0-9]+$/i.test(fullname)) continue;
+			try {
+				const res = await providerJson<RedditListing<unknown>[]>(
+					this.id,
+					`${API}/comments/${fullname.slice(3)}?${form({
+						sort: "new",
+						limit: String(REDDIT_COMMENTS_LIMIT),
+						depth: String(REDDIT_COMMENTS_DEPTH),
+						raw_json: "1",
+					})}`,
+					{ headers: this.headers(channel.accessToken), classify: classifyRedditRead(this.id) },
+				);
+				const comments = Array.isArray(res)
+					? (res[1] as RedditListing<RedditComment> | undefined)
+					: undefined;
+				items.push(...flattenRedditComments(comments, fullname, own));
+			} catch (error) {
+				// Deleted post (404) or a subreddit we can no longer read (403 + reason): skip it.
+				if (isProviderError(error) && error.kind === "invalid_request") continue;
+				throw error;
+			}
+		}
+		return finalizeItems(items, input.since);
+	}
+
+	/**
+	 * POST /api/comment answers a post (t3_) or comment (t1_). Like /api/submit,
+	 * failures come back as HTTP 200 + `json.errors`, all raised before anything
+	 * was created (RATELIMIT, THREAD_LOCKED, DELETED_COMMENT, TOO_LONG...).
+	 * https://www.reddit.com/dev/api#POST_api_comment
+	 */
+	private async replyToThing(
+		channel: ChannelContext,
+		input: { toExternalId: string; text: string },
+	): Promise<{ externalId: string; url: string | null }> {
+		if (!/^t[13]_[a-z0-9]+$/i.test(input.toExternalId)) {
+			throw new ProviderError("invalid_request", this.id, "Not a Reddit post or comment id");
+		}
+		const text = checkReplyText(this.id, input.text, REDDIT_MAX_COMMENT_CHARS);
+		const res = await providerJson<{
+			json?: {
+				errors?: RedditApiError[];
+				ratelimit?: number;
+				data?: { things?: RedditThing<{ name?: string; permalink?: string }>[] };
+			};
+		}>(this.id, `${API}/api/comment`, {
+			method: "POST",
+			mutating: true,
+			headers: {
+				...this.headers(channel.accessToken),
+				"Content-Type": "application/x-www-form-urlencoded",
+			},
+			body: form({ api_type: "json", thing_id: input.toExternalId, text }),
+		});
+		const errors = res.json?.errors ?? [];
+		if (errors.length > 0) throw redditErrorsToProviderError(this.id, errors, res.json?.ratelimit);
+		const created = res.json?.data?.things?.[0]?.data;
+		if (!created?.name) {
+			throw new ProviderError(
+				"unknown_outcome",
+				this.id,
+				"Reddit accepted the comment but returned no id",
+			);
+		}
+		return {
+			externalId: created.name,
+			url: created.permalink ? `${REDDIT_WEB}${created.permalink}` : null,
+		};
+	}
+
+	/**
+	 * Site-wide search for posts (not comments), newest first, `t` just wide
+	 * enough to cover `since`, following `after` for at most MAX_PAGES_PER_POST pages.
+	 * https://www.reddit.com/dev/api#GET_search
+	 */
+	private async searchDiscussions(
+		channel: ChannelContext,
+		input: { query: string; since: string | null; limit: number },
+	): Promise<DiscussionItem[]> {
+		const q = input.query.trim();
+		if (!q) throw new ProviderError("invalid_request", this.id, "Listening query is empty");
+		const limit = Math.max(
+			1,
+			Math.min(Math.floor(input.limit), REDDIT_SEARCH_PAGE * MAX_PAGES_PER_POST),
+		);
+		const t = redditSearchWindow(input.since);
+		const links: RedditSearchLink[] = [];
+		let after: string | null | undefined;
+		for (let page = 0; page < MAX_PAGES_PER_POST && links.length < limit; page++) {
+			const res = await providerJson<RedditListing<RedditSearchLink>>(
+				this.id,
+				`${API}/search?${form({
+					q,
+					sort: "new",
+					t,
+					type: "link",
+					restrict_sr: "false",
+					limit: String(Math.min(REDDIT_SEARCH_PAGE, limit)),
+					raw_json: "1",
+					...(after ? { after } : {}),
+				})}`,
+				{ headers: this.headers(channel.accessToken) },
+			);
+			links.push(...(res.data?.children ?? []).map((c) => c.data));
+			after = res.data?.after;
+			if (!after) break;
+		}
+		const items: DiscussionItem[] = [];
+		for (const l of links) {
+			const createdAt = l.created_utc !== undefined ? toIso(l.created_utc * 1000) : null;
+			if (!l.name || !createdAt) continue;
+			items.push({
+				externalId: l.name,
+				author: redditAuthor(l.author, l.author_fullname),
+				title: l.title ?? null,
+				text: l.selftext ?? "",
+				url: l.permalink ? `${REDDIT_WEB}${l.permalink}` : null,
+				community: l.subreddit_name_prefixed ?? null,
+				createdAt,
+				score: num(l.score) ?? null,
+				commentCount: num(l.num_comments) ?? null,
+			});
+		}
+		// Newest `limit` items, oldest first like every other engagement list.
+		return finalizeItems(items, input.since).slice(-limit);
 	}
 
 	validate(input: PublishInput<Settings>): string[] {

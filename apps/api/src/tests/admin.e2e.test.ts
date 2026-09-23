@@ -122,6 +122,28 @@ describe("overview", () => {
 			costMicros: 1_500_000,
 		});
 
+		const [inboxItem] = await db
+			.insert(schema.engagementItems)
+			.values({
+				organizationId: org.id,
+				channelId: reauth.id,
+				provider: "x",
+				kind: "mention",
+				externalId: crypto.randomUUID(),
+				author: { externalId: null, name: null, handle: null, avatarUrl: null, profileUrl: null },
+				text: "hello",
+				postedAt: new Date(),
+			})
+			.returning();
+		await db.insert(schema.engagementReplies).values(
+			(["unconfirmed", "failed"] as const).map((status) => ({
+				organizationId: org.id,
+				itemId: inboxItem?.id as string,
+				text: "hi",
+				status,
+			})),
+		);
+
 		const res = await admin.request("GET", "/admin/overview");
 		expect(res.status).toBe(200);
 		const after = res.json;
@@ -144,6 +166,9 @@ describe("overview", () => {
 		grew((o) => o.ai.generations.byStatus.succeeded, 1);
 		grew((o) => o.analytics.snapshots24h, 1);
 		grew((o) => o.analytics.channelsCollected24h, 1);
+		grew((o) => o.engagement.itemsNew, 1);
+		grew((o) => o.engagement.repliesUnconfirmed, 1);
+		grew((o) => o.engagement.repliesFailed24h, 1);
 		expect(Object.keys(after.ai.generations.byStatus).sort()).toEqual([
 			"failed",
 			"pending",

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+	boolean,
 	index,
 	numeric,
 	pgEnum,
@@ -24,6 +25,11 @@ export const organizations = pgTable(
 		createdBy: uuid().references(() => users.id, { onDelete: "set null" }),
 		/** Per-organization override of AI_ORG_MONTHLY_BUDGET_USD, set from the admin console. Null = default; 0 = unlimited. */
 		aiMonthlyBudgetUsd: numeric({ precision: 10, scale: 2, mode: "number" }),
+		/**
+		 * Engagement inbox: replies are public posts in the brand's name. On by default, an
+		 * admin must approve every reply an editor writes before it is sent.
+		 */
+		replyApprovalRequired: boolean().notNull().default(true),
 		deletedAt: timestamp({ withTimezone: true }),
 		...timestamps(),
 	},

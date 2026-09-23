@@ -4,6 +4,10 @@ import { QUEUE_PREFIX } from "./connection";
 import {
 	type AiMediaJob,
 	type AnalyticsJob,
+	ENGAGEMENT_BUCKET_MS,
+	type EngagementJob,
+	type EngagementReplyJob,
+	engagementReplyQueueName,
 	jobIds,
 	type PublishJob,
 	type PublishStatusJob,
@@ -47,6 +51,18 @@ const analyticsJobDefaults: JobsOptions = {
 const researchJobDefaults: JobsOptions = {
 	attempts: 2,
 	backoff: { type: "exponential", delay: 30_000 },
+	removeOnComplete: { age: 24 * 3600 },
+	removeOnFail: { age: 7 * 24 * 3600 },
+};
+
+/**
+ * Inbox reads are safe to retry (a sync re-reads from its stored cursor and never
+ * overwrites a stored item); triage is paid, but it only scores items still
+ * untriaged, so a second attempt costs only what the first did not finish.
+ */
+const engagementJobDefaults: JobsOptions = {
+	attempts: 3,
+	backoff: { type: "exponential", delay: 60_000 },
 	removeOnComplete: { age: 24 * 3600 },
 	removeOnFail: { age: 7 * 24 * 3600 },
 };
@@ -252,6 +268,58 @@ export class JobProducer {
 			// A scheduled job is kept past its week so a late replan within it stays a no-op.
 			...(force ? {} : { removeOnComplete: { age: 8 * 24 * 3600 } }),
 		});
+	}
+
+	// ── engagement inbox ─────────────────────────────────────────────────────────
+
+	/** Send one approved reply (the same one-attempt rule as publishing). Idempotent per version. */
+	async enqueueReply(provider: string, job: EngagementReplyJob, delayMs = 0) {
+		await this.queue(engagementReplyQueueName(provider)).add("reply", job, {
+			...publishJobDefaults,
+			jobId: jobIds.engagementReply(job.replyId, job.version),
+			delay: Math.max(0, delayMs),
+		});
+	}
+
+	/**
+	 * Safety-net enqueue for a reply left `queued` without a live job (see ensurePublish:
+	 * a finished copy under the same id would otherwise block it forever).
+	 */
+	async ensureReply(provider: string, job: EngagementReplyJob) {
+		const q = this.queue(engagementReplyQueueName(provider));
+		const existing = await q.getJob(jobIds.engagementReply(job.replyId, job.version));
+		if (existing) {
+			const state = await existing.getState();
+			if (state !== "completed" && state !== "failed") return false;
+			await existing.remove();
+		}
+		await this.enqueueReply(provider, job);
+		return true;
+	}
+
+	/** Planner → inbox jobs, collapsed per 10-minute bucket across runs and replicas. */
+	async enqueueEngagement(
+		job: Exclude<EngagementJob, { task: "plan" }>,
+		opts: { now?: number; forced?: boolean } = {},
+	) {
+		const bucket = Math.floor((opts.now ?? Date.now()) / ENGAGEMENT_BUCKET_MS);
+		const jobId =
+			job.task === "sync-channel"
+				? opts.forced
+					? jobIds.engagementSyncNow(job.channelId, bucket)
+					: jobIds.engagementSync(job.channelId, bucket)
+				: job.task === "listen"
+					? jobIds.engagementListen(job.queryId, bucket)
+					: jobIds.engagementTriage(job.organizationId, bucket);
+		await this.queue(QUEUES.engagement).add(job.task, job, { ...engagementJobDefaults, jobId });
+	}
+
+	/** "Sync now" from the inbox: one forced sync per channel. Returns how many were queued. */
+	async syncEngagementNow(channelIds: string[], now = Date.now()): Promise<number> {
+		for (const channelId of channelIds) {
+			await this.enqueueEngagement({ task: "sync-channel", channelId }, { now, forced: true });
+		}
+		return channelIds.length;
 	}
 
 	/** Readiness probe: the queue Redis answers. */

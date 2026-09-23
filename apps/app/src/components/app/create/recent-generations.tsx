@@ -10,6 +10,8 @@ import {
 	GalleryHorizontal,
 	Hash,
 	ImageIcon,
+	Inbox,
+	MessageSquareReply,
 	PenSquare,
 	Search,
 	Telescope,
@@ -36,6 +38,8 @@ const KIND_ICON: Record<GenerationKind, typeof ImageIcon> = {
 	research: Telescope,
 	visibility: Eye,
 	seo: Search,
+	triage: Inbox,
+	reply_draft: MessageSquareReply,
 };
 
 /** The line a person would recognise the generation by: its prompt, brief or topic. */

@@ -129,3 +129,27 @@ export type VisibilityCheckDetail = InferResponseType<
 	(typeof api.research.visibility.checks)[":id"]["$get"],
 	200
 >;
+
+// ── Engagement inbox (Phase 6) ──────────────────────────────────────────────
+export type InboxItemsQuery = InferRequestType<typeof api.inbox.items.$get>["query"];
+export type InboxItemsPage = InferResponseType<typeof api.inbox.items.$get, 200>;
+export type InboxCounts = InboxItemsPage["counts"];
+export type InboxItem = InboxItemsPage["items"][number];
+export type InboxItemStatus = InboxItem["status"];
+export type InboxKind = InboxItem["kind"];
+export type InboxSentiment = NonNullable<InboxItem["sentiment"]>;
+export type InboxItemDetail = InferResponseType<(typeof api.inbox.items)[":id"]["$get"], 200>;
+export type InboxReply = InboxItemDetail["replies"][number];
+export type InboxReplyStatus = InboxReply["status"];
+export type InboxDraftInput = InferRequestType<
+	(typeof api.inbox.items)[":id"]["draft"]["$post"]
+>["json"];
+export type InboxApproval = InferResponseType<
+	typeof api.inbox.approvals.$get,
+	200
+>["items"][number];
+export type ListeningPage = InferResponseType<typeof api.inbox.listening.$get, 200>;
+export type ListeningQuery = ListeningPage["items"][number];
+export type ListeningInput = InferRequestType<typeof api.inbox.listening.$post>["json"];
+export type InboxSettings = InferResponseType<typeof api.inbox.settings.$get, 200>;
+export type InboxChannelCapability = InboxSettings["channels"][number];

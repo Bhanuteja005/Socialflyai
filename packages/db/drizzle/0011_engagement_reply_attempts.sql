@@ -1,0 +1,1 @@
+ALTER TABLE "engagement_replies" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;

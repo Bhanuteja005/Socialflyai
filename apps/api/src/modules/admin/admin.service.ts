@@ -114,6 +114,7 @@ export class AdminService {
 			aiSpend,
 			aiRows,
 			analyticsCounts,
+			engagementCounts,
 		] = await Promise.all([
 			this.db
 				.select({
@@ -181,6 +182,18 @@ export class AdminService {
 							select d.channel_id from channel_metrics_daily d where d.updated_at >= ${since24h}
 						) x)::int as "channelsCollected24h"
 				`) as unknown as Promise<{ snapshots24h: number; channelsCollected24h: number }[]>,
+			// Inbox health: unconfirmed replies are all-time because each one needs a human.
+			this.db.execute(sql`
+					select
+						(select count(*) from engagement_items i
+							where i.status = 'new' and i.from_self = false)::int as "itemsNew",
+						(select count(*) from engagement_replies r
+							where r.status = 'unconfirmed')::int as "repliesUnconfirmed",
+						(select count(*) from engagement_replies r
+							where r.status = 'failed' and r.updated_at >= ${since24h})::int as "repliesFailed24h"
+				`) as unknown as Promise<
+				{ itemsNew: number; repliesUnconfirmed: number; repliesFailed24h: number }[]
+			>,
 		]);
 
 		const zero = { total: 0, new7d: 0 };
@@ -205,6 +218,11 @@ export class AdminService {
 			analytics: {
 				snapshots24h: Number(analyticsCounts[0]?.snapshots24h ?? 0),
 				channelsCollected24h: Number(analyticsCounts[0]?.channelsCollected24h ?? 0),
+			},
+			engagement: {
+				itemsNew: Number(engagementCounts[0]?.itemsNew ?? 0),
+				repliesUnconfirmed: Number(engagementCounts[0]?.repliesUnconfirmed ?? 0),
+				repliesFailed24h: Number(engagementCounts[0]?.repliesFailed24h ?? 0),
 			},
 		};
 	}

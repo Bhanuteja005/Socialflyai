@@ -5,8 +5,14 @@ import { createLogger } from "@socialfly/core/logger";
 import { createMailer } from "@socialfly/core/mail";
 import { createRedis } from "@socialfly/core/redis";
 import { createDb } from "@socialfly/db";
-import { createProviderRegistry } from "@socialfly/integrations";
-import { createQueueConnection, JobProducer, publishQueueName, QUEUES } from "@socialfly/queue";
+import { createProviderRegistry, type ProviderRegistry } from "@socialfly/integrations";
+import {
+	createQueueConnection,
+	engagementReplyQueueName,
+	JobProducer,
+	publishQueueName,
+	QUEUES,
+} from "@socialfly/queue";
 import {
 	createDataForSeo,
 	createVisibilityEngines,
@@ -50,8 +56,18 @@ export const providers = createProviderRegistry(env);
  */
 export const queueStats = new QueueStats(queueConnection, () => [
 	...providers.all().map((p) => publishQueueName(p.id)),
+	...providers
+		.all()
+		.filter((p) => p.engagement)
+		.map((p) => engagementReplyQueueName(p.id)),
 	...Object.values(QUEUES),
 ]);
+
+/**
+ * Platform adapters as the engagement inbox sees them. Mutable (like `ai`) so tests can
+ * swap in a fake registry whose inbox support is scripted.
+ */
+export const inboxTools: { providers: ProviderRegistry } = { providers };
 
 /**
  * Bun's native S3 client (no AWS SDK). Works against RustFS locally and R2/S3 in

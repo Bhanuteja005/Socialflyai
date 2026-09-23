@@ -2,6 +2,9 @@ import type {
 	AccountMetricsDay,
 	AnalyticsSupport,
 	ChannelContext,
+	DiscussionItem,
+	EngagementItem,
+	EngagementSupport,
 	PostMetrics,
 	PublishOutcome,
 	SocialProvider,
@@ -81,6 +84,90 @@ export class FakeProvider implements SocialProvider {
 							return this.accountDays;
 						},
 					}),
+		};
+		return this;
+	}
+
+	/** Absent until a test calls `withEngagement`. */
+	engagement?: EngagementSupport;
+	/** Comments/replies the "platform" holds; listComments filters them by post and since. */
+	platformComments: EngagementItem[] = [];
+	platformMentions: EngagementItem[] = [];
+	platformDiscussions: DiscussionItem[] = [];
+	/** Consumed one per inbox READ call (comments, mentions, search). */
+	engagementErrors: (Error | null)[] = [];
+	/** Consumed one per reply call: a result to return or an error to throw. */
+	replySteps: ({ externalId: string; url: string | null } | Error)[] = [];
+	commentCalls: { token: string; ids: string[]; since: string | null }[] = [];
+	mentionCalls: { since: string | null }[] = [];
+	searchCalls: { token: string; query: string; since: string | null; limit: number }[] = [];
+	replyCalls: { token: string; toExternalId: string; kind: string; text: string }[] = [];
+
+	withEngagement(
+		opts: {
+			maxPostsPerCall?: number;
+			mentions?: boolean;
+			search?: boolean;
+			maxReplyLength?: number;
+		} = {},
+	) {
+		const fail = () => {
+			const error = this.engagementErrors.shift();
+			if (error) throw error;
+		};
+		const since = (items: EngagementItem[], at: string | null) =>
+			at ? items.filter((i) => i.createdAt >= at) : items;
+		this.engagement = {
+			requiredScopes: { read: ["r_comments"], reply: ["w_comments"] },
+			maxPostsPerCall: opts.maxPostsPerCall ?? 2,
+			maxReplyLength: opts.maxReplyLength ?? 100,
+			listComments: async (channel, input) => {
+				this.commentCalls.push({
+					token: channel.accessToken,
+					ids: input.postExternalIds,
+					since: input.since,
+				});
+				fail();
+				return since(
+					this.platformComments.filter(
+						(c) => c.postExternalId && input.postExternalIds.includes(c.postExternalId),
+					),
+					input.since,
+				);
+			},
+			...(opts.mentions === false
+				? {}
+				: {
+						listMentions: async (_channel: ChannelContext, input: { since: string | null }) => {
+							this.mentionCalls.push(input);
+							fail();
+							return since(this.platformMentions, input.since);
+						},
+					}),
+			...(opts.search === false
+				? {}
+				: {
+						searchDiscussions: async (
+							channel: ChannelContext,
+							input: { query: string; since: string | null; limit: number },
+						) => {
+							this.searchCalls.push({ token: channel.accessToken, ...input });
+							fail();
+							return this.platformDiscussions.slice(0, input.limit);
+						},
+					}),
+			reply: async (channel, input) => {
+				this.replyCalls.push({
+					token: channel.accessToken,
+					toExternalId: input.toExternalId,
+					kind: input.kind,
+					text: input.text,
+				});
+				const step = this.replySteps.shift();
+				if (!step) throw new Error("FakeProvider: no scripted reply step left");
+				if (step instanceof Error) throw step;
+				return step;
+			},
 		};
 		return this;
 	}

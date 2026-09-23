@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { compact, type DayRange, num, todayInRange } from "../analytics";
-import { ProviderError } from "../errors";
+import { checkReplyText, finalizeItems, MAX_PAGES_PER_POST, toIso } from "../engagement";
+import { isProviderError, ProviderError } from "../errors";
 import { expiresAtFrom, fetchMediaBytes, form, providerFetch, providerJson } from "../http";
 import type {
 	AccountMetricsDay,
@@ -8,6 +9,8 @@ import type {
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
+	EngagementItem,
+	EngagementSupport,
 	PostMetrics,
 	PublishInput,
 	PublishOutcome,
@@ -66,10 +69,16 @@ export const settingsSchema = z.object({
 });
 type Settings = z.infer<typeof settingsSchema>;
 
+const READONLY = "https://www.googleapis.com/auth/youtube.readonly";
+const FORCE_SSL = "https://www.googleapis.com/auth/youtube.force-ssl";
+
 const SCOPES = [
 	"https://www.googleapis.com/auth/youtube.upload",
 	"https://www.googleapis.com/auth/youtube.readonly",
 	"https://www.googleapis.com/auth/userinfo.profile",
+	// Engagement inbox (added in phase 6; channels connected earlier must reconnect):
+	// comments.insert only accepts youtube.force-ssl.
+	FORCE_SSL,
 ];
 
 /** Tags share a 500-char budget; a tag containing a space is counted with its quotes. */
@@ -121,6 +130,24 @@ type GoogleErrorBody = {
 /** Quota/limit reasons that only clear when the daily quota resets. */
 const DAILY_REASONS = new Set(["quotaExceeded", "dailyLimitExceeded", "uploadLimitExceeded"]);
 const SHORT_RATE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded"]);
+/**
+ * Reasons about ONE video/comment, not the credentials. Without this a 403
+ * `commentsDisabled` would fall to the default 403 → auth mapping and push a
+ * healthy channel into needs_reauth.
+ * https://developers.google.com/youtube/v3/docs/commentThreads/list#errors
+ * https://developers.google.com/youtube/v3/docs/comments/insert#errors
+ */
+const CONTENT_REASONS = new Set([
+	"commentsDisabled",
+	"videoNotFound",
+	"commentNotFound",
+	"parentCommentNotFound",
+	"parentIdMissing",
+	"commentTextRequired",
+	"commentTextTooLong",
+	"invalidCommentMetadata",
+	"processingFailure",
+]);
 
 /**
  * Google API error bodies → our taxonomy. Returns undefined for the default mapping.
@@ -170,6 +197,9 @@ export function classifyGoogleError(
 			retryAfterMs: 60_000,
 		});
 	}
+	if (CONTENT_REASONS.has(reason)) {
+		return new ProviderError("invalid_request", provider, message, details);
+	}
 	return undefined;
 }
 
@@ -195,6 +225,87 @@ export function mapYouTubeStatistics(s: {
 	});
 }
 
+/**
+ * YouTube comments are limited to 10,000 characters (Help Center; the Data API
+ * reports `commentTextTooLong` without naming the number).
+ */
+const YOUTUBE_MAX_COMMENT_CHARS = 10_000;
+/** commentThreads.list / comments.list take maxResults 1..100. */
+const YOUTUBE_COMMENTS_PAGE = 100;
+/**
+ * A thread carries only a few replies inline; fetching the rest costs a request
+ * (1 unit) per thread, so at most this many threads per video are expanded per call.
+ */
+const YOUTUBE_MAX_THREAD_EXPANSIONS = 20;
+/** Posts read per engagement call: each costs 1+ quota units. */
+const YOUTUBE_ENGAGEMENT_MAX_POSTS = 25;
+
+type YouTubeComment = {
+	id: string;
+	snippet?: {
+		authorDisplayName?: string;
+		authorProfileImageUrl?: string;
+		authorChannelUrl?: string;
+		authorChannelId?: { value?: string };
+		textDisplay?: string;
+		textOriginal?: string;
+		parentId?: string;
+		publishedAt?: string;
+	};
+};
+type YouTubeThread = {
+	id: string;
+	snippet?: { topLevelComment?: YouTubeComment; totalReplyCount?: number };
+	replies?: { comments?: YouTubeComment[] };
+};
+type YouTubePage<T> = { items?: T[]; nextPageToken?: string };
+
+const commentUrl = (videoId: string, commentId: string) =>
+	`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&lc=${encodeURIComponent(commentId)}`;
+
+/** One comment (top-level or reply) → inbox item. */
+export function mapYouTubeComment(
+	c: YouTubeComment,
+	videoId: string,
+	channelId: string,
+): EngagementItem | null {
+	const s = c.snippet ?? {};
+	const createdAt = toIso(s.publishedAt);
+	if (!createdAt) return null;
+	const parent = s.parentId ?? null;
+	const name = s.authorDisplayName ?? null;
+	return {
+		externalId: c.id,
+		kind: parent ? "reply" : "comment",
+		postExternalId: videoId,
+		parentExternalId: parent,
+		author: {
+			externalId: s.authorChannelId?.value ?? null,
+			name,
+			// Display names are "@handle" for channels that have one.
+			handle: name?.startsWith("@") ? name.slice(1) : null,
+			avatarUrl: s.authorProfileImageUrl ?? null,
+			profileUrl: s.authorChannelUrl ?? null,
+		},
+		fromSelf: s.authorChannelId?.value === channelId,
+		// textFormat=plainText makes textDisplay plain; textOriginal only comes back for our own.
+		text: s.textDisplay ?? s.textOriginal ?? "",
+		url: commentUrl(videoId, c.id),
+		createdAt,
+	};
+}
+
+/** Reply ids are "<top-level id>.<suffix>"; YouTube threads are one level deep. */
+export const youtubeThreadId = (commentId: string) => commentId.split(".")[0] ?? commentId;
+
+/** Per-video errors that mean "nothing to read here", not a broken channel. */
+const isSkippableVideoError = (error: unknown) =>
+	isProviderError(error) &&
+	error.kind === "invalid_request" &&
+	(error.details.platformCode === "commentsDisabled" ||
+		error.details.platformCode === "videoNotFound" ||
+		error.details.status === 404);
+
 export class YouTubeProvider implements SocialProvider<Settings> {
 	readonly id = "youtube" as const;
 	readonly displayName = "YouTube";
@@ -213,6 +324,146 @@ export class YouTubeProvider implements SocialProvider<Settings> {
 
 	validate(input: PublishInput<Settings>): string[] {
 		return validateYouTube(input);
+	}
+
+	/**
+	 * Comments and replies on our videos; replies as the channel.
+	 *
+	 * Reading uses youtube.readonly (held since phase 1); replying needs
+	 * youtube.force-ssl (NEW — existing channels must reconnect to reply).
+	 * No mentions: the Data API has no mentions feed. Quota: 1 unit per read page,
+	 * 50 units per reply (a 10,000-unit day ≈ 200 replies with no uploads).
+	 */
+	readonly engagement: EngagementSupport = {
+		requiredScopes: { read: [READONLY], reply: [FORCE_SSL] },
+		maxPostsPerCall: YOUTUBE_ENGAGEMENT_MAX_POSTS,
+		maxReplyLength: YOUTUBE_MAX_COMMENT_CHARS,
+		listComments: (channel, input) => this.listComments(channel, input),
+		reply: (channel, input) => this.replyToComment(channel, input),
+	};
+
+	private readJson<T>(channel: ChannelContext, path: string, params: Record<string, string>) {
+		return providerJson<T>(this.id, `${API}/${path}?${form(params)}`, {
+			headers: { Authorization: `Bearer ${channel.accessToken}` },
+			classify: this.classify,
+		});
+	}
+
+	/**
+	 * commentThreads.list (part=snippet,replies) per video, newest threads first,
+	 * at most MAX_PAGES_PER_POST pages. `order=time` sorts threads by when they
+	 * started, not by their latest reply, so we never stop early on `since`: a new
+	 * reply on an old thread must still be found. Threads with more replies than
+	 * the inline few are expanded with comments.list (bounded, see above).
+	 * https://developers.google.com/youtube/v3/docs/commentThreads/list
+	 * https://developers.google.com/youtube/v3/docs/comments/list
+	 */
+	private async listComments(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]> {
+		const items: (EngagementItem | null)[] = [];
+		for (const videoId of input.postExternalIds) {
+			try {
+				const threads = await this.pages<YouTubeThread>(channel, "commentThreads", {
+					part: "snippet,replies",
+					videoId,
+					order: "time",
+					textFormat: "plainText",
+					maxResults: String(YOUTUBE_COMMENTS_PAGE),
+				});
+				let expansions = 0;
+				for (const thread of threads) {
+					const top = thread.snippet?.topLevelComment;
+					if (!top) continue;
+					items.push(mapYouTubeComment(top, videoId, channel.externalId));
+					let replies = thread.replies?.comments ?? [];
+					const total = thread.snippet?.totalReplyCount ?? 0;
+					if (total > replies.length && expansions < YOUTUBE_MAX_THREAD_EXPANSIONS) {
+						expansions++;
+						replies = await this.pages<YouTubeComment>(channel, "comments", {
+							part: "snippet",
+							parentId: top.id,
+							textFormat: "plainText",
+							maxResults: String(YOUTUBE_COMMENTS_PAGE),
+						});
+					}
+					for (const r of replies) {
+						items.push(
+							mapYouTubeComment(
+								// comments.list returns parentId; inline replies do too, but be sure.
+								{ ...r, snippet: { ...r.snippet, parentId: r.snippet?.parentId ?? top.id } },
+								videoId,
+								channel.externalId,
+							),
+						);
+					}
+				}
+			} catch (error) {
+				// Comments turned off, or the video is gone: skip it, as the contract asks.
+				if (isSkippableVideoError(error)) continue;
+				throw error;
+			}
+		}
+		return finalizeItems(
+			items.filter((i) => i !== null),
+			input.since,
+		);
+	}
+
+	private async pages<T>(
+		channel: ChannelContext,
+		path: string,
+		params: Record<string, string>,
+	): Promise<T[]> {
+		const out: T[] = [];
+		let pageToken: string | undefined;
+		for (let page = 0; page < MAX_PAGES_PER_POST; page++) {
+			const res = await this.readJson<YouTubePage<T>>(channel, path, {
+				...params,
+				...(pageToken ? { pageToken } : {}),
+			});
+			out.push(...(res.items ?? []));
+			pageToken = res.nextPageToken;
+			if (!pageToken) break;
+		}
+		return out;
+	}
+
+	/**
+	 * comments.insert with `snippet.parentId` answers a top-level comment. A reply
+	 * to a reply goes to its thread's top-level comment (YouTube has one level of
+	 * nesting), whose id is the reply id's prefix.
+	 * https://developers.google.com/youtube/v3/docs/comments/insert
+	 */
+	private async replyToComment(
+		channel: ChannelContext,
+		input: { toExternalId: string; postExternalId: string | null; text: string },
+	): Promise<{ externalId: string; url: string | null }> {
+		const text = checkReplyText(this.id, input.text, YOUTUBE_MAX_COMMENT_CHARS);
+		const res = await providerJson<{ id?: string }>(this.id, `${API}/comments?part=snippet`, {
+			method: "POST",
+			mutating: true,
+			headers: {
+				Authorization: `Bearer ${channel.accessToken}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				snippet: { parentId: youtubeThreadId(input.toExternalId), textOriginal: text },
+			}),
+			classify: this.classify,
+		});
+		if (!res.id) {
+			throw new ProviderError(
+				"unknown_outcome",
+				this.id,
+				"YouTube accepted the reply but returned no id",
+			);
+		}
+		return {
+			externalId: res.id,
+			url: input.postExternalId ? commentUrl(input.postExternalId, res.id) : null,
+		};
 	}
 
 	/**

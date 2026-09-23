@@ -9,6 +9,8 @@ import {
 	sumKnown,
 	todayInRange,
 } from "../analytics";
+import { checkReplyText, finalizeItems, toIso, unsupportedReplyKind } from "../engagement";
+import { ProviderError } from "../errors";
 import { expiresAtFrom, form, providerJson } from "../http";
 import type {
 	AccountMetricsDay,
@@ -16,6 +18,8 @@ import type {
 	Capabilities,
 	ChannelContext,
 	ConnectResult,
+	EngagementItem,
+	EngagementSupport,
 	MediaItem,
 	PostMetrics,
 	PublishInput,
@@ -30,10 +34,14 @@ import {
 	classifyMetaError,
 	collectDailySeries,
 	graphHeaders,
+	graphPagesBounded,
 	type InsightEntry,
 	insightTotals,
 	isMissingGraphObject,
+	META_ENGAGEMENT_CONCURRENCY,
+	META_ENGAGEMENT_MAX_POSTS,
 	parseContainerPending,
+	reachedSince,
 	toContainerState,
 } from "./meta";
 
@@ -84,7 +92,64 @@ const SCOPES = [
 	"threads_content_publish",
 	"threads_manage_insights",
 	"threads_manage_replies",
+	// Engagement inbox (added in phase 6; profiles connected earlier must reconnect):
+	// GET on the reply endpoints needs it, threads_manage_replies only covers POSTs.
+	"threads_read_replies",
 ];
+
+/** Replies are Threads posts: same 500-character limit. */
+const THREADS_MAX_REPLY_CHARS = 500;
+/** Text containers are usually ready at once; a few short checks before giving up. */
+const REPLY_CONTAINER_CHECKS = 5;
+const REPLY_CONTAINER_WAIT_MS = 1000;
+
+type ThreadsReply = {
+	id: string;
+	text?: string;
+	username?: string;
+	timestamp?: string;
+	permalink?: string;
+	replied_to?: { id?: string };
+	is_reply_owned_by_me?: boolean;
+};
+
+const THREADS_REPLY_FIELDS =
+	"id,text,username,timestamp,permalink,replied_to,root_post,is_reply_owned_by_me,hide_status";
+
+/**
+ * One reply from a conversation → inbox item. A reply straight to our post is a
+ * "comment"; a reply to someone's reply is a "reply" under that one.
+ */
+export function mapThreadsReply(
+	r: ThreadsReply,
+	postExternalId: string,
+	ownUsername: string | null,
+): EngagementItem | null {
+	const createdAt = toIso(r.timestamp);
+	if (!createdAt) return null;
+	const repliedTo = r.replied_to?.id ?? postExternalId;
+	const isTopLevel = repliedTo === postExternalId;
+	return {
+		externalId: r.id,
+		kind: isTopLevel ? "comment" : "reply",
+		postExternalId,
+		parentExternalId: isTopLevel ? null : repliedTo,
+		author: {
+			externalId: null,
+			name: null,
+			handle: r.username ?? null,
+			avatarUrl: null,
+			profileUrl: r.username ? `https://www.threads.net/@${r.username}` : null,
+		},
+		fromSelf:
+			r.is_reply_owned_by_me === true || (ownUsername !== null && r.username === ownUsername),
+		text: r.text ?? "",
+		url: r.permalink ?? null,
+		createdAt,
+	};
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Threads has no multiple-ID insights read: one request per post. The cap and
@@ -123,6 +188,106 @@ export class ThreadsProvider implements SocialProvider<Settings> {
 
 	private classify(mutating = false) {
 		return (status: number, body: string) => classifyMetaError(this.id, status, body, mutating);
+	}
+
+	/**
+	 * Replies (all depths) under our posts, and replying as the profile.
+	 * Reading needs threads_basic + threads_read_replies (NEW scope); replying
+	 * needs threads_manage_replies. No `listMentions`/`searchDiscussions`: those
+	 * need threads_manage_mentions / threads_keyword_search, which we do not request.
+	 * https://developers.facebook.com/docs/threads/retrieve-and-manage-replies
+	 */
+	readonly engagement: EngagementSupport = {
+		requiredScopes: {
+			read: ["threads_basic", "threads_read_replies"],
+			reply: ["threads_basic", "threads_manage_replies"],
+		},
+		maxPostsPerCall: META_ENGAGEMENT_MAX_POSTS,
+		maxReplyLength: THREADS_MAX_REPLY_CHARS,
+		listComments: (channel, input) => this.listReplies(channel, input),
+		reply: (channel, input) => this.reply(channel, input),
+	};
+
+	/**
+	 * `/{media}/conversation` returns replies at every depth for a root post (ours
+	 * always are), newest first by default (`reverse=true`), so the walk stops once
+	 * a page reaches back past `since`.
+	 * https://developers.facebook.com/docs/threads/retrieve-and-manage-replies/replies-and-conversations
+	 */
+	private async listReplies(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]> {
+		const own = typeof channel.metadata.username === "string" ? channel.metadata.username : null;
+		const perPost = await mapLimit(
+			input.postExternalIds,
+			META_ENGAGEMENT_CONCURRENCY,
+			async (postId) => {
+				try {
+					const rows = await graphPagesBounded<ThreadsReply>(
+						this.id,
+						`${API}/${encodeURIComponent(postId)}/conversation?${form({
+							fields: THREADS_REPLY_FIELDS,
+							reverse: "true",
+						})}`,
+						channel.accessToken,
+						{
+							classify: this.classify(),
+							stop: reachedSince<ThreadsReply>(input.since, (r) => r.timestamp),
+						},
+					);
+					return rows.map((r) => mapThreadsReply(r, postId, own));
+				} catch (error) {
+					if (isMissingGraphObject(error)) return [];
+					throw error;
+				}
+			},
+		);
+		return finalizeItems(
+			perPost.flat().filter((i) => i !== null),
+			input.since,
+		);
+	}
+
+	/**
+	 * A reply is a Threads post with `reply_to_id`: container (invisible, safe to
+	 * retry) → threads_publish (the visible, mutating step). Counts against the
+	 * profile's 1,000 API-published replies per 24h.
+	 * https://developers.facebook.com/docs/threads/retrieve-and-manage-replies
+	 */
+	private async reply(
+		channel: ChannelContext,
+		input: { toExternalId: string; kind: EngagementItem["kind"]; text: string },
+	): Promise<{ externalId: string; url: string | null }> {
+		if (input.kind === "mention") unsupportedReplyKind(this.id, input.kind);
+		const text = checkReplyText(this.id, input.text, THREADS_MAX_REPLY_CHARS);
+		const containerId = await this.createContainer(channel, {
+			media_type: "TEXT",
+			text,
+			reply_to_id: input.toExternalId,
+		});
+		const api = this.containerApi(channel);
+		for (let check = 0; ; check++) {
+			const state = await api.status(containerId);
+			if (state.state === "ready") break;
+			if (state.state === "failed") {
+				throw new ProviderError(
+					"invalid_request",
+					this.id,
+					`Threads rejected the reply${state.message ? `: ${state.message}` : ""}`,
+				);
+			}
+			// Nothing is visible yet, so giving up here is safe to retry.
+			if (check + 1 >= REPLY_CONTAINER_CHECKS) {
+				throw new ProviderError("transient", this.id, "Threads reply was not ready to publish");
+			}
+			await sleep(REPLY_CONTAINER_WAIT_MS);
+		}
+		const outcome = await this.publishContainer(channel, containerId);
+		if (outcome.status !== "published") {
+			throw new ProviderError("unknown_outcome", this.id, "Threads reply state unclear");
+		}
+		return { externalId: outcome.externalId, url: outcome.url };
 	}
 
 	/** Needs threads_basic + threads_manage_insights, both already requested. */

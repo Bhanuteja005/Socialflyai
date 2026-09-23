@@ -1,5 +1,6 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
+import { adsEnv } from "./ads";
 import { aiEnv } from "./ai";
 import { baseServerEnv } from "./base";
 import { integrationsEnv } from "./integrations";
@@ -12,6 +13,7 @@ export const workerEnv = createEnv({
 		...integrationsEnv,
 		...storageEnv,
 		...aiEnv,
+		...adsEnv,
 		OTEL_SERVICE_NAME: z.string().default("socialfly-worker"),
 		/** Serves /health, /ready and (outside production) Bull Board. */
 		WORKER_PORT: port(4500),

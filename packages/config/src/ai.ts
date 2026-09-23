@@ -8,7 +8,7 @@ import { z } from "zod";
 export const aiEnv = {
 	/** Text generation (posts, rewrites, hashtags, carousel outlines). */
 	ANTHROPIC_API_KEY: z.string().default(""),
-	AI_TEXT_MODEL: z.string().default("claude-opus-5"),
+	AI_TEXT_MODEL: z.string().default("claude-opus-5-5"),
 	/** low | medium | high | xhigh | max — short social copy does not need deep thinking. */
 	AI_TEXT_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).default("medium"),
 
@@ -29,9 +29,13 @@ export const aiEnv = {
 	 * using the same kind of model a consumer would get. An engine runs only when its
 	 * provider key (above) is set.
 	 */
-	VISIBILITY_CLAUDE_MODEL: z.string().default("claude-opus-5"),
-	/** OpenAI's flagship per developers.openai.com/api/docs/models (Sept 2026); supports the Responses API web_search tool. */
-	VISIBILITY_OPENAI_MODEL: z.string().default("gpt-6-astra"),
+	VISIBILITY_CLAUDE_MODEL: z.string().default("claude-opus-5-5"),
+	/**
+	 * Cost-efficient OpenAI model with the Responses API web_search tool. Chosen over the
+	 * flagship (gpt-6-astra, 5× the price) because checks run weekly × prompts × engines;
+	 * set gpt-6-astra here to mirror ChatGPT's top tier more closely.
+	 */
+	VISIBILITY_OPENAI_MODEL: z.string().default("gpt-6-sol"),
 	/** Newest Flash model listed with Google Search grounding in ai.google.dev/gemini-api/docs/google-search (Sept 2026). */
 	VISIBILITY_GEMINI_MODEL: z.string().default("gemini-3.8-flash"),
 

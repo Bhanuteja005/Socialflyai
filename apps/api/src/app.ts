@@ -17,6 +17,7 @@ import { adminRoutes } from "#src/modules/admin/admin.routes.ts";
 import { aiRoutes } from "#src/modules/ai/ai.routes.ts";
 import { analyticsRoutes } from "#src/modules/analytics/analytics.routes.ts";
 import { channelCallbackRoutes, channelsRoutes } from "#src/modules/channels/channels.routes.ts";
+import { inboxRoutes } from "#src/modules/inbox/inbox.routes.ts";
 import { mediaRoutes } from "#src/modules/media/media.routes.ts";
 import {
 	currentOrganizationRoutes,
@@ -72,6 +73,7 @@ const api = new Hono()
 	.route("/ai", aiRoutes)
 	.route("/analytics", analyticsRoutes)
 	.route("/research", researchRoutes)
+	.route("/inbox", inboxRoutes)
 	.route("/admin", adminRoutes);
 
 export const app = base.route("/", api);

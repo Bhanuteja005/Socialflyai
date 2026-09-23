@@ -57,6 +57,46 @@ describe("analytics support across the registry", () => {
 		]);
 	});
 
+	test("which providers expose the engagement inbox, mentions and listening", () => {
+		const ids = (pick: (p: ReturnType<typeof registry.all>[number]) => unknown) =>
+			registry
+				.all()
+				.filter(pick)
+				.map((p) => p.id)
+				.sort();
+		// linkedin (personal) is deliberately absent: comments on member posts need
+		// r_member_social_feed, a restricted partner scope — docs/platforms.md → Engagement inbox.
+		expect(ids((p) => p.engagement)).toEqual([
+			"facebook",
+			"instagram",
+			"linkedin_page",
+			"reddit",
+			"threads",
+			"x",
+			"youtube",
+		]);
+		expect(ids((p) => p.engagement?.listMentions)).toEqual(["x"]);
+		expect(ids((p) => p.engagement?.searchDiscussions)).toEqual(["reddit", "x"]);
+	});
+
+	test("engagement limits are sane and required scopes are ones the provider requests", async () => {
+		for (const p of registry.all()) {
+			const e = p.engagement;
+			if (!e) continue;
+			expect(Number.isInteger(e.maxPostsPerCall) && e.maxPostsPerCall > 0).toBe(true);
+			expect(Number.isInteger(e.maxReplyLength) && e.maxReplyLength > 0).toBe(true);
+			const { url } = await p.getAuthorizationUrl({ redirectUri: "https://x/cb", state: "s" });
+			const requested = (new URL(url).searchParams.get("scope") ?? "").split(/[ ,]/);
+			for (const scope of [...e.requiredScopes.read, ...e.requiredScopes.reply]) {
+				expect({ provider: p.id, scope, requested: requested.includes(scope) }).toEqual({
+					provider: p.id,
+					scope,
+					requested: true,
+				});
+			}
+		}
+	});
+
 	test("every batch size is a positive integer", () => {
 		for (const p of registry.all()) {
 			if (!p.analytics) continue;

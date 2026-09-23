@@ -18,6 +18,15 @@ import { z } from "zod";
  */
 export const publishQueueName = (provider: string) => `publish-${provider}` as const;
 
+/**
+ * Sending an inbox reply creates a visible public post, so it follows publishing: one
+ * queue per provider (rate limited with that provider's publish budget) and one
+ * BullMQ attempt — retries are decided by the reply sender, which knows whether the
+ * platform may already have the reply.
+ */
+export const engagementReplyQueueName = (provider: string) =>
+	`engagement-reply-${provider}` as const;
+
 export const QUEUES = {
 	/** Polls targets in `processing` (IG/Threads/YouTube async media) until done. */
 	publishStatus: "publish-status",
@@ -37,6 +46,12 @@ export const QUEUES = {
 	 * of many paid calls, kept apart so they can never hold up publishing or media.
 	 */
 	research: "research",
+	/**
+	 * Engagement inbox reads and AI triage: syncing comments/mentions, keyword listening
+	 * and scoring. Its own queue so an inbox backlog never delays publishing or analytics.
+	 * (Sending replies uses the per-provider engagement-reply queues.)
+	 */
+	engagement: "engagement",
 } as const;
 
 export const publishJobSchema = z.object({
@@ -114,6 +129,27 @@ export const researchJobSchema = z.discriminatedUnion("task", [
 export type ResearchJob = z.infer<typeof researchJobSchema>;
 
 /**
+ * `plan` (on a job scheduler) fans out: `sync-channel` reads new comments and
+ * mentions for one channel, `listen` runs one keyword-listening query, `triage`
+ * scores an organization's untriaged items with the text model.
+ */
+export const engagementJobSchema = z.discriminatedUnion("task", [
+	z.object({ task: z.literal("plan") }),
+	z.object({ task: z.literal("sync-channel"), channelId: z.uuid() }),
+	z.object({ task: z.literal("listen"), queryId: z.uuid() }),
+	z.object({ task: z.literal("triage"), organizationId: z.uuid() }),
+]);
+export type EngagementJob = z.infer<typeof engagementJobSchema>;
+
+export const engagementReplyJobSchema = z.object({
+	replyId: z.uuid(),
+	organizationId: z.uuid(),
+	/** Must equal engagement_replies.attempts when the job runs, or the job is stale. */
+	version: z.number().int().nonnegative(),
+});
+export type EngagementReplyJob = z.infer<typeof engagementReplyJobSchema>;
+
+/**
  * Deterministic job ids make enqueueing idempotent: scheduling the same target
  * twice (double click, API retry, sweep racing the original job) is a no-op in
  * BullMQ instead of a double post. The schedule version is part of the id so a
@@ -151,6 +187,22 @@ export const jobIds = {
 		organizationId: string,
 		tenMinuteBucket: number,
 	) => `research.${kind}.${organizationId}.f${tenMinuteBucket}`,
+	/** Per reply and version: enqueueing twice is a no-op; a requeue bumps the version. */
+	engagementReply: (replyId: string, version: number) => `engagement-reply.${replyId}.${version}`,
+	/**
+	 * Inbox jobs carry a 10-minute bucket (the planner cadence): planner runs on every
+	 * replica collapse onto one job per bucket.
+	 */
+	engagementSync: (channelId: string, bucket: number) => `engagement.sync.${channelId}.${bucket}`,
+	/** A user's "sync now": its own bucket so it is not swallowed by the planner's job. */
+	engagementSyncNow: (channelId: string, bucket: number) =>
+		`engagement.sync-now.${channelId}.${bucket}`,
+	engagementListen: (queryId: string, bucket: number) => `engagement.listen.${queryId}.${bucket}`,
+	engagementTriage: (organizationId: string, bucket: number) =>
+		`engagement.triage.${organizationId}.${bucket}`,
 };
+
+/** Bucket width for engagement job ids (see jobIds.engagementSync). */
+export const ENGAGEMENT_BUCKET_MS = 10 * 60_000;
 
 export const WEEK_MS = 7 * 24 * 3600_000;

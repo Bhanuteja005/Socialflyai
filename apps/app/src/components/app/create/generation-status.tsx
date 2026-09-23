@@ -20,6 +20,8 @@ export const GENERATION_KIND: Record<GenerationKind, string> = {
 	research: "Brand research",
 	visibility: "AI visibility check",
 	seo: "Keyword data",
+	triage: "Inbox triage",
+	reply_draft: "Reply draft",
 };
 
 export const GENERATION_STATUS: Record<GenerationStatus, { label: string; tone: BadgeTone }> = {

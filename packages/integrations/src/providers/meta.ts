@@ -6,11 +6,20 @@ import {
 	DayAccumulator,
 	type DayRange,
 	dayStartSeconds,
+	mapLimit,
 	metaEndTimeToDay,
 	num,
 	splitRange,
 	todayInRange,
 } from "../analytics";
+import {
+	checkReplyText,
+	finalizeItems,
+	isNewer,
+	MAX_PAGES_PER_POST,
+	toIso,
+	unsupportedReplyKind,
+} from "../engagement";
 import { isProviderError, ProviderError } from "../errors";
 import { expiresAtFrom, form, providerJson } from "../http";
 import type {
@@ -20,6 +29,8 @@ import type {
 	ChannelContext,
 	ConnectResult,
 	DiscoveredAccount,
+	EngagementItem,
+	EngagementSupport,
 	MediaItem,
 	PostMetrics,
 	PublishInput,
@@ -166,6 +177,47 @@ async function graphPages<T>(
 	}
 	return out;
 }
+
+/**
+ * Cursor pagination for engagement reads, bounded to `maxPages`. `stop` sees each
+ * page and ends the walk early — used where Meta documents newest-first order,
+ * so the first page reaching back past `since` means the rest is older still.
+ */
+export async function graphPagesBounded<T>(
+	provider: string,
+	firstUrl: string,
+	accessToken: string,
+	opts: { maxPages?: number; classify?: Classify; stop?: (page: T[]) => boolean } = {},
+): Promise<T[]> {
+	const classify: Classify = opts.classify ?? ((s, b) => classifyMetaError(provider, s, b));
+	const out: T[] = [];
+	let next: string | undefined = firstUrl;
+	for (let page = 0; next && page < (opts.maxPages ?? MAX_PAGES_PER_POST); page++) {
+		const res: Paged<T> = await providerJson<Paged<T>>(provider, next, {
+			headers: graphHeaders(accessToken, false),
+			classify,
+		});
+		const rows = res.data ?? [];
+		out.push(...rows);
+		if (opts.stop?.(rows)) break;
+		next = res.paging?.next;
+	}
+	return out;
+}
+
+/** True when the page holds something at or before `since` (newest-first listings only). */
+export const reachedSince =
+	<T>(since: string | null, createdAt: (row: T) => string | undefined) =>
+	(page: T[]): boolean =>
+		since !== null &&
+		page.some((row) => {
+			const iso = toIso(createdAt(row));
+			return iso !== null && !isNewer(iso, since);
+		});
+
+/** Posts read per engagement call and how many are read in parallel. */
+export const META_ENGAGEMENT_MAX_POSTS = 25;
+export const META_ENGAGEMENT_CONCURRENCY = 4;
 
 // ---------------------------------------------------------------------------
 // Read-only analytics helpers (also used by threads.ts)
@@ -515,6 +567,55 @@ const facebookCapabilities: Capabilities = {
 /** "Only 90 days of insights can be viewed at one time." (insights reference) */
 const FACEBOOK_INSIGHTS_MAX_DAYS = 90;
 
+/**
+ * Facebook's comment box stops at 8,000 characters. Not stated on the Graph
+ * reference; long-standing product limit, so treat it as a ceiling, not a promise.
+ */
+const FACEBOOK_MAX_COMMENT_CHARS = 8000;
+
+type FacebookComment = {
+	id: string;
+	message?: string;
+	created_time?: string;
+	from?: { id?: string; name?: string; picture?: { data?: { url?: string } } };
+	parent?: { id?: string };
+	permalink_url?: string;
+};
+
+const FACEBOOK_COMMENT_FIELDS =
+	"id,message,created_time,from{id,name,picture},parent{id},permalink_url";
+
+/**
+ * One Graph comment → inbox item. `from` is only returned with
+ * pages_read_user_content; without it the author stays unknown (never guessed).
+ */
+export function mapFacebookComment(
+	c: FacebookComment,
+	postExternalId: string,
+	pageId: string,
+): EngagementItem | null {
+	const createdAt = toIso(c.created_time);
+	if (!createdAt) return null;
+	const parent = c.parent?.id ?? null;
+	return {
+		externalId: c.id,
+		kind: parent ? "reply" : "comment",
+		postExternalId,
+		parentExternalId: parent,
+		author: {
+			externalId: c.from?.id ?? null,
+			name: c.from?.name ?? null,
+			handle: null,
+			avatarUrl: c.from?.picture?.data?.url ?? null,
+			profileUrl: c.from?.id ? `https://www.facebook.com/${c.from.id}` : null,
+		},
+		fromSelf: c.from?.id === pageId,
+		text: c.message ?? "",
+		url: c.permalink_url ?? null,
+		createdAt,
+	};
+}
+
 const facebookSettingsSchema = z.object({});
 type FacebookSettings = z.infer<typeof facebookSettingsSchema>;
 
@@ -532,7 +633,112 @@ export class FacebookProvider extends MetaBase<FacebookSettings> {
 		"pages_manage_metadata",
 		"read_insights",
 		"business_management",
+		// Engagement inbox (added in phase 6; channels connected earlier must reconnect):
+		// reading comments and who wrote them, and answering as the Page.
+		"pages_read_user_content",
+		"pages_manage_engagement",
 	];
+
+	/**
+	 * Comments on the Page's posts (all levels) and replies as the Page.
+	 * Reading needs pages_read_engagement + pages_read_user_content (the latter
+	 * for the commenter's identity); replying needs pages_manage_engagement and a
+	 * Page token of someone with the MODERATE task.
+	 * https://developers.facebook.com/docs/graph-api/reference/object/comments/
+	 */
+	readonly engagement: EngagementSupport = {
+		requiredScopes: {
+			read: ["pages_read_engagement", "pages_read_user_content"],
+			reply: ["pages_manage_engagement"],
+		},
+		maxPostsPerCall: META_ENGAGEMENT_MAX_POSTS,
+		maxReplyLength: FACEBOOK_MAX_COMMENT_CHARS,
+		listComments: (channel, input) => this.listComments(channel, input),
+		reply: (channel, input) => this.replyToComment(channel, input),
+	};
+
+	/**
+	 * `filter=stream` returns comments of every level (replies carry `parent`),
+	 * `order=reverse_chronological` newest first — so once a page reaches back past
+	 * `since` the walk stops. Works for `{page}_{post}` ids and bare video ids alike.
+	 * https://developers.facebook.com/docs/graph-api/reference/object/comments/
+	 */
+	private async listComments(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]> {
+		const perPost = await mapLimit(
+			input.postExternalIds,
+			META_ENGAGEMENT_CONCURRENCY,
+			async (postId) => {
+				try {
+					const rows = await graphPagesBounded<FacebookComment>(
+						this.id,
+						`${this.graph}/${encodeURIComponent(postId)}/comments?${form({
+							filter: "stream",
+							order: "reverse_chronological",
+							limit: "100",
+							fields: FACEBOOK_COMMENT_FIELDS,
+						})}`,
+						channel.accessToken,
+						{ stop: reachedSince<FacebookComment>(input.since, (c) => c.created_time) },
+					);
+					return rows.map((c) => mapFacebookComment(c, postId, channel.externalId));
+				} catch (error) {
+					// Deleted post: skipped, as the contract asks.
+					if (isMissingGraphObject(error)) return [];
+					throw error;
+				}
+			},
+		);
+		return finalizeItems(
+			perPost.flat().filter((i) => i !== null),
+			input.since,
+		);
+	}
+
+	/**
+	 * POST /{comment-id}/comments answers a comment as the Page. Facebook threads
+	 * are one level deep, so answering a reply goes to its top-level comment
+	 * (looked up first — a read, safe to retry). `fields` uses Graph's
+	 * read-after-write to get the permalink in the same call.
+	 * https://developers.facebook.com/docs/graph-api/reference/object/comments/
+	 */
+	private async replyToComment(
+		channel: ChannelContext,
+		input: { toExternalId: string; kind: EngagementItem["kind"]; text: string },
+	): Promise<{ externalId: string; url: string | null }> {
+		if (input.kind === "mention") unsupportedReplyKind(this.id, input.kind);
+		const message = checkReplyText(this.id, input.text, FACEBOOK_MAX_COMMENT_CHARS);
+		let target = input.toExternalId;
+		if (input.kind === "reply") {
+			const comment = await providerJson<{ parent?: { id?: string } }>(
+				this.id,
+				`${this.graph}/${encodeURIComponent(target)}?${form({ fields: "parent{id}" })}`,
+				{ headers: graphHeaders(channel.accessToken, false), classify: this.classify() },
+			);
+			target = comment.parent?.id ?? target;
+		}
+		const res = await providerJson<{ id?: string; permalink_url?: string }>(
+			this.id,
+			`${this.graph}/${encodeURIComponent(target)}/comments?${form({ fields: "id,permalink_url" })}`,
+			{
+				method: "POST",
+				mutating: true,
+				headers: graphHeaders(channel.accessToken),
+				body: JSON.stringify({ message }),
+				classify: this.classify(true),
+			},
+		);
+		if (!res.id) {
+			throw new ProviderError(
+				"unknown_outcome",
+				this.id,
+				"Facebook accepted the reply but returned no id",
+			);
+		}
+		return { externalId: res.id, url: res.permalink_url ?? null };
+	}
 
 	/**
 	 * Uses read_insights + pages_read_engagement, both already requested.
@@ -552,7 +758,7 @@ export class FacebookProvider extends MetaBase<FacebookSettings> {
 	 * publish() returns `{page}_{post}` ids for feed/photo posts and a bare VIDEO id
 	 * for videos. Post insights only exist on the post; for videos we read the
 	 * reaction/comment counts (video insights need pages_manage_engagement, which
-	 * we do not request).
+	 * only channels reconnected since the engagement inbox hold — not read yet).
 	 * https://developers.facebook.com/docs/graph-api/reference/post/
 	 */
 	private async getPostMetrics(
@@ -767,6 +973,57 @@ export function instagramInsightMetrics(productType: string | undefined): string
 	return productType === "STORY" ? "reach,views,shares" : "reach,views,saved,shares";
 }
 
+/**
+ * Instagram's comment limit is 2,200 characters (the caption limit). Not on the
+ * comments reference itself; product limit, treated as a ceiling.
+ */
+const INSTAGRAM_MAX_COMMENT_CHARS = 2200;
+/** "Returns a maximum of 50 comments per query." (IG Media comments reference) */
+const INSTAGRAM_COMMENTS_PAGE = 50;
+
+type InstagramComment = {
+	id: string;
+	text?: string;
+	timestamp?: string;
+	username?: string;
+	from?: { id?: string; username?: string };
+	parent_id?: string;
+	replies?: { data?: InstagramComment[] };
+};
+
+const IG_COMMENT_FIELDS = "id,text,timestamp,username,from{id,username},parent_id";
+
+/** One IG comment → inbox item. `parentId` is the top-level comment when nested under it. */
+export function mapInstagramComment(
+	c: InstagramComment,
+	postExternalId: string,
+	igUserId: string,
+	parentId: string | null = null,
+): EngagementItem | null {
+	const createdAt = toIso(c.timestamp);
+	if (!createdAt) return null;
+	const parent = c.parent_id ?? parentId;
+	const handle = c.from?.username ?? c.username ?? null;
+	return {
+		externalId: c.id,
+		kind: parent ? "reply" : "comment",
+		postExternalId,
+		parentExternalId: parent,
+		author: {
+			externalId: c.from?.id ?? null,
+			name: null,
+			handle,
+			avatarUrl: null,
+			profileUrl: handle ? `https://www.instagram.com/${handle}/` : null,
+		},
+		fromSelf: c.from?.id === igUserId,
+		text: c.text ?? "",
+		// IG comments have no permalink of their own.
+		url: null,
+		createdAt,
+	};
+}
+
 const instagramSettingsSchema = z.object({
 	postType: z.enum(["feed", "reel", "story"]).default("feed"),
 });
@@ -834,6 +1091,101 @@ export class InstagramProvider extends MetaBase<InstagramSettings> {
 
 	validate(input: PublishInput<InstagramSettings>): string[] {
 		return validateInstagram(input);
+	}
+
+	/**
+	 * Comments and their replies on our media; replies as the account. All
+	 * scopes were already requested (instagram_manage_comments since phase 1).
+	 *
+	 * No `listMentions`: caption/comment @mentions of the account are delivered
+	 * only through the `mentions` webhook (the ids it carries are what
+	 * /{ig-user}/mentions answers), and the `/tags` edge lists photo tags, which
+	 * are not something we can reply to through the documented API.
+	 * https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-media/comments
+	 */
+	readonly engagement: EngagementSupport = {
+		requiredScopes: {
+			read: ["instagram_basic", "instagram_manage_comments", "pages_read_engagement"],
+			reply: ["instagram_manage_comments"],
+		},
+		maxPostsPerCall: META_ENGAGEMENT_MAX_POSTS,
+		maxReplyLength: INSTAGRAM_MAX_COMMENT_CHARS,
+		listComments: (channel, input) => this.listComments(channel, input),
+		reply: (channel, input) => this.replyToComment(channel, input),
+	};
+
+	/**
+	 * Top-level comments with replies expanded inline (`replies.limit(50){…}`),
+	 * up to 50 per page and MAX_PAGES_PER_POST pages. Meta documents no order for
+	 * this edge, so we never stop early on `since` — we filter instead.
+	 * `username`/`from` need instagram_manage_comments (since 2024-08-27).
+	 * https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-comment
+	 */
+	private async listComments(
+		channel: ChannelContext,
+		input: { postExternalIds: string[]; since: string | null },
+	): Promise<EngagementItem[]> {
+		const perPost = await mapLimit(
+			input.postExternalIds,
+			META_ENGAGEMENT_CONCURRENCY,
+			async (mediaId) => {
+				try {
+					const rows = await graphPagesBounded<InstagramComment>(
+						this.id,
+						`${this.graph}/${encodeURIComponent(mediaId)}/comments?${form({
+							fields: `${IG_COMMENT_FIELDS},replies.limit(${INSTAGRAM_COMMENTS_PAGE}){${IG_COMMENT_FIELDS}}`,
+							limit: String(INSTAGRAM_COMMENTS_PAGE),
+						})}`,
+						channel.accessToken,
+					);
+					return rows.flatMap((c) => [
+						mapInstagramComment(c, mediaId, channel.externalId),
+						...(c.replies?.data ?? []).map((r) =>
+							mapInstagramComment(r, mediaId, channel.externalId, c.id),
+						),
+					]);
+				} catch (error) {
+					if (isMissingGraphObject(error)) return [];
+					throw error;
+				}
+			},
+		);
+		return finalizeItems(
+			perPost.flat().filter((i) => i !== null),
+			input.since,
+		);
+	}
+
+	/**
+	 * POST /{ig-comment-id}/replies. Instagram threads are one level deep and a
+	 * reply to a reply is attached to its top-level comment by Instagram itself.
+	 * https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-comment/replies
+	 */
+	private async replyToComment(
+		channel: ChannelContext,
+		input: { toExternalId: string; kind: EngagementItem["kind"]; text: string },
+	): Promise<{ externalId: string; url: string | null }> {
+		if (input.kind === "mention") unsupportedReplyKind(this.id, input.kind);
+		const message = checkReplyText(this.id, input.text, INSTAGRAM_MAX_COMMENT_CHARS);
+		const res = await providerJson<{ id?: string }>(
+			this.id,
+			`${this.graph}/${encodeURIComponent(input.toExternalId)}/replies`,
+			{
+				method: "POST",
+				mutating: true,
+				headers: graphHeaders(channel.accessToken),
+				body: JSON.stringify({ message }),
+				classify: this.classify(true),
+			},
+		);
+		if (!res.id) {
+			throw new ProviderError(
+				"unknown_outcome",
+				this.id,
+				"Instagram accepted the reply but returned no id",
+			);
+		}
+		return { externalId: res.id, url: null };
 	}
 
 	/** Uses instagram_basic + instagram_manage_insights + pages_read_engagement, already requested. */

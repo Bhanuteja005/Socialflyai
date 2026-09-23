@@ -1,5 +1,6 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
+import { adsEnv } from "./ads";
 import { aiEnv } from "./ai";
 import { baseServerEnv } from "./base";
 import { integrationsEnv } from "./integrations";
@@ -12,6 +13,7 @@ export const apiEnv = createEnv({
 		...integrationsEnv,
 		...storageEnv,
 		...aiEnv,
+		...adsEnv,
 		PORT: port(4400),
 		OTEL_SERVICE_NAME: z.string().default("socialfly-api"),
 		// The product app and the admin console call the API from the browser.

@@ -18,6 +18,9 @@ import { AiMediaProcessor } from "#src/ai/ai-media.ts";
 import { AnalyticsCollector } from "#src/analytics/analytics-collector.ts";
 import { RedisCallBudget } from "#src/analytics/call-budget.ts";
 import { ChannelTokens } from "#src/channels/channel-tokens.ts";
+import { EngagementProcessor } from "#src/engagement/engagement-processor.ts";
+import { ReplySender } from "#src/engagement/reply-sender.ts";
+import { ReplyState } from "#src/engagement/reply-state.ts";
 import { Maintenance } from "#src/maintenance/maintenance.ts";
 import { PublishingEngine } from "#src/publishing/publishing-engine.ts";
 import { TargetState } from "#src/publishing/target-state.ts";
@@ -58,7 +61,8 @@ export const engine = new PublishingEngine({
 	logger,
 	publicMediaUrl: env.S3_PUBLIC_URL,
 });
-export const maintenance = new Maintenance(db, jobs, targetState, logger);
+export const replyState = new ReplyState(db);
+export const maintenance = new Maintenance(db, jobs, targetState, logger, replyState);
 
 export const analytics = new AnalyticsCollector({
 	db,
@@ -105,4 +109,28 @@ export const research = new ResearchProcessor({
 		userAgent: env.RESEARCH_USER_AGENT,
 		monthlyBudgetUsd: env.AI_ORG_MONTHLY_BUDGET_USD,
 	},
+});
+
+/**
+ * Engagement inbox. Its platform reads get their own per-provider budget (20 calls a
+ * minute), separate from analytics, so neither can starve the other and together they
+ * stay well inside what publishing needs.
+ */
+export const engagement = new EngagementProcessor({
+	db,
+	ai,
+	providers,
+	tokens: channelTokens,
+	budget: new RedisCallBudget(queueConnection, { max: 20, windowMs: 60_000 }, "engagement"),
+	jobs,
+	logger,
+	config: { monthlyBudgetUsd: env.AI_ORG_MONTHLY_BUDGET_USD },
+});
+export const replySender = new ReplySender({
+	db,
+	providers,
+	tokens: channelTokens,
+	state: replyState,
+	jobs,
+	logger,
 });
