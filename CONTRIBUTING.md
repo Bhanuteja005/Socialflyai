@@ -1,11 +1,10 @@
-# Contributing to SocialFly
+# Working on SocialFly
 
-Thanks for helping! This guide gets you from clone to merged PR.
+How to get from clone to merged pull request.
 
 ## Before you start
 
-- **Bugs**: search [existing issues](https://github.com/Bhanuteja005/Socialflyai/issues) first, then
-  open one with the bug template. A minimal reproduction makes a fix much faster.
+- **Bugs**: search existing issues first, then open one with the bug template. A minimal reproduction makes a fix much faster.
 - **Features and larger changes**: open a feature request or discussion *before* writing code,
   so we can agree on the approach. This saves you from reworking a PR.
 - **Security issues**: never in public issues. See [SECURITY.md](SECURITY.md).
@@ -15,7 +14,7 @@ Thanks for helping! This guide gets you from clone to merged PR.
 Prerequisites: [Bun 1.3.13](https://bun.sh) and Docker.
 
 ```bash
-git clone https://github.com/<you>/Socialflyai.git && cd Socialflyai
+git clone <repository-url> socialflyai && cd socialflyai
 bun install          # installs git hooks too
 bun run cli env      # writes .env with generated local secrets
 bun dev              # starts Postgres/Redis/S3/Mailpit in Docker, migrates, runs every app
@@ -36,7 +35,7 @@ services fit together and why.
    ```
    CI is Jenkins ([docs/ci-jenkins.md](docs/ci-jenkins.md)). Its results show up as a status check on
    your PR. It also checks that migrations are committed, scans for secrets, audits dependencies and
-   builds every Docker image. PRs from forks wait for a maintainer to approve the CI run.
+   builds every Docker image.
 5. Commit with [Conventional Commits](https://www.conventionalcommits.org):
    `feat(api): add cursor pagination to GET /posts`, `fix(worker): ...`, `docs: ...`.
 6. Open a PR against `main` and fill in the template. Keep PRs focused, one concern each.
@@ -63,4 +62,4 @@ requirements in [docs/platforms.md](docs/platforms.md).
 
 ## License
 
-By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).
+Proprietary — see [LICENSE](LICENSE). Do not share this code outside the team.

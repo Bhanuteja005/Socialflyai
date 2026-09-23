@@ -45,9 +45,7 @@ export const aiEnv = {
 
 	/** Website research crawl limits: polite by default. */
 	RESEARCH_MAX_PAGES: z.coerce.number().int().min(1).max(500).default(40),
-	RESEARCH_USER_AGENT: z
-		.string()
-		.default("SocialFlyBot/1.0 (+https://github.com/Bhanuteja005/Socialflyai)"),
+	RESEARCH_USER_AGENT: z.string().default("SocialFlyBot/1.0 (+https://socialflyai.com)"),
 
 	/**
 	 * Spend cap per organization per calendar month (USD). Generation is refused

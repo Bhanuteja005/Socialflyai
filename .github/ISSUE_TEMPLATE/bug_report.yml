@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Security problems go to [SECURITY.md](https://github.com/Bhanuteja005/Socialflyai/blob/main/SECURITY.md), not here.
+        Thanks for reporting! Security problems are reported privately to the maintainers (see SECURITY.md), not here.
   - type: textarea
     id: what-happened
     attributes:

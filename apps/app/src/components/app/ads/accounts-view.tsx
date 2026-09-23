@@ -107,15 +107,17 @@ export function AdAccountsView() {
 					<h2 id="ad-connect-heading" className="font-medium text-muted-foreground text-sm">
 						Ad platforms
 					</h2>
-					<a
-						href={ADS_DOCS_URL}
-						target="_blank"
-						rel="noreferrer"
-						className="inline-flex items-center gap-1.5 text-muted-foreground text-xs underline-offset-2 hover:text-foreground hover:underline"
-					>
-						<BookOpen className="size-3.5" aria-hidden="true" />
-						Setup guide for each platform
-					</a>
+					{ADS_DOCS_URL ? (
+						<a
+							href={ADS_DOCS_URL}
+							target="_blank"
+							rel="noreferrer"
+							className="inline-flex items-center gap-1.5 text-muted-foreground text-xs underline-offset-2 hover:text-foreground hover:underline"
+						>
+							<BookOpen className="size-3.5" aria-hidden="true" />
+							Setup guide for each platform
+						</a>
+					) : null}
 				</div>
 				<ProvidersGrid />
 			</section>
@@ -245,15 +247,17 @@ function ProviderCard({
 							{meta.approval}
 						</p>
 					) : null}
-					<a
-						href={ADS_DOCS_URL}
-						target="_blank"
-						rel="noreferrer"
-						className="w-fit text-primary-text underline-offset-2 hover:underline"
-					>
-						How to set up {meta.name}
-						<span className="sr-only"> (opens in a new tab)</span>
-					</a>
+					{ADS_DOCS_URL ? (
+						<a
+							href={ADS_DOCS_URL}
+							target="_blank"
+							rel="noreferrer"
+							className="w-fit text-primary-text underline-offset-2 hover:underline"
+						>
+							How to set up {meta.name}
+							<span className="sr-only"> (opens in a new tab)</span>
+						</a>
+					) : null}
 				</div>
 			)}
 		</li>

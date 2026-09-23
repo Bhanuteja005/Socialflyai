@@ -6,17 +6,13 @@
 </p>
 
 <p align="center">
-  <b>Open-source AI marketing automation for social media.</b><br>
+  <b>AI marketing automation for social media.</b><br>
   Research your brand, create content, schedule and publish it everywhere, engage with
-  conversations, and measure what works — in one self-hostable product.
+  conversations, run ads, and measure what works — in one product.
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0BE27D"></a>
   <a href="docs/ci-jenkins.md"><img alt="CI: Jenkins" src="https://img.shields.io/badge/CI-Jenkins-D24939?logo=jenkins&logoColor=white"></a>
-  <a href="https://github.com/Bhanuteja005/Socialflyai/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Bhanuteja005/Socialflyai?style=flat&color=0BE27D"></a>
-  <a href="https://github.com/Bhanuteja005/Socialflyai/issues"><img alt="Issues" src="https://img.shields.io/github/issues/Bhanuteja005/Socialflyai"></a>
-  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-0BE27D"></a>
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
   <img alt="Bun" src="https://img.shields.io/badge/Bun-1.3-000?logo=bun">
 </p>
@@ -25,9 +21,7 @@
   <a href="#-quick-start">Quick start</a> ·
   <a href="docs/architecture.md">Architecture</a> ·
   <a href="docs/platforms.md">Platform setup</a> ·
-  <a href="#-roadmap">Roadmap</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a> ·
-  <a href="#-support-the-project">Sponsor</a>
+  <a href="CONTRIBUTING.md">Working on the code</a>
 </p>
 
 <p align="center">
@@ -54,7 +48,7 @@ team runs every week:
 6. **Measure** — impressions, engagement, mentions and AI citations.
 7. **Advertise** — turn winning posts into ad campaigns.
 
-All seven steps are built. Platform integrations are covered by tests against simulated APIs; see [docs/platforms.md](docs/platforms.md) and [docs/ads.md](docs/ads.md) for what still needs verifying on live accounts and which platform approvals are required.
+All seven are built. Platform integrations are covered by tests against simulated APIs; see [docs/platforms.md](docs/platforms.md) and [docs/ads.md](docs/ads.md) for what still needs verifying on live accounts and which platform approvals are required.
 
 ## 🚀 Features available now
 
@@ -107,8 +101,8 @@ All seven steps are built. Platform integrations are covered by tests against si
 Prerequisites: [Bun 1.3.13](https://bun.sh) and Docker.
 
 ```bash
-git clone https://github.com/Bhanuteja005/Socialflyai.git
-cd Socialflyai
+git clone <repository-url> socialflyai
+cd socialflyai
 bun install                 # also installs git hooks (lefthook)
 bun run cli env             # .env with freshly generated local secrets
 bun dev                     # infra in Docker → migrations → every service and app with hot reload
@@ -161,24 +155,6 @@ scripts/        the `bun run cli` developer CLI
 docs/           architecture, platform setup, deployment, runbooks
 ```
 
-## 🗺 Roadmap
-
-| Phase | Scope | Status |
-|---|---|---|
-| 0 | Monorepo, tooling, infra, CI/CD, observability | ✅ Done |
-| 1 | Auth, organizations, roles, invitations, channel connections | ✅ Done |
-| 2 | Media, composer, scheduling, publishing engine (8 platforms) | ✅ Done |
-| 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice | ✅ Done |
-| 3b | AI short videos / reels (script → scenes → voiceover → MP4) | ✅ Done |
-| — | Split into site / app / admin console; Jenkins CI/CD | ✅ Done |
-| 4 | Analytics: per-post and per-account metrics, dashboards, best time to post | ✅ Done |
-| 5 | Research, SEO/AEO and AI-visibility tracking | ✅ Done |
-| 6 | Engagement inbox: comments, mentions, listening, AI triage and reply drafts, approval | ✅ Done |
-| 7 | Ads: Meta, Google, LinkedIn, TikTok, Pinterest and X — AI copy, approval, paused-by-default creation, spend sync | ✅ Done |
-
-Details in [docs/architecture.md](docs/architecture.md#roadmap). Have an idea?
-[Open a feature request](https://github.com/Bhanuteja005/Socialflyai/issues/new/choose).
-
 ## 🧑‍💻 Development
 
 ```bash
@@ -199,39 +175,7 @@ and gitleaks on staged files. Documentation:
 - [Deploying to Azure](docs/deployment-azure.md): Container Apps, secrets, CI/CD
 - [Runbook: publishing](docs/runbooks/publishing.md): what to do when posts fail
 
-## 🤝 Contributing
+## 🔒 License
 
-Contributions of all sizes are welcome: bug reports, docs, platform adapters and features.
-Read [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, and check
-[good first issues](https://github.com/Bhanuteja005/Socialflyai/labels/good%20first%20issue).
-Everyone taking part agrees to the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-Found a security issue? Please don't open a public issue — see [SECURITY.md](SECURITY.md).
-
-## 💚 Support the project
-
-SocialFly is free and open source. If it saves you time, you can help keep it going:
-
-- ⭐ **Star this repo**: it helps others find it.
-- 💖 **[Sponsor on GitHub](https://github.com/sponsors/Bhanuteja005)**
-- ☕ **Buy Me a Coffee** / **Open Collective**: links are in the Sponsor button at the top of the repo.
-
-### Sponsors
-
-Your logo here: [become a sponsor](https://github.com/sponsors/Bhanuteja005) and appear in this section.
-
-## 🌟 Contributors
-
-<a href="https://github.com/Bhanuteja005/Socialflyai/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Bhanuteja005/Socialflyai" alt="Contributors">
-</a>
-
-## 📈 Star history
-
-<a href="https://star-history.com/#Bhanuteja005/Socialflyai&Date">
-  <img src="https://api.star-history.com/svg?repos=Bhanuteja005/Socialflyai&type=Date" alt="Star history chart" width="600">
-</a>
-
-## 📄 License
-
-[MIT](LICENSE) © SocialFly contributors
+Proprietary and confidential — see [LICENSE](LICENSE). Report security issues privately to
+the maintainers ([SECURITY.md](SECURITY.md)).

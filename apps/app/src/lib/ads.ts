@@ -9,7 +9,8 @@ import type {
 
 /** UI metadata for ad platforms (Phase 7). The API decides what is configured and allowed. */
 
-export const ADS_DOCS_URL = "https://github.com/Bhanuteja005/Socialflyai/blob/main/docs/ads.md";
+/** Where the per-platform ads setup guide is published (optional; links hide when unset). */
+export const ADS_DOCS_URL: string | null = process.env.NEXT_PUBLIC_ADS_DOCS_URL || null;
 
 type AdsProviderMeta = {
 	name: string;
