@@ -25,6 +25,8 @@ export const QUEUES = {
 	tokenRefresh: "token-refresh",
 	/** Periodic safety net: re-enqueues due targets whose delayed job went missing. */
 	maintenance: "maintenance",
+	/** AI image generation and carousel rendering: slow, paid calls kept off the request path. */
+	aiMedia: "ai-media",
 } as const;
 
 export const publishJobSchema = z.object({
@@ -46,6 +48,13 @@ export type PublishStatusJob = z.infer<typeof publishStatusJobSchema>;
 export const tokenRefreshJobSchema = z.object({ channelId: z.uuid() });
 export type TokenRefreshJob = z.infer<typeof tokenRefreshJobSchema>;
 
+/** Everything else (prompt, slides, style) is read from ai_generations.input when the job runs. */
+export const aiMediaJobSchema = z.object({
+	generationId: z.uuid(),
+	organizationId: z.uuid(),
+});
+export type AiMediaJob = z.infer<typeof aiMediaJobSchema>;
+
 export const maintenanceJobSchema = z.object({
 	task: z.enum(["sweep-due-targets", "schedule-token-refresh", "recover-stuck-targets"]),
 });
@@ -60,6 +69,7 @@ export type MaintenanceJob = z.infer<typeof maintenanceJobSchema>;
 export const jobIds = {
 	publish: (targetId: string, scheduleVersion: number) => `publish.${targetId}.${scheduleVersion}`,
 	publishStatus: (targetId: string, check: number) => `status.${targetId}.${check}`,
+	aiMedia: (generationId: string) => `ai-media.${generationId}`,
 	tokenRefresh: (channelId: string, expiresAtEpoch: number) =>
 		`refresh.${channelId}.${expiresAtEpoch}`,
 };

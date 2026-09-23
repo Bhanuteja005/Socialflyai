@@ -1,14 +1,16 @@
 import type { Logger } from "@socialfly/core/logger";
-import { and, type Database, eq, inArray, isNotNull, lte, schema, sql } from "@socialfly/db";
+import { and, type Database, eq, inArray, isNotNull, lt, lte, schema, sql } from "@socialfly/db";
 import type { JobProducer, MaintenanceJob } from "@socialfly/queue";
 import type { TargetState } from "#src/publishing/target-state.ts";
 
-const { postTargets, channels } = schema;
+const { postTargets, channels, aiGenerations } = schema;
 
 /** A target left in `publishing` this long means its worker died mid-attempt. */
 const STUCK_PUBLISHING_MS = 15 * 60_000;
 /** Processing with no progress this long: the status-poll chain was lost. */
 const STUCK_PROCESSING_MS = 2 * 3600_000;
+/** Far beyond any real image call (providers time out at ~3 min, with one retry). */
+const STUCK_AI_GENERATION_MS = 30 * 60_000;
 
 /**
  * Periodic self-healing. BullMQ delayed jobs are the primary scheduler; these
@@ -27,8 +29,14 @@ export class Maintenance {
 		switch (job.task) {
 			case "sweep-due-targets":
 				return this.sweepDueTargets();
-			case "recover-stuck-targets":
-				return this.recoverStuckTargets();
+			case "recover-stuck-targets": {
+				// AI media recovery rides on this schedule because the task enum lives in
+				// packages/queue; a separate task id would need a queue-package change for
+				// no behavioural gain — both are "a worker died mid-job" sweeps.
+				const targets = await this.recoverStuckTargets();
+				const aiGenerations = await this.recoverStuckAiGenerations();
+				return { ...targets, aiGenerations: aiGenerations.recovered };
+			}
 			case "schedule-token-refresh":
 				return this.scheduleTokenRefresh();
 		}
@@ -89,6 +97,35 @@ export class Maintenance {
 		}
 		if (stuck.length > 0)
 			this.logger.error({ count: stuck.length }, "stuck targets marked unconfirmed");
+		return { recovered: stuck.length };
+	}
+
+	/**
+	 * AI media generations whose job was lost (Redis restore, enqueue failed after the
+	 * row was inserted, worker killed past its retries) would spin forever in the UI.
+	 * Failing them is safe: a late job sees `failed` and never generates or bills.
+	 */
+	async recoverStuckAiGenerations() {
+		const stuck = await this.db
+			.update(aiGenerations)
+			.set({
+				status: "failed",
+				errorCode: "timeout",
+				errorMessage: "This generation took too long and was stopped. Please try again.",
+				completedAt: new Date(),
+			})
+			.where(
+				and(
+					inArray(aiGenerations.status, ["pending", "running"]),
+					lt(
+						aiGenerations.createdAt,
+						sql`now() - make_interval(secs => ${STUCK_AI_GENERATION_MS / 1000})`,
+					),
+				),
+			)
+			.returning({ id: aiGenerations.id });
+		if (stuck.length > 0)
+			this.logger.error({ count: stuck.length }, "stuck ai generations marked failed");
 		return { recovered: stuck.length };
 	}
 

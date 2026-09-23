@@ -10,12 +10,13 @@ import { errorMessage } from "@/lib/errors";
 import { missingSettings, providerName } from "@/lib/providers";
 import { useOrg } from "../org-provider";
 import { PageHeader } from "../page-header";
+import { AiAssist } from "./ai-assist";
 import { ChannelPicker } from "./channel-picker";
 import { ContentEditor } from "./content-editor";
 import { MediaAttach } from "./media-attach";
 import { ProviderSettings } from "./provider-settings";
 import { SchedulePanel } from "./schedule-panel";
-import { initialState, useComposer } from "./use-composer";
+import { type ComposerPrefill, initialState, useComposer } from "./use-composer";
 import { useLiveValidation, useSubmitPost } from "./use-post-actions";
 import { type ChannelProblems, ValidationPanel } from "./validation-panel";
 
@@ -24,11 +25,12 @@ type ComposerProps = {
 	providers: ProviderInfo[];
 	post?: PostDetail;
 	presetDate?: string | null;
+	prefill?: ComposerPrefill;
 };
 
-export function Composer({ channels, providers, post, presetDate }: ComposerProps) {
+export function Composer({ channels, providers, post, presetDate, prefill }: ComposerProps) {
 	const { org } = useOrg();
-	const [initial] = useState(() => initialState(org.timezone, post, presetDate));
+	const [initial] = useState(() => initialState(org.timezone, post, presetDate, prefill));
 	const composer = useComposer(initial, channels, org.timezone);
 	const [tab, setTab] = useState("main");
 	const validation = useLiveValidation(composer, true);
@@ -106,8 +108,9 @@ export function Composer({ channels, providers, post, presetDate }: ComposerProp
 						</CardContent>
 					</Card>
 					<Card>
-						<CardHeader>
+						<CardHeader className="flex-row items-center justify-between gap-2">
 							<CardTitle>Content</CardTitle>
+							<AiAssist composer={composer} activeTab={tab} disabled={busy} />
 						</CardHeader>
 						<CardContent className="grid gap-4">
 							<ContentEditor

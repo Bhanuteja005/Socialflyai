@@ -1,3 +1,4 @@
+import { afterAll } from "bun:test";
 import { migrateTestDatabase } from "@socialfly/db/testing";
 
 // Must run before any module reads the env: bunfig.toml preloads this file.
@@ -13,3 +14,11 @@ process.env.LINKEDIN_CLIENT_ID = "test-client";
 process.env.LINKEDIN_CLIENT_SECRET = "test-secret";
 
 await migrateTestDatabase(process.env.DATABASE_URL);
+
+// Every test file runs in this one process and shares the infrastructure singletons, so
+// they are closed once after the whole run — a per-file afterAll would close them under
+// the files that run after it. Imported lazily: the env above must be set first.
+afterAll(async () => {
+	const { database, jobs, redis } = await import("#src/infrastructure/index.ts");
+	await Promise.all([jobs.close(), redis.quit(), database.close()]);
+});

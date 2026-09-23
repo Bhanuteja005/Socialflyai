@@ -15,6 +15,7 @@
 	"dependencies": {
 		"@bull-board/api": "^9.10.1",
 		"@bull-board/hono": "^9.10.1",
+		"@socialfly/ai": "workspace:*",
 		"@socialfly/config": "workspace:*",
 		"@socialfly/core": "workspace:*",
 		"@socialfly/db": "workspace:*",

@@ -2,6 +2,7 @@ import { type JobsOptions, Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import { QUEUE_PREFIX } from "./connection";
 import {
+	type AiMediaJob,
 	jobIds,
 	type PublishJob,
 	type PublishStatusJob,
@@ -96,6 +97,21 @@ export class JobProducer {
 			delay,
 			attempts: 5,
 			backoff: { type: "exponential", delay: 60_000 },
+			removeOnComplete: { age: 24 * 3600 },
+			removeOnFail: { age: 7 * 24 * 3600 },
+		});
+	}
+
+	/**
+	 * AI media is paid per call, so a blind retry spends money twice. Two attempts
+	 * cover a worker crash or a transient provider error; the worker records the
+	 * cost of each attempt, so the budget stays accurate either way.
+	 */
+	async enqueueAiMedia(job: AiMediaJob) {
+		await this.queue(QUEUES.aiMedia).add("generate", job, {
+			jobId: jobIds.aiMedia(job.generationId),
+			attempts: 2,
+			backoff: { type: "exponential", delay: 15_000 },
 			removeOnComplete: { age: 24 * 3600 },
 			removeOnFail: { age: 7 * 24 * 3600 },
 		});

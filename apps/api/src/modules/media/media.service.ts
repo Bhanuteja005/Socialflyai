@@ -32,6 +32,8 @@ export const toMediaDto = (a: AssetRow) => ({
 	durationMs: a.durationMs,
 	altText: a.altText,
 	status: a.status,
+	/** "ai" when produced by a generation — the library badges and filters on it. */
+	source: a.source,
 	url: publicUrl(a.storageKey),
 	createdAt: a.createdAt.toISOString(),
 });

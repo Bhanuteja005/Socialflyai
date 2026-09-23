@@ -26,8 +26,8 @@ links a user report to its trace.
 | Service | Responsibility | Talks to |
 |---|---|---|
 | `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP |
-| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling | Postgres, Redis, storage, SMTP |
-| `apps/worker` | Publishing engine, async-media status polling, token refresh, maintenance (sweep, stuck recovery) | Postgres, Redis, platform APIs |
+| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice | Postgres, Redis, storage, SMTP, Anthropic |
+| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs |
 | `apps/web` | Marketing site + the product UI | auth, api |
 
 Auth is its own service (as in the reference monorepo) so identity can be scaled,
@@ -51,7 +51,8 @@ users ─┬─ auth_sessions (refresh hash + previous hash for reuse detection)
        ├─ auth_oauth_accounts, auth_email_tokens, auth_audit_events
        └─ memberships ── organizations ─┬─ invitations
                                         ├─ channels (tokens AES-256-GCM encrypted)
-                                        ├─ media_assets
+                                        ├─ media_assets (source: upload | ai)
+                                        ├─ brand_profiles, ai_generations
                                         └─ posts ─┬─ post_media
                                                   └─ post_targets ── post_target_events
 ```
@@ -108,6 +109,37 @@ hidden, not broken.
 | `reddit` | OAuth 2 | self and link posts | media upload intentionally out of scope |
 | `youtube` | Google OAuth | video | resumable upload; default API quota ≈ 6 uploads/day |
 
+## AI content
+
+`packages/ai` — the provider layer, stateless like the platform adapters: request in,
+content + what it cost out. Persistence, budgets and retries live in the callers.
+
+| Capability | Provider (official SDK) | Where it runs | Why there |
+|---|---|---|---|
+| Posts per platform, rewrites, hashtags, carousel outlines | Anthropic Claude (`AI_TEXT_MODEL`, default `claude-opus-5`) | API, synchronously | 5–20 s; the user is waiting in the composer |
+| Images | OpenAI `gpt-image-1`, then Gemini (fallback chain) | worker, `ai-media` queue | 10–60 s, paid per call — never on the request path |
+| Carousel slides (PNG, 1080×1350) | Satori → resvg (WebAssembly) | worker, `ai-media` queue | CPU work; no browser, no native binaries |
+
+- **Structured output, not parsing.** Every text task is one call constrained to a Zod
+  schema (`output_config.format`), then post-processed for hard limits the model might
+  miss: per-platform character limits (`fitText`) and hashtag counts/format.
+- **Brand voice** (`brand_profiles`) is injected into every prompt; user text is wrapped
+  in tags and the system prompt says it is data, never instructions.
+- **Refusals.** Claude calls send `fallbacks: "default"` so a benign request declined by a
+  safety classifier is re-run server-side on the recommended fallback model. A final
+  refusal is `AiError("refused")` → 422, never retried. Image providers: a refusal stops
+  the chain (the next provider would refuse too); an outage falls through to the next.
+- **Metering.** `ai_generations` records every call — succeeded or failed — with tokens
+  and `cost_micros` (integer micro-dollars, list prices in `pricing.ts`; unknown models
+  are priced at the highest rate so they can never look free). The API refuses new
+  generations once an organization's month-to-date cost reaches
+  `AI_ORG_MONTHLY_BUDGET_USD` (`0` = unlimited).
+- **Media jobs** are idempotent: the worker skips a generation already `succeeded` or
+  `failed`, adds (never overwrites) cost across attempts, and at most 2 attempts run.
+  Output lands in `media_assets` with `source = 'ai'`, so it flows into the composer and
+  publishing like any upload. Generations stuck for 30 minutes are failed by maintenance.
+- **Missing keys hide features** (`GET /ai/capabilities`), exactly like platform credentials.
+
 ## Observability
 
 - **Logs**: pino JSON to stdout, secrets/PII redacted, `trace_id` on every line, mirrored to OTel logs.
@@ -133,7 +165,7 @@ hidden, not broken.
 | 0 | Monorepo, tooling, infra, CI/CD, observability | ✅ |
 | 1 | Auth, organizations, roles, invitations, channel connections | ✅ |
 | 2 | Media, composer, scheduling, publishing engine (8 platforms) | ✅ (platform calls not yet exercised against live accounts) |
-| 3 | AI content: posts, images, carousels (Satori), reels (Remotion renderer app) | next |
+| 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice, budgets | ✅ (reels with Remotion → 3b) |
 | 4 | Analytics: per-post and per-account metrics, dashboards | |
 | 5 | Research + SEO/AEO + AI-visibility (pgvector, crawler, LLM citation tracking) | |
 | 6 | Engagement inbox: listening, reply drafts, approval | |

@@ -42,3 +42,23 @@ export type ValidationResult = InferResponseType<typeof api.posts.validate.$post
 
 export type CreatePostInput = InferRequestType<typeof api.posts.$post>["json"];
 export type PostsQuery = InferRequestType<typeof api.posts.$get>["query"];
+
+// ── AI (Phase 3) ────────────────────────────────────────────────────────────
+export type AiCapabilities = InferResponseType<typeof api.ai.capabilities.$get, 200>;
+export type AiBudget = AiCapabilities["budget"];
+export type BrandProfile = InferResponseType<typeof api.ai.brand.$get, 200>;
+export type BrandProfileInput = InferRequestType<typeof api.ai.brand.$put>["json"];
+export type GeneratePostsInput = InferRequestType<typeof api.ai.posts.$post>["json"];
+export type GeneratedPosts = InferResponseType<typeof api.ai.posts.$post, 200>;
+export type PostVariant = GeneratedPosts["variants"][number];
+export type PostDraft = PostVariant["drafts"][number];
+export type RewriteInput = InferRequestType<typeof api.ai.rewrite.$post>["json"];
+export type RewriteAction = RewriteInput["action"];
+export type CarouselOutline = InferResponseType<typeof api.ai.carousels.outline.$post, 200>;
+export type Generation = InferResponseType<(typeof api.ai.generations)[":id"]["$get"], 200>;
+export type GenerationKind = Generation["kind"];
+export type GenerationStatus = Generation["status"];
+export type GenerationsQuery = InferRequestType<typeof api.ai.generations.$get>["query"];
+export type ImageInput = InferRequestType<typeof api.ai.images.$post>["json"];
+export type AspectRatio = NonNullable<ImageInput["aspectRatio"]>;
+export type CarouselInput = InferRequestType<typeof api.ai.carousels.$post>["json"];

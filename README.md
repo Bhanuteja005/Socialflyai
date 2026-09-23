@@ -54,7 +54,7 @@ team runs every week:
 6. **Measure** — impressions, engagement, mentions and AI citations.
 7. **Advertise** — turn winning posts into ad campaigns.
 
-Steps 4 and the foundations under it are built today; the rest is the [roadmap](#-roadmap).
+Steps 3 and 4 and the foundations under them are built today; the rest is the [roadmap](#-roadmap).
 
 ## 🚀 Features available now
 
@@ -64,6 +64,10 @@ Steps 4 and the foundations under it are built today; the rest is the [roadmap](
 - **Composer and scheduling** — one post, many channels, per-channel overrides, media uploads to S3-compatible storage.
 - **Publishing engine** — BullMQ queues, idempotent state machine, per-platform rate limits,
   safe retries. A platform call whose outcome is unknown is never blindly retried, so you won't get double posts.
+- **AI content** — write posts for every selected channel from one brief (each adapted to the
+  platform's length and style), rewrite in one click, suggest hashtags, generate images and
+  render LinkedIn/Instagram carousels. A brand-voice profile keeps everything on brand, and a
+  monthly budget per workspace keeps AI spend predictable.
 - **Operations built in** — OpenTelemetry traces, logs and metrics, Bull Board for jobs,
   health checks, a developer CLI and production Dockerfiles.
 
@@ -81,6 +85,7 @@ Steps 4 and the foundations under it are built today; the rest is the [roadmap](
 | Frontend | [Next.js 16](https://nextjs.org) |
 | Database | PostgreSQL 17 + [Drizzle ORM](https://orm.drizzle.team) + pgvector |
 | Queues | [BullMQ](https://bullmq.io) on Redis |
+| AI | Anthropic Claude (text), OpenAI / Gemini (images), Satori + resvg (carousels) |
 | Storage | Any S3-compatible store (RustFS locally, Cloudflare R2 / S3 in production) |
 | Observability | OpenTelemetry → Grafana (Tempo, Loki, Prometheus) |
 | Tooling | Turborepo, Biome, lefthook, commitlint, gitleaks |
@@ -112,15 +117,17 @@ bun run cli db seed         # demo@socialfly.local / Demo-Password-123!
 `secrets`, `service-client`.
 
 To connect real social accounts, create a developer app per platform and add its credentials to
-`.env` — see [docs/platforms.md](docs/platforms.md).
+`.env` — see [docs/platforms.md](docs/platforms.md). For AI features add `ANTHROPIC_API_KEY`
+(text) and `OPENAI_API_KEY` or `GEMINI_API_KEY` (images) to `.env`; without them those features
+are simply hidden.
 
 ## 🗂 Repository layout
 
 ```
 apps/
-  api/          Hono on Bun: REST API (organizations, channels, media, posts)
+  api/          Hono on Bun: REST API (organizations, channels, media, posts, AI)
   auth/         Hono on Bun: identity, sessions, refresh rotation, Google, service tokens
-  worker/       Bun + BullMQ: publishing engine, token refresh, self-healing maintenance
+  worker/       Bun + BullMQ: publishing engine, AI media jobs, token refresh, maintenance
   web/          Next.js 16: marketing site + the app
 packages/
   config/       zod-validated env per service; production refuses to boot without secrets
@@ -128,6 +135,7 @@ packages/
   db/           Drizzle schema + SQL migrations + seeds
   queue/        typed job contracts shared by producer (api) and consumer (worker)
   integrations/ one adapter per platform behind one contract
+  ai/           AI providers (Claude text, image chain), prompts, carousel renderer
   tsconfig/     shared strict TypeScript configs
 infra/          local compose stack, production Dockerfiles, OpenTelemetry config
 scripts/        the `bun run cli` developer CLI
@@ -141,7 +149,8 @@ docs/           architecture, platform setup, deployment, runbooks
 | 0 | Monorepo, tooling, infra, CI/CD, observability | ✅ Done |
 | 1 | Auth, organizations, roles, invitations, channel connections | ✅ Done |
 | 2 | Media, composer, scheduling, publishing engine (8 platforms) | ✅ Done |
-| 3 | AI content: posts, images, carousels, reels | 🚧 Next |
+| 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice | ✅ Done |
+| 3b | AI short videos / reels | 🚧 Next |
 | 4 | Analytics: per-post and per-account metrics, dashboards | Planned |
 | 5 | Research, SEO/AEO and AI-visibility tracking | Planned |
 | 6 | Engagement inbox: listening, reply drafts, approval | Planned |

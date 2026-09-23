@@ -3,7 +3,7 @@ import { eq, schema } from "@socialfly/db";
 import { createQueueConnection, jobIds, publishQueueName, QUEUE_PREFIX } from "@socialfly/queue";
 import { Queue } from "bullmq";
 import { app } from "#src/app.ts";
-import { database, db, jobs, redis, tokenCipher } from "#src/infrastructure/index.ts";
+import { db, redis, tokenCipher } from "#src/infrastructure/index.ts";
 import { type ApiClient, createChannel, createUser } from "./helpers";
 
 const queueRedis = createQueueConnection(process.env.REDIS_URL as string);
@@ -16,7 +16,6 @@ afterAll(async () => {
 	await linkedinQueue.obliterate({ force: true }).catch(() => {});
 	await linkedinQueue.close();
 	await queueRedis.quit();
-	await Promise.all([jobs.close(), redis.quit(), database.close()]);
 });
 
 let owner: ApiClient;

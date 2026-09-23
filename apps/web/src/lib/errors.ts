@@ -54,6 +54,14 @@ const FRIENDLY: Record<string, string> = {
 	media_in_use: "This file is used by a post. Remove it from the post first.",
 	post_locked: "This post has already been sent and can no longer be edited.",
 	last_owner: "An organization needs at least one owner. Promote someone else first.",
+	ai_not_configured:
+		"AI isn't set up on this server yet. Ask whoever runs SocialFly to add an API key.",
+	ai_budget_exceeded:
+		"Your organization has used this month's AI budget. It resets at the start of next month.",
+	ai_rate_limited: "You're generating faster than the AI allows. Wait a moment and try again.",
+	ai_refused: "The AI declined this request. Try rephrasing it.",
+	ai_invalid_output: "The AI returned something we couldn't use. Please try again.",
+	ai_unavailable: "The AI service is unavailable right now. Please try again in a minute.",
 	network_error: "Can't reach SocialFly right now. Check your connection and try again.",
 };
 

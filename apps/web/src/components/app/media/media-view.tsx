@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Upload } from "lucide-react";
+import { ImageIcon, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Skeleton } from "@/components/ui/feedback";
@@ -101,10 +101,19 @@ export function MediaView() {
 									onClick={() => setSelected(asset)}
 									className="group grid w-full cursor-pointer gap-1.5 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
 								>
-									<MediaThumb
-										asset={asset}
-										className="ring-1 ring-border transition group-hover:ring-border-strong"
-									/>
+									<span className="relative block">
+										<MediaThumb
+											asset={asset}
+											className="ring-1 ring-border transition group-hover:ring-border-strong"
+										/>
+										{asset.source === "ai" ? (
+											<span className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 rounded bg-black/65 px-1.5 py-0.5 font-medium text-[10px] text-white">
+												<Sparkles className="size-3" aria-hidden="true" />
+												AI
+												<span className="sr-only"> generated</span>
+											</span>
+										) : null}
+									</span>
 									<span className="grid min-w-0 px-0.5">
 										<span className="truncate font-medium text-xs">{asset.fileName}</span>
 										<span className="truncate text-[11px] text-muted-foreground">

@@ -1,11 +1,12 @@
 "use client";
 
-import { Eye, Lock } from "lucide-react";
+import { AlertTriangle, Eye, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { EmptyState, Skeleton } from "@/components/ui/feedback";
+import { Alert, EmptyState, Skeleton } from "@/components/ui/feedback";
 import { useChannels, usePost, useProviders } from "@/hooks/queries";
+import { isGenerationActive, useGeneration } from "@/hooks/use-ai";
 import { errorMessage } from "@/lib/errors";
 import { isPostEditable } from "@/lib/status";
 import { useOrg } from "../org-provider";
@@ -39,14 +40,26 @@ function ReadOnlyNotice() {
 	);
 }
 
+/**
+ * `/compose` accepts a hand-over from the Create page:
+ * - `?generation=<id>` attaches the media an AI image/carousel generation produced;
+ * - `?content=<text>` pre-fills the post text (e.g. a carousel caption).
+ * The generation is re-read from the API rather than passed in the URL so the
+ * link survives a reload and can't smuggle in media from another organization.
+ */
 export function NewPostPage() {
 	const { can } = useOrg();
 	const params = useSearchParams();
 	const channels = useChannels();
 	const providers = useProviders();
+	const generationId = params.get("generation");
+	const generation = useGeneration(generationId);
+	const content = params.get("content");
 
 	if (!can("editor")) return <ReadOnlyNotice />;
-	if (channels.isPending || providers.isPending) return <ComposerSkeleton />;
+	const waitingForMedia =
+		Boolean(generationId) && (generation.isPending || isGenerationActive(generation.data));
+	if (channels.isPending || providers.isPending || waitingForMedia) return <ComposerSkeleton />;
 	if (channels.isError || providers.isError) {
 		return (
 			<EmptyState
@@ -61,7 +74,22 @@ export function NewPostPage() {
 		);
 	}
 	return (
-		<Composer channels={channels.data} providers={providers.data} presetDate={params.get("date")} />
+		<>
+			{generationId && generation.isError ? (
+				<Alert tone="warning" icon={AlertTriangle} className="mb-4">
+					Couldn't attach the generated media: {errorMessage(generation.error)}
+				</Alert>
+			) : null}
+			<Composer
+				channels={channels.data}
+				providers={providers.data}
+				presetDate={params.get("date")}
+				prefill={{
+					content: content ?? undefined,
+					media: generation.data?.status === "succeeded" ? generation.data.media : undefined,
+				}}
+			/>
+		</>
 	);
 }
 

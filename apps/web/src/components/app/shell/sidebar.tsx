@@ -6,9 +6,11 @@ import {
 	Images,
 	LayoutDashboard,
 	type LucideIcon,
+	Megaphone,
 	PenSquare,
 	Radio,
 	Rows3,
+	Sparkles,
 	UserRound,
 	Users,
 } from "lucide-react";
@@ -90,12 +92,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 		{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 		{ href: "/calendar", label: "Calendar", icon: CalendarDays },
 		{ href: "/posts", label: "Posts", icon: Rows3 },
+		{ href: "/create", label: "Create", icon: Sparkles },
 		{ href: "/media", label: "Media", icon: Images },
 		{ href: "/channels", label: "Channels", icon: Radio, badge: needsReauth },
 	];
 	const settings: NavItem[] = [
 		{ href: "/settings/organization", label: "Organization", icon: Building2 },
 		{ href: "/settings/team", label: "Team", icon: Users },
+		{ href: "/settings/brand", label: "Brand voice", icon: Megaphone },
 		{ href: "/settings/account", label: "Account", icon: UserRound },
 	];
 

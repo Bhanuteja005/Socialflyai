@@ -4,6 +4,7 @@ import { id, timestamps } from "./columns";
 import { organizations } from "./organizations";
 
 export const mediaKind = pgEnum("media_kind", ["image", "video", "document"]);
+export const mediaSource = pgEnum("media_source", ["upload", "ai"]);
 export const mediaStatus = pgEnum("media_status", ["pending_upload", "ready", "failed"]);
 
 /**
@@ -28,6 +29,8 @@ export const mediaAssets = pgTable(
 		height: integer(),
 		durationMs: integer(),
 		altText: text(),
+		/** Uploaded by a person, or produced by an AI generation (see ai_generations.media_ids). */
+		source: mediaSource().notNull().default("upload"),
 		status: mediaStatus().notNull().default("pending_upload"),
 		...timestamps(),
 	},

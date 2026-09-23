@@ -1,0 +1,30 @@
+{
+	"name": "@socialfly/ai",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./testing": "./src/testing.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@anthropic-ai/sdk": "^0.128.0",
+		"@fontsource/inter": "^5.3.0",
+		"@google/genai": "^2.24.0",
+		"@resvg/resvg-wasm": "^2.6.2",
+		"@socialfly/integrations": "workspace:*",
+		"openai": "^7.23.0",
+		"satori": "^0.33.5",
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@types/bun": "^1.4.2",
+		"@types/react": "^19.3.0",
+		"typescript": "5.9.3"
+	}
+}

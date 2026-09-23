@@ -1,3 +1,4 @@
+import { type AiModels, createAi } from "@socialfly/ai";
 import { apiEnv as env } from "@socialfly/config";
 import { TokenCipher } from "@socialfly/core/crypto";
 import { createLogger } from "@socialfly/core/logger";
@@ -47,3 +48,9 @@ export const storage = new S3Client({
 });
 
 export const mailer = createMailer({ smtpUrl: env.SMTP_URL, from: env.MAIL_FROM, logger });
+
+/**
+ * AI models; a capability without a key is null (hidden, not broken). Exported as a
+ * mutable object whose fields are read at call time, so tests can swap in fakes.
+ */
+export const ai: AiModels = createAi(env);

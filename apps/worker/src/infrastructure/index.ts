@@ -1,9 +1,12 @@
+import { createAi } from "@socialfly/ai";
 import { workerEnv as env } from "@socialfly/config";
 import { TokenCipher } from "@socialfly/core/crypto";
 import { createLogger } from "@socialfly/core/logger";
 import { createDb } from "@socialfly/db";
 import { createProviderRegistry } from "@socialfly/integrations";
 import { createQueueConnection, JobProducer } from "@socialfly/queue";
+import { S3Client } from "bun";
+import { AiMediaProcessor } from "#src/ai/ai-media.ts";
 import { ChannelTokens } from "#src/channels/channel-tokens.ts";
 import { Maintenance } from "#src/maintenance/maintenance.ts";
 import { PublishingEngine } from "#src/publishing/publishing-engine.ts";
@@ -45,3 +48,22 @@ export const engine = new PublishingEngine({
 	publicMediaUrl: env.S3_PUBLIC_URL,
 });
 export const maintenance = new Maintenance(db, jobs, targetState, logger);
+
+/** Same bucket as the API: it presigns user uploads there, the worker writes AI output there. */
+export const storage = new S3Client({
+	endpoint: env.S3_ENDPOINT,
+	region: env.S3_REGION,
+	bucket: env.S3_BUCKET,
+	accessKeyId: env.S3_ACCESS_KEY_ID,
+	secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+});
+
+/** Missing keys disable a capability (images) instead of failing the boot. */
+export const ai = createAi(env);
+export const aiMedia = new AiMediaProcessor({
+	db,
+	ai,
+	storage,
+	logger,
+	publicMediaUrl: env.S3_PUBLIC_URL,
+});

@@ -1,5 +1,6 @@
 import { workerEnv as env } from "@socialfly/config";
 import {
+	aiMediaJobSchema,
 	type MaintenanceJob,
 	maintenanceJobSchema,
 	publishJobSchema,
@@ -12,6 +13,7 @@ import {
 import { type Processor, Queue, Worker } from "bullmq";
 import { ChannelNeedsReauthError } from "#src/channels/channel-tokens.ts";
 import {
+	aiMedia,
 	channelTokens,
 	database,
 	engine,
@@ -91,6 +93,18 @@ export async function startWorkers() {
 		if (channel?.tokenExpiresAt)
 			await jobs.scheduleTokenRefresh({ channelId }, channel.tokenExpiresAt);
 	});
+
+	// Always started, even with no image keys: carousels render locally, and an image
+	// job must still be consumed so its generation is marked `not_configured`.
+	start(
+		QUEUES.aiMedia,
+		async (job) =>
+			aiMedia.process(aiMediaJobSchema.parse(job.data), {
+				attemptsMade: job.attemptsMade,
+				maxAttempts: job.opts.attempts ?? 1,
+			}),
+		{ concurrency: env.AI_MEDIA_CONCURRENCY },
+	);
 
 	start(QUEUES.maintenance, async (job) => maintenance.run(maintenanceJobSchema.parse(job.data)), {
 		concurrency: 1,

@@ -1,4 +1,4 @@
-import type { PostsQuery } from "./api-types";
+import type { GenerationsQuery, PostsQuery } from "./api-types";
 
 /** Every org-scoped key starts with ["org", orgId] so switching orgs never mixes caches. */
 export const qk = {
@@ -17,4 +17,10 @@ export const qk = {
 	post: (orgId: string, id: string) => ["org", orgId, "post", id] as const,
 	media: (orgId: string, kind?: string) => ["org", orgId, "media", kind ?? "all"] as const,
 	mediaAll: (orgId: string) => ["org", orgId, "media"] as const,
+	aiCapabilities: (orgId: string) => ["org", orgId, "ai", "capabilities"] as const,
+	brand: (orgId: string) => ["org", orgId, "ai", "brand"] as const,
+	generation: (orgId: string, id: string) => ["org", orgId, "ai", "generation", id] as const,
+	generationsAll: (orgId: string) => ["org", orgId, "ai", "generations"] as const,
+	generations: (orgId: string, query: GenerationsQuery = {}) =>
+		["org", orgId, "ai", "generations", query] as const,
 };

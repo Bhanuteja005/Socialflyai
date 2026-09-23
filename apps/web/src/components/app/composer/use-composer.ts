@@ -26,19 +26,23 @@ function defaultLater(timeZone: string) {
 	return toLocalInputValue(d, timeZone);
 }
 
+/** Starting content for a new post, e.g. handed over from the Create page. */
+export type ComposerPrefill = { content?: string; media?: MediaAsset[] };
+
 export function initialState(
 	timeZone: string,
 	post?: PostDetail,
 	presetDate?: string | null,
+	prefill?: ComposerPrefill,
 ): ComposerState {
 	if (!post) {
 		const preset = presetDate ? new Date(presetDate) : null;
 		return {
-			content: "",
+			content: prefill?.content ?? "",
 			channelIds: [],
 			overrides: {},
 			settings: {},
-			media: [],
+			media: prefill?.media ?? [],
 			mode: "later",
 			scheduledLocal:
 				preset && !Number.isNaN(preset.getTime()) && preset.getTime() > Date.now()

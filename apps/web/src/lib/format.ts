@@ -85,3 +85,11 @@ export const pluralize = (n: number, one: string, many = `${one}s`) =>
 
 /** Twitter-style weighted length is out of scope; code points are close enough for limits UI. */
 export const textLength = (text: string) => [...text].length;
+
+const usd =
+	typeof Intl !== "undefined"
+		? new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" })
+		: null;
+
+/** "$1.23": AI spend is small, so always two decimals. */
+export const formatUsd = (value: number) => usd?.format(value) ?? `$${value.toFixed(2)}`;

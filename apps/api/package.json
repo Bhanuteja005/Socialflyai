@@ -17,6 +17,7 @@
 	},
 	"dependencies": {
 		"@scalar/hono-api-reference": "^0.12.4",
+		"@socialfly/ai": "workspace:*",
 		"@socialfly/config": "workspace:*",
 		"@socialfly/core": "workspace:*",
 		"@socialfly/db": "workspace:*",
