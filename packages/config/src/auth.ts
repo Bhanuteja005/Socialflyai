@@ -8,7 +8,8 @@ export const authEnv = createEnv({
 		...baseServerEnv,
 		PORT: port(4800),
 		OTEL_SERVICE_NAME: z.string().default("socialfly-auth"),
-		CORS_ORIGINS: csv("http://localhost:3000"),
+		// The product app and the admin console both sign users in.
+		CORS_ORIGINS: csv("http://localhost:4700,http://localhost:4702"),
 		AUTH_COOKIE_SECURE: boolFlag(process.env.NODE_ENV === "production"),
 		/** JSON array overriding the first-party client registry (apps/auth/src/config/clients.ts). */
 		AUTH_CLIENTS_JSON: z.string().optional(),

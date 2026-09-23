@@ -46,7 +46,7 @@ export function printUrls(profiles: string[]) {
 		["Mail inbox", "http://localhost:8025"],
 	];
 	if (profiles.includes("observability") || profiles.includes("full")) {
-		rows.push(["Grafana (traces/logs/metrics)", "http://localhost:3001  (admin / admin)"]);
+		rows.push(["Grafana (traces/logs/metrics)", "http://localhost:4703  (admin / admin)"]);
 	}
 	console.log();
 	for (const [name, url] of rows) console.log(`  ${color.cyan(name.padEnd(30))} ${url}`);

@@ -6,8 +6,9 @@ import { createMailer } from "@socialfly/core/mail";
 import { createRedis } from "@socialfly/core/redis";
 import { createDb } from "@socialfly/db";
 import { createProviderRegistry } from "@socialfly/integrations";
-import { createQueueConnection, JobProducer } from "@socialfly/queue";
+import { createQueueConnection, JobProducer, publishQueueName, QUEUES } from "@socialfly/queue";
 import { S3Client } from "bun";
+import { QueueStats } from "./queue-stats.ts";
 
 /** Process-wide singletons. Created once here, closed once in index.ts on shutdown. */
 export const logger = createLogger({
@@ -25,7 +26,10 @@ export const db = database.db;
 /** Request-path Redis: OAuth state, rate limits. */
 export const redis = createRedis(env.REDIS_URL, { keyPrefix: "sf:api:" });
 
-export const jobs = new JobProducer(createQueueConnection(env.REDIS_URL));
+/** One BullMQ connection for everything the API does with queues (enqueue + admin stats). */
+export const queueConnection = createQueueConnection(env.REDIS_URL);
+
+export const jobs = new JobProducer(queueConnection);
 
 export const tokenCipher = new TokenCipher(
 	env.TOKEN_ENCRYPTION_KEY,
@@ -33,6 +37,15 @@ export const tokenCipher = new TokenCipher(
 );
 
 export const providers = createProviderRegistry(env);
+
+/**
+ * Every queue the worker consumes. Publish queues come from the registry (configured or
+ * not), so a newly registered platform shows up in the admin console without an edit here.
+ */
+export const queueStats = new QueueStats(queueConnection, () => [
+	...providers.all().map((p) => publishQueueName(p.id)),
+	...Object.values(QUEUES),
+]);
 
 /**
  * Bun's native S3 client (no AWS SDK). Works against RustFS locally and R2/S3 in

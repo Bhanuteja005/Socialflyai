@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0BE27D"></a>
-  <a href="https://github.com/Bhanuteja005/Socialflyai/actions/workflows/deploy.yml"><img alt="CI" src="https://github.com/Bhanuteja005/Socialflyai/actions/workflows/deploy.yml/badge.svg?branch=main"></a>
+  <a href="docs/ci-jenkins.md"><img alt="CI: Jenkins" src="https://img.shields.io/badge/CI-Jenkins-D24939?logo=jenkins&logoColor=white"></a>
   <a href="https://github.com/Bhanuteja005/Socialflyai/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Bhanuteja005/Socialflyai?style=flat&color=0BE27D"></a>
   <a href="https://github.com/Bhanuteja005/Socialflyai/issues"><img alt="Issues" src="https://img.shields.io/github/issues/Bhanuteja005/Socialflyai"></a>
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-0BE27D"></a>
@@ -31,12 +31,12 @@
 </p>
 
 <p align="center">
-  <img src="apps/web/public/assets/applogos/linkedin.svg" width="32" alt="LinkedIn">&nbsp;
-  <img src="apps/web/public/assets/applogos/facebook.svg" width="32" alt="Facebook">&nbsp;
-  <img src="apps/web/public/assets/applogos/instagram.svg" width="32" alt="Instagram">&nbsp;
-  <img src="apps/web/public/assets/applogos/threads.svg" width="32" alt="Threads">&nbsp;
-  <img src="apps/web/public/assets/applogos/x.svg" width="32" alt="X">&nbsp;
-  <img src="apps/web/public/assets/applogos/youtube.svg" width="32" alt="YouTube">
+  <img src="apps/site/public/assets/applogos/linkedin.svg" width="32" alt="LinkedIn">&nbsp;
+  <img src="apps/site/public/assets/applogos/facebook.svg" width="32" alt="Facebook">&nbsp;
+  <img src="apps/site/public/assets/applogos/instagram.svg" width="32" alt="Instagram">&nbsp;
+  <img src="apps/site/public/assets/applogos/threads.svg" width="32" alt="Threads">&nbsp;
+  <img src="apps/site/public/assets/applogos/x.svg" width="32" alt="X">&nbsp;
+  <img src="apps/site/public/assets/applogos/youtube.svg" width="32" alt="YouTube">
 </p>
 
 ---
@@ -66,7 +66,7 @@ Steps 3 and 4 and the foundations under them are built today; the rest is the [r
   safe retries. A platform call whose outcome is unknown is never blindly retried, so you won't get double posts.
 - **AI content** — write posts for every selected channel from one brief (each adapted to the
   platform's length and style), rewrite in one click, suggest hashtags, generate images and
-  render LinkedIn/Instagram carousels. A brand-voice profile keeps everything on brand, and a
+  render LinkedIn/Instagram carousels and short vertical videos with voiceover. A brand-voice profile keeps everything on brand, and a
   monthly budget per workspace keeps AI spend predictable.
 - **Operations built in** — OpenTelemetry traces, logs and metrics, Bull Board for jobs,
   health checks, a developer CLI and production Dockerfiles.
@@ -99,27 +99,30 @@ git clone https://github.com/Bhanuteja005/Socialflyai.git
 cd Socialflyai
 bun install                 # also installs git hooks (lefthook)
 bun run cli env             # .env with freshly generated local secrets
-bun dev                     # infra in Docker → migrations → auth, api, worker, web with hot reload
+bun dev                     # infra in Docker → migrations → every service and app with hot reload
 bun run cli db seed         # demo@socialfly.local / Demo-Password-123!
 ```
 
 | Service | URL | |
 |---|---|---|
-| Web app | http://localhost:3000 | Next.js |
+| App (dashboard) | http://localhost:4700 | Next.js — sign in here |
+| Marketing site | http://localhost:4701 | Next.js, static |
+| Admin console | http://localhost:4702 | staff only — `bun run cli admin grant <email>` |
 | API | http://localhost:4400/docs | OpenAPI reference (Scalar) |
 | Auth | http://localhost:4800/docs | OpenAPI reference |
 | Worker | http://localhost:4500/queues | Bull Board: inspect and replay jobs |
 | Mail inbox | http://localhost:8025 | Mailpit catches every email |
 | Storage console | http://localhost:9001 | S3-compatible (RustFS) |
-| Grafana | http://localhost:3001 | traces, logs, metrics: `bun run cli stack up observability` |
+| Grafana | http://localhost:4703 | traces, logs, metrics: `bun run cli stack up observability` |
 
 `bun run cli` lists every command: `status`, `stack up|down|logs`, `db migrate|generate|seed|reset`,
 `secrets`, `service-client`.
 
 To connect real social accounts, create a developer app per platform and add its credentials to
 `.env` — see [docs/platforms.md](docs/platforms.md). For AI features add `ANTHROPIC_API_KEY`
-(text) and `OPENAI_API_KEY` or `GEMINI_API_KEY` (images) to `.env`; without them those features
-are simply hidden.
+(text), `OPENAI_API_KEY` (images + video voiceover) or `GEMINI_API_KEY` (images) to `.env`;
+without them those features are simply hidden. Carousels and videos with theme backgrounds need
+no key at all.
 
 ## 🗂 Repository layout
 
@@ -127,17 +130,21 @@ are simply hidden.
 apps/
   api/          Hono on Bun: REST API (organizations, channels, media, posts, AI)
   auth/         Hono on Bun: identity, sessions, refresh rotation, Google, service tokens
-  worker/       Bun + BullMQ: publishing engine, AI media jobs, token refresh, maintenance
-  web/          Next.js 16: marketing site + the app
+  worker/       Bun + BullMQ: publishing engine, AI images/carousels/videos, token refresh
+  app/          Next.js 16: the product (dashboard, composer, calendar, Create studio)
+  site/         Next.js 16: public marketing site (static, SEO)
+  admin/        Next.js 16: internal staff console (orgs, users, publishing, AI spend, queues)
 packages/
   config/       zod-validated env per service; production refuses to boot without secrets
   core/         errors, logger, telemetry, HTTP middleware, auth helpers, crypto, mail
   db/           Drizzle schema + SQL migrations + seeds
   queue/        typed job contracts shared by producer (api) and consumer (worker)
   integrations/ one adapter per platform behind one contract
-  ai/           AI providers (Claude text, image chain), prompts, carousel renderer
+  ai/           AI providers (Claude text, image chain, voiceover), prompts, carousel + video renderer
+  ui/           shared design system for app, site and admin
   tsconfig/     shared strict TypeScript configs
-infra/          local compose stack, production Dockerfiles, OpenTelemetry config
+infra/          local compose stack, Dockerfiles, Jenkins controller, OpenTelemetry config
+Jenkinsfile     CI/CD: lint, typecheck, tests on real infra, security scans, images, Azure deploy
 scripts/        the `bun run cli` developer CLI
 docs/           architecture, platform setup, deployment, runbooks
 ```
@@ -150,8 +157,9 @@ docs/           architecture, platform setup, deployment, runbooks
 | 1 | Auth, organizations, roles, invitations, channel connections | ✅ Done |
 | 2 | Media, composer, scheduling, publishing engine (8 platforms) | ✅ Done |
 | 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice | ✅ Done |
-| 3b | AI short videos / reels | 🚧 Next |
-| 4 | Analytics: per-post and per-account metrics, dashboards | Planned |
+| 3b | AI short videos / reels (script → scenes → voiceover → MP4) | ✅ Done |
+| — | Split into site / app / admin console; Jenkins CI/CD | ✅ Done |
+| 4 | Analytics: per-post and per-account metrics, dashboards | 🚧 Next |
 | 5 | Research, SEO/AEO and AI-visibility tracking | Planned |
 | 6 | Engagement inbox: listening, reply drafts, approval | Planned |
 | 7 | Ads: campaign drafts, Meta / Google / LinkedIn / TikTok / X / Pinterest sync | Planned |
@@ -172,6 +180,8 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org). Pre-
 and gitleaks on staged files. Documentation:
 
 - [Architecture](docs/architecture.md): services, data model, publishing engine, decisions
+- [CI/CD with Jenkins](docs/ci-jenkins.md): pipeline stages, controller setup, credentials, rollback
+- [Admin console](docs/admin-console.md): staff access, what it shows, audit trail
 - [Platform setup](docs/platforms.md): creating the LinkedIn / Meta / X / Reddit / Google apps
 - [Deploying to Azure](docs/deployment-azure.md): Container Apps, secrets, CI/CD
 - [Runbook: publishing](docs/runbooks/publishing.md): what to do when posts fail

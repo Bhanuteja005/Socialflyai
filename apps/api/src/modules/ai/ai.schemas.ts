@@ -1,4 +1,4 @@
-import { CAROUSEL_THEMES, carouselSlideSchema } from "@socialfly/ai";
+import { CAROUSEL_THEMES, carouselSlideSchema, VOICES, videoSceneSchema } from "@socialfly/ai";
 import { z } from "zod";
 
 // The text-task bodies are the task input schemas from @socialfly/ai, re-exported so the
@@ -8,6 +8,7 @@ export {
 	generatePostsInput,
 	hashtagsInput,
 	rewriteInput,
+	videoScriptInput,
 } from "@socialfly/ai";
 
 /** Trimmed, bounded free text that may be empty (brand fields are all optional in practice). */
@@ -45,6 +46,52 @@ export const carouselBody = z.object({
 });
 export type CarouselInput = z.infer<typeof carouselBody>;
 
+/** Longest reel we render: Reels/Shorts sweet spot, and a bound on worker time and cost. */
+export const MAX_VIDEO_SECONDS = 120;
+
+export const videoBody = z
+	.object({
+		scenes: z.array(videoSceneSchema).min(1).max(12),
+		/** "ai": one generated image per scene from its `visual`; "theme": gradient backgrounds. */
+		background: z.enum(["ai", "theme"]).default("theme"),
+		/**
+		 * Optional per-scene background from the org's own library (index-aligned with
+		 * `scenes`; null = use `background`). Wins over "ai" for that scene, so a user
+		 * can mix their own photos with generated ones and pay only for the rest.
+		 */
+		sceneMediaIds: z.array(z.uuid().nullable()).max(12).optional(),
+		voiceover: z
+			.object({
+				enabled: z.boolean().default(false),
+				voice: z.enum(VOICES).default("alloy"),
+				/** Delivery direction for the voice, e.g. "upbeat and friendly". */
+				style: z.string().trim().max(200).optional(),
+			})
+			.default({ enabled: false, voice: "alloy" }),
+		theme: z.enum(THEMES).default("midnight"),
+		footer: z.string().trim().max(60).optional(),
+	})
+	.superRefine((body, ctx) => {
+		if (body.sceneMediaIds && body.sceneMediaIds.length > body.scenes.length) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["sceneMediaIds"],
+				message: "There are more scene backgrounds than scenes",
+			});
+		}
+		// Planned length only: narration can stretch a scene at render time, which the
+		// per-scene narration cap (400 chars ≈ 27 s) keeps bounded.
+		const total = body.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
+		if (total > MAX_VIDEO_SECONDS) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["scenes"],
+				message: `A video can be at most ${MAX_VIDEO_SECONDS} seconds long`,
+			});
+		}
+	});
+export type VideoInput = z.output<typeof videoBody>;
+
 export const GENERATION_KINDS = [
 	"post",
 	"rewrite",
@@ -52,6 +99,8 @@ export const GENERATION_KINDS = [
 	"carousel_outline",
 	"image",
 	"carousel",
+	"video_script",
+	"video",
 ] as const;
 
 export const listGenerationsQuery = z.object({

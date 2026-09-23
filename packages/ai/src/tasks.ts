@@ -291,3 +291,96 @@ export function buildImagePrompt(prompt: string, brand: BrandContext | null, sty
 	);
 	return parts.join(" ");
 }
+
+// ── Short video script ──────────────────────────────────────────────────────
+
+export const videoScriptInput = z.object({
+	topic: z.string().trim().min(3).max(2000),
+	/** Target length; the render stretches scenes to fit narration. */
+	durationSeconds: z.number().int().min(10).max(90).default(30),
+	platform: platformSchema.default("instagram"),
+	language: z.string().trim().max(40).default("English"),
+	/** Write narration lines (spoken) in addition to on-screen captions. */
+	voiceover: z.boolean().default(true),
+});
+export type VideoScriptInput = z.input<typeof videoScriptInput>;
+
+export const videoSceneSchema = z.object({
+	/** On screen, big and bold: keep it short. */
+	caption: z.string().trim().min(1).max(90),
+	/** Spoken over the scene. Empty when there is no voiceover. */
+	narration: z.string().trim().max(400).default(""),
+	/** Image prompt for the scene's background. */
+	visual: z.string().trim().max(500).default(""),
+	durationSeconds: z.number().min(2).max(15).default(4),
+});
+export type VideoScene = z.infer<typeof videoSceneSchema>;
+
+export async function videoScript(
+	model: TextModel,
+	brand: BrandContext | null,
+	rawInput: VideoScriptInput,
+) {
+	const input = videoScriptInput.parse(rawInput);
+	const sceneCount = Math.max(3, Math.min(12, Math.round(input.durationSeconds / 4)));
+	const prompt = [
+		brandSection(brand),
+		platformSection([input.platform]),
+		userText("topic", input.topic),
+		`Write a ${input.durationSeconds}-second vertical short video (Reels / Shorts style) in ${input.language}, as ${sceneCount} scenes.`,
+		"Scene 1 is the hook: it must stop the scroll in under 2 seconds. The last scene is a call to action.",
+		"For each scene give: caption — the on-screen text, under 60 characters, readable in one glance; " +
+			(input.voiceover
+				? "narration — what the voiceover says, natural spoken language, about 2.5 words per second of the scene; "
+				: "narration — an empty string (no voiceover); ") +
+			"visual — a concrete photographic description of the background image (subject, setting, lighting), with no text, logos or people's faces in close-up; " +
+			"durationSeconds — how long the scene stays on screen.",
+		`Scene durations must add up to about ${input.durationSeconds} seconds.`,
+		"Also write the post caption to publish with the video, following the platform guidance, and suggest hashtags separately.",
+	]
+		.filter(Boolean)
+		.join("\n\n");
+
+	const result = await model.generate({
+		system: SYSTEM_PROMPT,
+		prompt,
+		schema: z.object({
+			title: z.string(),
+			scenes: z.array(
+				z.object({
+					caption: z.string(),
+					narration: z.string(),
+					visual: z.string(),
+					durationSeconds: z.number(),
+				}),
+			),
+			caption: z.string(),
+			hashtags: z.array(z.string()),
+		}),
+	});
+
+	const [, maxTags] = PLATFORM_GUIDES[input.platform].hashtags;
+	const hashtags = normalizeHashtags(result.output.hashtags, maxTags);
+	const scenes: VideoScene[] = result.output.scenes.slice(0, 12).map((s) => ({
+		caption: s.caption.trim().slice(0, 90),
+		narration: input.voiceover ? s.narration.trim().slice(0, 400) : "",
+		visual: s.visual.trim().slice(0, 500),
+		durationSeconds: Math.min(
+			15,
+			Math.max(2, Number.isFinite(s.durationSeconds) ? s.durationSeconds : 4),
+		),
+	}));
+	return {
+		...result,
+		output: {
+			title: result.output.title.trim().slice(0, 120),
+			scenes,
+			caption: fitText(
+				result.output.caption.trim(),
+				hashtags,
+				PLATFORM_GUIDES[input.platform].maxChars,
+			),
+			hashtags,
+		},
+	};
+}

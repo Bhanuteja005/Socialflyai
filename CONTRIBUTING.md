@@ -34,6 +34,9 @@ services fit together and why.
    ```bash
    bun run lint && bun run typecheck && bun run test
    ```
+   CI is Jenkins ([docs/ci-jenkins.md](docs/ci-jenkins.md)). Its results show up as a status check on
+   your PR. It also checks that migrations are committed, scans for secrets, audits dependencies and
+   builds every Docker image. PRs from forks wait for a maintainer to approve the CI run.
 5. Commit with [Conventional Commits](https://www.conventionalcommits.org):
    `feat(api): add cursor pagination to GET /posts`, `fix(worker): ...`, `docs: ...`.
 6. Open a PR against `main` and fill in the template. Keep PRs focused, one concern each.

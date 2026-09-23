@@ -14,6 +14,8 @@ import {
 	imageBody,
 	listGenerationsQuery,
 	rewriteInput,
+	videoBody,
+	videoScriptInput,
 } from "./ai.schemas.ts";
 import { AiService } from "./ai.service.ts";
 
@@ -116,6 +118,30 @@ export const aiRoutes = new Hono<OrgEnv>()
 					ctx.get("auth").userId,
 					ctx.req.valid("json"),
 				),
+				202,
+			),
+	)
+	.post(
+		"/videos/script",
+		describeRoute({ tags, summary: "Plan a short video: scenes, caption and hashtags" }),
+		requireRole("editor"),
+		validate("json", videoScriptInput),
+		async (ctx) =>
+			ctx.json(
+				await service.videoScript(ctx.get("org").id, ctx.get("auth").userId, ctx.req.valid("json")),
+			),
+	)
+	.post(
+		"/videos",
+		describeRoute({
+			tags,
+			summary: "Render a short vertical video from scenes (async — poll the generation)",
+		}),
+		requireRole("editor"),
+		validate("json", videoBody),
+		async (ctx) =>
+			ctx.json(
+				await service.startVideo(ctx.get("org").id, ctx.get("auth").userId, ctx.req.valid("json")),
 				202,
 			),
 	)

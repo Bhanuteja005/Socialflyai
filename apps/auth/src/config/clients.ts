@@ -32,6 +32,17 @@ const defaults: AuthClient[] = [
 		loginEnabled: true,
 		oauthProviders: ["google"],
 	},
+	{
+		// Staff console. Anyone may SIGN IN here (same accounts), but the API only
+		// serves /admin to users whose platform_role is admin; no sign-ups from it.
+		clientId: "socialfly-admin",
+		name: "SocialFly admin console",
+		origins: [new URL(env.ADMIN_URL).origin],
+		redirectUris: [`${new URL(env.ADMIN_URL).origin}/auth/callback`],
+		registrationEnabled: false,
+		loginEnabled: true,
+		oauthProviders: ["google"],
+	},
 ];
 
 const clients = new Map(

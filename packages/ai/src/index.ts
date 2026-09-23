@@ -1,9 +1,11 @@
 import { AnthropicTextModel } from "./anthropic";
 import { GeminiImageModel, ImageModelChain, OpenAiImageModel } from "./images";
+import { OpenAiSpeechModel, type SpeechModel } from "./speech";
 import type { ImageModel, TextModel } from "./types";
 
 export { AnthropicTextModel } from "./anthropic";
 export { AiError, type AiErrorKind, isAiError } from "./errors";
+export { ffmpegPath, mediaDurationSeconds, runFfmpeg } from "./ffmpeg";
 export { ASPECT_SIZES, GeminiImageModel, ImageModelChain, OpenAiImageModel } from "./images";
 export { imageCostMicros, microsToUsd, textCostMicros, usdToMicros } from "./pricing";
 export { PLATFORM_GUIDES } from "./prompts";
@@ -14,8 +16,17 @@ export {
 	cropToAspect,
 	renderCarousel,
 } from "./render";
+export {
+	type GeneratedSpeech,
+	OpenAiSpeechModel,
+	type SpeechModel,
+	type SpeechRequest,
+	VOICES,
+	type Voice,
+} from "./speech";
 export * from "./tasks";
 export type * from "./types";
+export { type RenderedVideo, renderVideo, VIDEO_SIZE, type VideoSceneInput } from "./video";
 
 export type AiEnv = {
 	ANTHROPIC_API_KEY: string;
@@ -25,12 +36,15 @@ export type AiEnv = {
 	OPENAI_IMAGE_MODEL: string;
 	GEMINI_API_KEY: string;
 	GEMINI_IMAGE_MODEL: string;
+	OPENAI_TTS_MODEL: string;
 };
 
 export type AiModels = {
 	/** Null when no text provider is configured — the feature is hidden, not broken. */
 	text: TextModel | null;
 	images: ImageModel | null;
+	/** Voiceover for videos (OpenAI key). */
+	speech: SpeechModel | null;
 };
 
 /** Builds the configured models from env. Like the platform registry, missing keys disable, never crash. */
@@ -54,5 +68,9 @@ export function createAi(env: AiEnv): AiModels {
 		);
 	const images = imageModels.length ? new ImageModelChain(imageModels) : null;
 
-	return { text, images };
+	const speech = env.OPENAI_API_KEY
+		? new OpenAiSpeechModel({ apiKey: env.OPENAI_API_KEY, model: env.OPENAI_TTS_MODEL })
+		: null;
+
+	return { text, images, speech };
 }

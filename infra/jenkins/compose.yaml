@@ -1,0 +1,53 @@
+# SocialFly Jenkins controller (local machine or a VM).
+#
+#   cp infra/jenkins/.env.example infra/jenkins/.env   # then fill it in
+#   docker compose -f infra/jenkins/compose.yaml up -d --build
+#   open http://localhost:4780
+#
+# SECURITY TRADE-OFF — read before running this anywhere shared:
+# the host's Docker socket is mounted so pipelines can start containers (Bun,
+# the per-build Postgres/Redis/S3 stack, image builds). Access to that socket is
+# root on the host: any code a build runs — a PR's tests, a dependency's install
+# script, a Dockerfile — can take over the machine. That is why fork PRs wait for
+# an admin's approval (Jenkinsfile, "Approve fork PR") and why this controller
+# should run on a dedicated VM that holds nothing else of value. Alternatives
+# with a smaller blast radius: a separate agent VM (controller without the
+# socket), rootless Docker, or ephemeral cloud agents. See docs/ci-jenkins.md.
+
+name: socialfly-jenkins
+
+services:
+  jenkins:
+    build: .
+    image: socialfly-jenkins:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:-admin}
+      # No default on purpose: the controller must not boot with a known password.
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?set JENKINS_ADMIN_PASSWORD in infra/jenkins/.env}
+      JENKINS_URL: ${JENKINS_URL:-http://localhost:4780/}
+    # Only the web UI, on loopback, on 4780 (8080 is taken on the dev machine).
+    # The inbound-agent port (50000) is not published: agents connect over
+    # WebSocket through the HTTP port, or over SSH.
+    ports:
+      - "127.0.0.1:4780:8080"
+    # The jenkins user must be able to use the socket. Docker Desktop: the socket
+    # is root-owned, so group 0 works. Linux: set DOCKER_GID to
+    # `stat -c %g /var/run/docker.sock`.
+    group_add:
+      - "${DOCKER_GID:-0}"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost:8080/login || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  jenkins_home:

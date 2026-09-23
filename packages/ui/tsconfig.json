@@ -1,0 +1,9 @@
+{
+	"extends": "@socialfly/tsconfig/base.json",
+	"compilerOptions": {
+		"lib": ["DOM", "DOM.Iterable", "ES2023"],
+		"jsx": "react-jsx",
+		"noUnusedParameters": false
+	},
+	"include": ["src"]
+}

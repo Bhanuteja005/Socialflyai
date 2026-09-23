@@ -1,0 +1,135 @@
+# Jenkins Configuration as Code for the SocialFly controller.
+#
+# Values come from the environment (infra/jenkins/.env via compose.yaml, or your
+# VM's service environment). Anything changed in the UI is overwritten on the
+# next restart — change it here instead. Reference: docs/ci-jenkins.md.
+
+jenkins:
+  systemMessage: "SocialFly CI. Configured from infra/jenkins/casc.yaml; UI changes are lost on restart."
+  # Builds run on the controller itself, labelled "docker" (the label the
+  # Jenkinsfile asks for). For a shared/production controller, set this to 0 and
+  # attach a separate agent with that label instead (docs/ci-jenkins.md).
+  numExecutors: ${JENKINS_EXECUTORS:-4}
+  labelString: "docker"
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID:-admin}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  crumbIssuer: "standard"
+  markupFormatter: "plainText"
+  # Non-secret deployment configuration, visible to every build as env vars.
+  # Blank AZURE_ACR_NAME = CI only: main is verified but nothing is built or deployed.
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: AZURE_ACR_NAME
+            value: "${AZURE_ACR_NAME:-}"
+          - key: AZURE_RESOURCE_GROUP
+            value: "${AZURE_RESOURCE_GROUP:-}"
+          - key: ACA_AUTH_APP
+            value: "${ACA_AUTH_APP:-}"
+          - key: ACA_API_APP
+            value: "${ACA_API_APP:-}"
+          - key: ACA_WORKER_APP
+            value: "${ACA_WORKER_APP:-}"
+          - key: ACA_WEB_APP
+            value: "${ACA_WEB_APP:-}"
+          - key: ACA_SITE_APP
+            value: "${ACA_SITE_APP:-}"
+          - key: ACA_ADMIN_APP
+            value: "${ACA_ADMIN_APP:-}"
+          - key: ACA_MIGRATE_JOB
+            value: "${ACA_MIGRATE_JOB:-}"
+          - key: AUTH_URL
+            value: "${AUTH_URL:-}"
+          - key: API_URL
+            value: "${API_URL:-}"
+          - key: WEB_URL
+            value: "${WEB_URL:-}"
+          - key: SITE_URL
+            value: "${SITE_URL:-}"
+          - key: ADMIN_URL
+            value: "${ADMIN_URL:-}"
+          - key: NEXT_PUBLIC_SENTRY_DSN
+            value: "${NEXT_PUBLIC_SENTRY_DSN:-}"
+          # Comma-separated Jenkins user ids. Blank = deploys need no approval.
+          - key: DEPLOY_APPROVERS
+            value: "${DEPLOY_APPROVERS:-}"
+          # Who may approve CI for pull requests from forks.
+          - key: FORK_PR_APPROVERS
+            value: "${FORK_PR_APPROVERS:-admin}"
+
+unclassified:
+  location:
+    url: "${JENKINS_URL:-http://localhost:4780/}"
+  lockableResourcesManager:
+    declaredResources:
+      - name: "production-deploy"
+        description: "Held for the whole migrate → deploy → smoke → rollback sequence"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # Used to scan the repo and report commit statuses. A fine-grained PAT
+          # (Contents: read, Commit statuses: read/write, Pull requests: read,
+          # Metadata: read) or swap in a GitHub App credential — docs/ci-jenkins.md.
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github"
+              description: "GitHub access for SocialFly (branch source + commit statuses)"
+              username: "${GITHUB_USERNAME:-Bhanuteja005}"
+              password: "${GITHUB_TOKEN:-}"
+          # Azure credentials (azure-sp, azure-tenant-id, azure-subscription-id)
+          # are NOT defined here on purpose: add them in Manage Jenkins →
+          # Credentials so the secret never sits in an env file next to this one.
+
+jobs:
+  - script: |
+      multibranchPipelineJob('socialfly') {
+        displayName('SocialFly')
+        description('CI for every branch and PR; deploy from main. Pipeline: Jenkinsfile at the repo root.')
+        branchSources {
+          branchSource {
+            source {
+              github {
+                id('socialfly-github')
+                repoOwner('Bhanuteja005')
+                repository('Socialflyai')
+                repositoryUrl('https://github.com/Bhanuteja005/Socialflyai')
+                configuredByUrl(true)
+                credentialsId('github')
+                traits {
+                  // 1 = branches that are not also filed as PRs (the PR build covers them).
+                  gitHubBranchDiscovery { strategyId(1) }
+                  // 1 = build the PR merged with its target branch.
+                  gitHubPullRequestDiscovery { strategyId(1) }
+                  // Fork PRs are discovered, but an untrusted fork's Jenkinsfile is
+                  // replaced by the target branch's, whose first stage waits for an
+                  // admin to approve running the fork's code.
+                  gitHubForkDiscovery {
+                    strategyId(1)
+                    trust { gitHubTrustPermissions() }
+                  }
+                }
+              }
+            }
+          }
+        }
+        factory {
+          workflowBranchProjectFactory { scriptPath('Jenkinsfile') }
+        }
+        orphanedItemStrategy {
+          discardOldItems { numToKeep(20) }
+        }
+        // Safety net only; pushes arrive through the GitHub webhook.
+        triggers {
+          periodicFolderTrigger { interval('1d') }
+        }
+      }

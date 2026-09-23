@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { AiError } from "@socialfly/ai";
-import { FakeImageModel, FakeTextModel } from "@socialfly/ai/testing";
+import { FakeImageModel, FakeSpeechModel, FakeTextModel } from "@socialfly/ai/testing";
 import { eq, schema } from "@socialfly/db";
 import { createQueueConnection, jobIds, QUEUE_PREFIX, QUEUES } from "@socialfly/queue";
 import { Queue } from "bullmq";
@@ -55,6 +55,7 @@ beforeEach(() => {
 	images = new FakeImageModel();
 	ai.text = text;
 	ai.images = images;
+	ai.speech = new FakeSpeechModel();
 });
 
 describe("capabilities", () => {
@@ -66,6 +67,8 @@ describe("capabilities", () => {
 			text: true,
 			images: true,
 			carousels: true,
+			videos: true,
+			voiceover: true,
 			budget: { limitUsd: 25, usedUsd: 0, remainingUsd: 25 },
 		});
 		const start = new Date(res.json.budget.periodStart);
@@ -76,9 +79,16 @@ describe("capabilities", () => {
 	test("without keys, text and images are off but carousels still work", async () => {
 		ai.text = null;
 		ai.images = null;
+		ai.speech = null;
 		const { client } = await newOrg();
 		const res = await client.request("GET", "/ai/capabilities");
-		expect(res.json).toMatchObject({ text: false, images: false, carousels: true });
+		expect(res.json).toMatchObject({
+			text: false,
+			images: false,
+			carousels: true,
+			videos: true,
+			voiceover: false,
+		});
 	});
 });
 
@@ -265,6 +275,70 @@ describe("text generation", () => {
 		expect(caps.json.budget).toMatchObject({ usedUsd: 26, remainingUsd: 0 });
 	});
 
+	test("a per-organization budget override replaces the server default (0 = unlimited)", async () => {
+		const { client, orgId } = await newOrg();
+		const setOverride = (usd: number | null) =>
+			db
+				.update(schema.organizations)
+				.set({ aiMonthlyBudgetUsd: usd })
+				.where(eq(schema.organizations.id, orgId));
+		await db.insert(schema.aiGenerations).values({
+			organizationId: orgId,
+			kind: "image",
+			status: "succeeded",
+			costMicros: 3_000_000,
+		});
+		const generate = () =>
+			client.request("POST", "/ai/posts", { brief: "Hello", platforms: ["linkedin"] });
+
+		// Lower than the default: $3 spent reaches a $2.50 limit.
+		await setOverride(2.5);
+		const blocked = await generate();
+		expect(blocked.status).toBe(429);
+		expect(blocked.json.error.details).toEqual({ limitUsd: 2.5, usedUsd: 3 });
+		expect(text.requests).toHaveLength(0);
+		expect((await client.request("GET", "/ai/capabilities")).json.budget).toMatchObject({
+			limitUsd: 2.5,
+			usedUsd: 3,
+			remainingUsd: 0,
+		});
+
+		// 0 = unlimited, even far past the server default of $25.
+		await setOverride(0);
+		await db.insert(schema.aiGenerations).values({
+			organizationId: orgId,
+			kind: "image",
+			status: "succeeded",
+			costMicros: 100_000_000,
+		});
+		text.reply(postsReply);
+		expect((await generate()).status).toBe(200);
+		expect((await client.request("GET", "/ai/capabilities")).json.budget).toMatchObject({
+			limitUsd: null,
+			remainingUsd: null,
+		});
+
+		// Cleared: back to the server default, which $103 exceeds.
+		await setOverride(null);
+		expect((await generate()).status).toBe(429);
+		expect((await client.request("GET", "/ai/capabilities")).json.budget).toMatchObject({
+			limitUsd: 25,
+		});
+	});
+
+	test("the budget only counts this organization's spend", async () => {
+		const other = await newOrg("Big Spender");
+		await db.insert(schema.aiGenerations).values({
+			organizationId: other.orgId,
+			kind: "image",
+			status: "succeeded",
+			costMicros: 30_000_000,
+		});
+		const { client } = await newOrg();
+		const caps = await client.request("GET", "/ai/capabilities");
+		expect(caps.json.budget).toMatchObject({ usedUsd: 0, remainingUsd: 25 });
+	});
+
 	test("no text model configured → 503", async () => {
 		ai.text = null;
 		const { client } = await newOrg();
@@ -353,6 +427,174 @@ describe("media generation", () => {
 			"slide-1.png",
 		]);
 		expect(done.json.media[0].source).toBe("ai");
+	});
+});
+
+describe("short videos", () => {
+	const scenes = [
+		{
+			caption: "Stop scrolling",
+			narration: "Here is a tip.",
+			visual: "a desk",
+			durationSeconds: 3,
+		},
+		{ caption: "Follow for more", narration: "", visual: "a phone", durationSeconds: 3 },
+	];
+	const noVoice = { enabled: false, voice: "alloy" };
+
+	test("script: scenes, caption and hashtags from the text model, recorded as video_script", async () => {
+		const { client, orgId } = await newOrg();
+		await client.request("PUT", "/ai/brand", { brandName: "Acme Rockets" });
+		text.reply({
+			title: "Rocket tips",
+			scenes: scenes.map((s) => ({ ...s, durationSeconds: 5 })),
+			caption: "Watch till the end",
+			hashtags: ["rockets", "#Space"],
+		});
+
+		const res = await client.request("POST", "/ai/videos/script", {
+			topic: "Three rocket facts",
+			durationSeconds: 10,
+		});
+		expect(res.status).toBe(200);
+		expect(res.json).toMatchObject({
+			title: "Rocket tips",
+			hashtags: ["#rockets", "#Space"],
+		});
+		expect(res.json.scenes).toHaveLength(2);
+		expect(res.json.scenes[0]).toMatchObject({ caption: "Stop scrolling", durationSeconds: 5 });
+		expect(res.json.caption).toContain("Watch till the end");
+		expect(text.requests[0]?.prompt).toContain("Acme Rockets");
+
+		const [row] = await db
+			.select()
+			.from(schema.aiGenerations)
+			.where(eq(schema.aiGenerations.id, res.json.generationId));
+		expect(row).toMatchObject({ organizationId: orgId, kind: "video_script", status: "succeeded" });
+		expect(row?.input).toMatchObject({ platform: "instagram", voiceover: true });
+
+		expect(
+			(await client.request("POST", "/ai/videos/script", { topic: "x", durationSeconds: 5 }))
+				.status,
+		).toBe(422);
+	});
+
+	test("render: 202 pending with defaults, one job keyed by the generation id", async () => {
+		const { client, orgId } = await newOrg();
+		const res = await client.request("POST", "/ai/videos", {
+			scenes,
+			voiceover: { enabled: true, voice: "coral" },
+		});
+		expect(res.status).toBe(202);
+		expect(res.json).toMatchObject({ kind: "video", status: "pending", media: [], error: null });
+		expect(res.json.input).toMatchObject({
+			background: "theme",
+			theme: "midnight",
+			voiceover: { enabled: true, voice: "coral" },
+		});
+		const job = await aiMediaQueue.getJob(jobIds.aiMedia(res.json.id));
+		expect(job?.data).toEqual({ generationId: res.json.id, organizationId: orgId });
+	});
+
+	test("render: a theme-only video with no voice needs no provider", async () => {
+		ai.text = null;
+		ai.images = null;
+		ai.speech = null;
+		const { client } = await newOrg();
+		const res = await client.request("POST", "/ai/videos", { scenes, voiceover: noVoice });
+		expect(res.status).toBe(202);
+	});
+
+	test("render: AI backgrounds or voiceover without their provider → 503", async () => {
+		const { client } = await newOrg();
+		ai.images = null;
+		const noImages = await client.request("POST", "/ai/videos", {
+			scenes,
+			background: "ai",
+			voiceover: noVoice,
+		});
+		expect(noImages.status).toBe(503);
+		expect(noImages.json.error.code).toBe("ai_not_configured");
+
+		ai.images = images;
+		ai.speech = null;
+		const noSpeech = await client.request("POST", "/ai/videos", {
+			scenes,
+			voiceover: { enabled: true, voice: "alloy" },
+		});
+		expect(noSpeech.status).toBe(503);
+		expect(noSpeech.json.error.code).toBe("ai_not_configured");
+	});
+
+	test("render: validation — scene count, total length, voice, extra scene media", async () => {
+		const { client } = await newOrg();
+		const post = (body: Record<string, unknown>) =>
+			client.request("POST", "/ai/videos", { scenes, voiceover: noVoice, ...body });
+		expect((await post({ scenes: [] })).status).toBe(422);
+		expect((await post({ scenes: Array.from({ length: 13 }, () => scenes[0]) })).status).toBe(422);
+		// 9 × 15 s = 135 s > 120 s.
+		const long = await post({
+			scenes: Array.from({ length: 9 }, () => ({ ...scenes[0], durationSeconds: 15 })),
+		});
+		expect(long.status).toBe(422);
+		expect((await post({ voiceover: { enabled: true, voice: "robot" } })).status).toBe(422);
+		expect((await post({ theme: "neon-nope" })).status).toBe(422);
+		expect((await post({ sceneMediaIds: [null, null, crypto.randomUUID()] })).status).toBe(422);
+	});
+
+	test("render: scene media must be the org's own ready images", async () => {
+		const { client, orgId } = await newOrg();
+		const other = await newOrg("Other");
+		const media = (
+			organizationId: string,
+			kind: "image" | "video",
+			status: "ready" | "pending_upload",
+		) =>
+			db
+				.insert(schema.mediaAssets)
+				.values({
+					organizationId,
+					storageKey: `orgs/${organizationId}/media/${crypto.randomUUID()}/f`,
+					fileName: "f",
+					mimeType: kind === "image" ? "image/png" : "video/mp4",
+					kind,
+					sizeBytes: 10,
+					status,
+				})
+				.returning()
+				.then((rows) => rows[0]?.id as string);
+		const post = (id: string) =>
+			client.request("POST", "/ai/videos", {
+				scenes,
+				background: "ai",
+				sceneMediaIds: [id],
+				voiceover: noVoice,
+			});
+
+		const foreign = await post(await media(other.orgId, "image", "ready"));
+		expect(foreign.status).toBe(404);
+		expect((await post(await media(orgId, "video", "ready"))).status).toBe(422);
+		expect((await post(await media(orgId, "image", "pending_upload"))).status).toBe(422);
+
+		const ok = await post(await media(orgId, "image", "ready"));
+		expect(ok.status).toBe(202);
+	});
+
+	test("render: paid steps are budget-checked; a theme-only video is not", async () => {
+		const { client, orgId } = await newOrg();
+		await db.insert(schema.aiGenerations).values({
+			organizationId: orgId,
+			kind: "image",
+			status: "succeeded",
+			costMicros: 26_000_000,
+		});
+		const post = (body: Record<string, unknown>) =>
+			client.request("POST", "/ai/videos", { scenes, voiceover: noVoice, ...body });
+		expect((await post({ background: "ai" })).json.error.code).toBe("ai_budget_exceeded");
+		expect((await post({ voiceover: { enabled: true, voice: "alloy" } })).json.error.code).toBe(
+			"ai_budget_exceeded",
+		);
+		expect((await post({})).status).toBe(202);
 	});
 });
 

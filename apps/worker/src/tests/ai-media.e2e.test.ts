@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { AiError, type AiModels } from "@socialfly/ai";
-import { FakeImageModel } from "@socialfly/ai/testing";
+import { FakeImageModel, FakeSpeechModel } from "@socialfly/ai/testing";
 import { workerEnv as env } from "@socialfly/config";
 import { createLogger } from "@socialfly/core/logger";
 import { normalizeEmail } from "@socialfly/core/security";
@@ -31,6 +31,7 @@ const FIRST_OF_TWO = { attemptsMade: 0, maxAttempts: 2 };
 const LAST_OF_TWO = { attemptsMade: 1, maxAttempts: 2 };
 
 let images: FakeImageModel;
+let speech: FakeSpeechModel;
 let ai: AiModels;
 let processor: AiMediaProcessor;
 /** Every key written during the suite, removed in afterAll so the bucket stays clean. */
@@ -38,7 +39,8 @@ const writtenKeys: string[] = [];
 
 beforeEach(() => {
 	images = new FakeImageModel();
-	ai = { text: null, images };
+	speech = new FakeSpeechModel();
+	ai = { text: null, images, speech };
 	processor = new AiMediaProcessor({
 		db,
 		ai,
@@ -69,7 +71,7 @@ async function org() {
 }
 
 async function pending(
-	kind: "image" | "carousel",
+	kind: "image" | "carousel" | "video",
 	input: Record<string, unknown>,
 	owner?: { orgId: string; userId: string },
 ) {
@@ -246,6 +248,7 @@ describe("ai image generation", () => {
 				delete: async (key: string) => {
 					deleted.push(key);
 				},
+				file: storage.file.bind(storage),
 			},
 			logger,
 			publicMediaUrl: "http://storage.test/media",
@@ -323,6 +326,198 @@ describe("ai carousel rendering", () => {
 		await processor.process(g.job, FIRST_OF_TWO);
 		expect((await load(g.id)).generation.status).toBe("succeeded");
 	}, 30_000);
+});
+
+describe("ai video rendering", () => {
+	// Real ffmpeg renders take seconds each: scenes are kept short and few.
+	const RENDER_TIMEOUT = 120_000;
+	const scenes = [
+		{
+			caption: "Stop scrolling",
+			narration: "Here is a tip.",
+			visual: "a desk",
+			durationSeconds: 2,
+		},
+		{ caption: "Follow for more", narration: "", visual: "a phone", durationSeconds: 2 },
+	];
+	const input = (overrides: Record<string, unknown> = {}) => ({
+		scenes,
+		background: "theme",
+		voiceover: { enabled: true, voice: "coral", style: "upbeat" },
+		theme: "midnight",
+		...overrides,
+	});
+
+	/** The MP4 is stored where the row says, is the size the row says, and is really an MP4. */
+	async function expectStoredMp4(asset: { storageKey: string; sizeBytes: number } | undefined) {
+		const bytes = new Uint8Array(await storage.file(asset?.storageKey as string).arrayBuffer());
+		expect(new TextDecoder().decode(bytes.slice(4, 8))).toBe("ftyp");
+		expect(bytes.byteLength).toBe(asset?.sizeBytes as number);
+	}
+
+	test(
+		"theme backgrounds + voiceover: one ready MP4, narration billed",
+		async () => {
+			const g = await pending("video", input({ footer: "@beanthere" }));
+
+			await processor.process(g.job, FIRST_OF_TWO);
+
+			const { generation, media } = await load(g.id);
+			// Only scenes with narration are voiced: no paid call for an empty line.
+			expect(speech.requests).toHaveLength(1);
+			expect(speech.requests[0]).toMatchObject({
+				text: "Here is a tip.",
+				voice: "coral",
+				style: "upbeat",
+			});
+			expect(images.requests).toHaveLength(0);
+			expect(generation).toMatchObject({
+				status: "succeeded",
+				model: "renderer",
+				costMicros: "Here is a tip.".length * 20,
+				errorCode: null,
+			});
+			expect(generation.output).toMatchObject({ scenes: 2 });
+			expect(generation.output?.durationMs).toBeGreaterThan(0);
+			expect(generation.output?.urls).toEqual([
+				`http://storage.test/media/${media[0]?.storageKey}`,
+			]);
+
+			expect(media).toHaveLength(1);
+			const asset = media[0];
+			expect(asset).toMatchObject({
+				organizationId: g.orgId,
+				uploadedBy: g.userId,
+				fileName: "ai-video.mp4",
+				mimeType: "video/mp4",
+				kind: "video",
+				status: "ready",
+				source: "ai",
+				width: 1080,
+				height: 1920,
+				altText: "Stop scrolling",
+			});
+			expect(asset?.durationMs).toBe(generation.output?.durationMs as number);
+			expect(asset?.storageKey).toBe(`orgs/${g.orgId}/media/${asset?.id}/ai-video.mp4`);
+			await expectStoredMp4(asset);
+		},
+		RENDER_TIMEOUT,
+	);
+
+	test(
+		"AI backgrounds: one 9:16 on-brand image per scene, image model recorded",
+		async () => {
+			const g = await pending(
+				"video",
+				input({ background: "ai", voiceover: { enabled: false, voice: "alloy" } }),
+			);
+			await db.insert(schema.brandProfiles).values({
+				organizationId: g.orgId,
+				brandName: "Bean There",
+			});
+
+			await processor.process(g.job, FIRST_OF_TWO);
+
+			const { generation, media } = await load(g.id);
+			expect(speech.requests).toHaveLength(0);
+			expect(images.requests).toHaveLength(2);
+			expect(images.requests.map((r) => r.aspectRatio)).toEqual(["9:16", "9:16"]);
+			expect(images.requests[0]?.prompt).toContain("a desk");
+			expect(images.requests[0]?.prompt).toContain("Bean There");
+			expect(generation).toMatchObject({
+				status: "succeeded",
+				model: "fake:image",
+				costMicros: 80_000,
+				inputTokens: 100,
+			});
+			await expectStoredMp4(media[0]);
+		},
+		RENDER_TIMEOUT,
+	);
+
+	test(
+		"a scene background from the org's own library is read from storage instead of generated",
+		async () => {
+			const owner = await org();
+			const photo = await new FakeImageModel().generate({ prompt: "x", aspectRatio: "1:1" });
+			const [own] = await db
+				.insert(schema.mediaAssets)
+				.values({
+					organizationId: owner.orgId,
+					storageKey: `orgs/${owner.orgId}/media/${crypto.randomUUID()}/photo.png`,
+					fileName: "photo.png",
+					mimeType: "image/png",
+					kind: "image",
+					sizeBytes: photo.bytes.byteLength,
+					status: "ready",
+				})
+				.returning();
+			const ownKey = own?.storageKey as string;
+			await storage.write(ownKey, photo.bytes, { type: "image/png" });
+			writtenKeys.push(ownKey);
+
+			const g = await pending(
+				"video",
+				input({
+					background: "ai",
+					sceneMediaIds: [own?.id, null],
+					voiceover: { enabled: false, voice: "alloy" },
+				}),
+				owner,
+			);
+
+			await processor.process(g.job, FIRST_OF_TWO);
+
+			const { generation, media } = await load(g.id);
+			// Scene 1 used the library photo; only scene 2 was generated (and paid for).
+			expect(images.requests).toHaveLength(1);
+			expect(images.requests[0]?.prompt).toContain("a phone");
+			expect(generation).toMatchObject({ status: "succeeded", costMicros: 40_000 });
+			await expectStoredMp4(media[0]);
+		},
+		RENDER_TIMEOUT,
+	);
+
+	test("a library background deleted before rendering fails cleanly, nothing paid", async () => {
+		const g = await pending(
+			"video",
+			input({ sceneMediaIds: [crypto.randomUUID()], voiceover: { enabled: true, voice: "alloy" } }),
+		);
+		await processor.process(g.job, FIRST_OF_TWO);
+		expect((await load(g.id)).generation).toMatchObject({
+			status: "failed",
+			errorCode: "invalid_request",
+			costMicros: 0,
+		});
+		expect(speech.requests).toHaveLength(0);
+	});
+
+	test(
+		"a refused image fails without a retry, and bills what was already generated",
+		async () => {
+			const g = await pending("video", input({ background: "ai" }));
+			images.failNext(new AiError("refused", "The image request was declined"));
+
+			await processor.process(g.job, FIRST_OF_TWO); // resolves: nothing for BullMQ to retry
+
+			const { generation } = await load(g.id);
+			expect(generation).toMatchObject({ status: "failed", errorCode: "refused" });
+			// Whatever succeeded alongside the refusal (the other image, the narration) was paid for.
+			expect(generation.costMicros).toBeGreaterThan(0);
+			expect(await mediaCount(g.orgId)).toBe(0);
+		},
+		RENDER_TIMEOUT,
+	);
+
+	test("voiceover without a speech model fails as not_configured", async () => {
+		const g = await pending("video", input());
+		ai.speech = null;
+		await processor.process(g.job, FIRST_OF_TWO);
+		expect((await load(g.id)).generation).toMatchObject({
+			status: "failed",
+			errorCode: "not_configured",
+		});
+	});
 });
 
 describe("maintenance", () => {

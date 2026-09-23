@@ -3,9 +3,11 @@
 ## System at a glance
 
 ```
-                 ┌──────────────┐   cookies (sf_access, sf_csrf)   ┌──────────────┐
-  browser ──────▶│  web (Next)  │─────────────────────────────────▶│ auth (Hono)  │── users, sessions
-                 └──────┬───────┘                                  └──────────────┘
+  visitors ──▶ site  (Next :4701)    static marketing pages; "Log in" / "Get started" link to app
+  users ─────▶ app   (Next :4700) ─┐
+  staff ─────▶ admin (Next :4702) ─┤  cookies (sf_access, sf_csrf)  ┌──────────────┐
+                        ┌──────────┴───────────────────────────────▶│ auth (Hono)  │── users, sessions
+                        │                                           └──────────────┘
                         │ typed Hono RPC client (hc<AppType>)
                         ▼
                  ┌──────────────┐  enqueue (BullMQ, Redis)  ┌────────────────┐   platform APIs
@@ -17,18 +19,53 @@
                  S3-compatible storage (browser uploads directly via presigned URLs)
 ```
 
-All services are TypeScript on Bun, except web (Next.js on Node). Every service
-exports OpenTelemetry traces, metrics and logs; `X-Trace-Id` on every API response
-links a user report to its trace.
+All services are TypeScript on Bun, except the Next.js frontends (site, app, admin),
+which run on Node. Every service exports OpenTelemetry traces, metrics and logs;
+`X-Trace-Id` on every API response links a user report to its trace.
 
 ## Services
 
-| Service | Responsibility | Talks to |
-|---|---|---|
-| `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP |
-| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice | Postgres, Redis, storage, SMTP, Anthropic |
-| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs |
-| `apps/web` | Marketing site + the product UI | auth, api |
+| Service | Responsibility | Talks to | Local port |
+|---|---|---|---|
+| `apps/auth` | Identity only: register/login, 15-min access JWT + rotating refresh token (httpOnly cookies), CSRF, Google sign-in, email verification & recovery, service tokens (client credentials) | Postgres, SMTP | 4800 |
+| `apps/api` | Everything tenant-scoped: organizations & roles, invitations, channel OAuth, media, posts & scheduling, AI text generation & brand voice | Postgres, Redis, storage, SMTP, Anthropic | 4400 |
+| `apps/worker` | Publishing engine, async-media status polling, token refresh, AI media (images, carousels), maintenance (sweep, stuck recovery) | Postgres, Redis, storage, platform + AI APIs | 4500 |
+| `apps/app` | The product UI: sign-in/sign-up, onboarding, dashboard, composer, calendar, channels, media, settings. `/` redirects to `/dashboard` | auth, api | 4700 |
+| `apps/site` | Public marketing site: landing, features, solutions, comparisons, free tools, blog, legal. Statically rendered; no API client, no auth. "Log in"/"Get started" link to the app | — | 4701 |
+| `apps/admin` | Internal admin console for staff (see `docs/admin-console.md`) | auth, api | 4702 |
+
+## Frontends
+
+Three Next.js apps share one design system and one Dockerfile.
+
+```
+apps/
+  app/    @socialfly/app    product UI       (app) + (auth) route groups, TanStack Query, typed API client
+  site/   @socialfly/site   marketing site   every route static; robots.ts + sitemap.ts (lists every page)
+  admin/  @socialfly/admin  admin console
+packages/
+  ui/     @socialfly/ui     design system: primitives, cn(), theme provider, tokens CSS
+```
+
+- **`@socialfly/ui`** ships TypeScript source (no build), like every workspace package;
+  each app lists it in `transpilePackages`. Imports are by subpath:
+  `@socialfly/ui/components/button`, `@socialfly/ui/utils` (`cn`), `@socialfly/ui/theme`
+  (`themeScript`), `@socialfly/ui/theme-provider`. Code inside the package uses relative
+  imports only — an app's `@/` alias would not resolve from another app.
+- **Tokens and theme.** `@socialfly/ui/theme.css` holds the design tokens (`:root` / `.dark`
+  CSS variables), the Tailwind 4 `@theme` mapping, base styles and the `.dark` variant. Each
+  app's `globals.css` is `@import "tailwindcss"; @import "@socialfly/ui/theme.css";` plus
+  anything app-specific. The theme file carries an `@source` directive pointing at the
+  package's components, so every consumer's Tailwind build generates their classes
+  (automatic source detection skips `node_modules`, where the package is linked).
+- **Light/dark.** The app and admin follow the user's choice (`ThemeProvider` +
+  `themeScript` before paint). The site is always dark: `.dark` is fixed on `<html>`.
+- **Cross-links.** The frontends are separate deployments, so every app knows all three
+  public URLs (`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_ADMIN_URL` in
+  `packages/config/src/web.ts`); cross-app links are absolute `<a>` links.
+- **Images.** `docker build -f infra/docker/web.Dockerfile --build-arg APP=<site|app|admin> .`
+  — Next standalone output, served by Node as a non-root user on container port 3000.
+  `NEXT_PUBLIC_*` are build args (inlined at build time).
 
 Auth is its own service (as in the reference monorepo) so identity can be scaled,
 audited and hardened independently. It is deliberately identity-only: tokens carry
@@ -41,7 +78,7 @@ no organization or role, and the API checks membership on every request from the
 - **Errors**: services throw `AppError(status, code, message)` (`@socialfly/core/errors`). One handler turns it into `{ error: { code, message, details } }`. Anything else is a 500 with no internals leaked. Never choose a status by matching error text.
 - **Validation once**: `validate(target, schema)` middleware; handlers read `ctx.req.valid(...)`.
 - **Config**: each service imports only its own env (`apiEnv`, `authEnv`, `workerEnv`). Secrets have no production default.
-- **Imports**: `#src/...` subpath imports inside an app (they resolve across packages, which the web app's typed client needs); `@socialfly/*` between workspaces.
+- **Imports**: `#src/...` subpath imports inside a Bun service (they resolve across packages, which the product app's typed client needs); `@socialfly/*` between workspaces. The Next apps use an `@/` alias internally (nothing imports them); shared UI code in `packages/ui` uses relative imports.
 - **Comments explain why**, not what.
 
 ## Data model
@@ -119,6 +156,8 @@ content + what it cost out. Persistence, budgets and retries live in the callers
 | Posts per platform, rewrites, hashtags, carousel outlines | Anthropic Claude (`AI_TEXT_MODEL`, default `claude-opus-5`) | API, synchronously | 5–20 s; the user is waiting in the composer |
 | Images | OpenAI `gpt-image-1`, then Gemini (fallback chain) | worker, `ai-media` queue | 10–60 s, paid per call — never on the request path |
 | Carousel slides (PNG, 1080×1350) | Satori → resvg (WebAssembly) | worker, `ai-media` queue | CPU work; no browser, no native binaries |
+| Video scripts (scenes, caption, hashtags) | Anthropic Claude | API, synchronously | same as posts |
+| Short videos (MP4, 1080×1920) | scene backgrounds (own library image, AI image at 9:16, or theme gradient) + OpenAI TTS voiceover (`OPENAI_TTS_MODEL`) → Satori captions → ffmpeg (zoompan, crossfades, AAC) | worker, `ai-media` queue | 1–4 min; the worker image ships Alpine's `ffmpeg` |
 
 - **Structured output, not parsing.** Every text task is one call constrained to a Zod
   schema (`output_config.format`), then post-processed for hard limits the model might
@@ -138,12 +177,18 @@ content + what it cost out. Persistence, budgets and retries live in the callers
   `failed`, adds (never overwrites) cost across attempts, and at most 2 attempts run.
   Output lands in `media_assets` with `source = 'ai'`, so it flows into the composer and
   publishing like any upload. Generations stuck for 30 minutes are failed by maintenance.
+- **Videos** are one generation of kind `video` → one `media_assets` row (`kind = video`).
+  AI backgrounds and voiceover are the only paid steps: the API requires their provider
+  (503 otherwise) and checks the budget only when one is used. Per-scene paid calls run
+  2 at a time; the cost of calls that succeeded is billed even when a later one or the
+  render fails. The `ai-media` queue holds a 10-minute BullMQ lock so a long render is
+  never declared stalled.
 - **Missing keys hide features** (`GET /ai/capabilities`), exactly like platform credentials.
 
 ## Observability
 
 - **Logs**: pino JSON to stdout, secrets/PII redacted, `trace_id` on every line, mirrored to OTel logs.
-- **Traces**: one server span per request named by route; W3C context propagates web → api.
+- **Traces**: one server span per request named by route; W3C context propagates app → api.
 - **Metrics**: `http.server.request.duration`, `socialfly.publish.outcomes{provider,outcome}`, `socialfly.publish.duration`.
 - **Errors**: Sentry (optional, via `SENTRY_DSN`).
 - **Probes**: `/health` (process alive, never touches dependencies) and `/ready` (checks Postgres/Redis/queue — used by the deploy smoke test).
@@ -165,7 +210,8 @@ content + what it cost out. Persistence, budgets and retries live in the callers
 | 0 | Monorepo, tooling, infra, CI/CD, observability | ✅ |
 | 1 | Auth, organizations, roles, invitations, channel connections | ✅ |
 | 2 | Media, composer, scheduling, publishing engine (8 platforms) | ✅ (platform calls not yet exercised against live accounts) |
-| 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice, budgets | ✅ (reels with Remotion → 3b) |
+| 3 | AI content: posts, rewrites, hashtags, images, carousels, brand voice, budgets | ✅ |
+| 3b | AI short videos: scripts, AI/library/theme backgrounds, voiceover, ffmpeg render | ✅ (backend; not yet rendered against live OpenAI TTS) |
 | 4 | Analytics: per-post and per-account metrics, dashboards | |
 | 5 | Research + SEO/AEO + AI-visibility (pgvector, crawler, LLM citation tracking) | |
 | 6 | Engagement inbox: listening, reply drafts, approval | |

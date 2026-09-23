@@ -33,8 +33,12 @@ export const baseServerEnv = {
 	TOKEN_ENCRYPTION_KEY_PREVIOUS: base64Key32.optional(),
 
 	// URLs
-	WEB_URL: devDefault(z.string().url(), "http://localhost:3000"),
+	WEB_URL: devDefault(z.string().url(), "http://localhost:4700"),
 	API_URL: devDefault(z.string().url(), "http://localhost:4400"),
+	/** Public marketing site (apps/site). */
+	SITE_URL: devDefault(z.string().url(), "http://localhost:4701"),
+	/** Internal admin console (apps/admin). */
+	ADMIN_URL: devDefault(z.string().url(), "http://localhost:4702"),
 
 	// Observability
 	OTEL_SDK_DISABLED: boolFlag(false),

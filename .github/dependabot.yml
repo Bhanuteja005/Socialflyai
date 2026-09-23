@@ -10,14 +10,11 @@ updates:
       dependencies:
         patterns: ["*"]
         update-types: [minor, patch]
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      actions:
-        patterns: ["*"]
   - package-ecosystem: docker
     directory: /infra/docker
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /infra/jenkins
     schedule:
       interval: weekly

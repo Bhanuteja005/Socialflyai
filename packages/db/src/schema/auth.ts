@@ -18,6 +18,13 @@ import { createdAt, id, timestamps } from "./columns";
 
 export const userStatus = pgEnum("user_status", ["active", "disabled"]);
 
+/**
+ * SocialFly staff access to the internal admin console (apps/admin). Separate from
+ * organization roles: a platform admin sees across tenants, an org owner never does.
+ * Granted only from the CLI (`bun run cli admin grant <email>`), never via the API.
+ */
+export const platformRole = pgEnum("platform_role", ["user", "admin"]);
+
 export const users = pgTable(
 	"users",
 	{
@@ -32,6 +39,7 @@ export const users = pgTable(
 		status: userStatus().notNull().default("active"),
 		/** Bumped on password change/reset: every outstanding access token becomes invalid. */
 		tokenVersion: integer().notNull().default(1),
+		platformRole: platformRole().notNull().default("user"),
 		lastLoginAt: timestamp({ withTimezone: true }),
 		...timestamps(),
 	},

@@ -4,7 +4,8 @@ import { createDb } from "./client";
 import { memberships, organizations, users } from "./schema";
 
 /**
- * Local demo data: one verified user who owns one organization. Idempotent —
+ * Local demo data: one verified user who owns one organization and is a platform
+ * admin (so the admin console works out of the box locally). Idempotent —
  * running it twice changes nothing. Refuses to run against a non-local database.
  */
 const url = process.env.DATABASE_URL ?? "postgres://socialfly:socialfly@localhost:5434/socialfly";
@@ -35,6 +36,9 @@ try {
 			.returning();
 	}
 	if (!user) throw new Error("could not create demo user");
+	if (user.platformRole !== "admin") {
+		await db.update(users).set({ platformRole: "admin" }).where(eq(users.id, user.id));
+	}
 
 	const [existing] = await db.select().from(organizations).where(eq(organizations.slug, "demo"));
 	if (!existing) {
@@ -48,7 +52,9 @@ try {
 				.values({ organizationId: org.id, userId: user.id, role: "owner" });
 	}
 
-	console.warn(`seed: done — sign in at http://localhost:3000/login with ${EMAIL} / ${PASSWORD}`);
+	console.warn(
+		`seed: done — sign in at http://localhost:4700/login with ${EMAIL} / ${PASSWORD} (also a platform admin: http://localhost:4702)`,
+	);
 } finally {
 	await close();
 }

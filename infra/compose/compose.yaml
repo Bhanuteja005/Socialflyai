@@ -4,8 +4,8 @@
 #   bun run cli stack up observability    + Grafana LGTM (traces, logs, metrics)
 #   bun run cli stack down
 #
-# The apps themselves (api, auth, worker, web) run on the host with `bun dev` for
-# fast reload. `--profile apps` runs them in containers instead, from the same
+# The apps themselves (api, auth, worker, and the Next.js frontends app/site/admin)
+# run on the host with `bun dev` for fast reload. `--profile apps` runs them in containers instead, from the same
 # Dockerfiles CI builds — use it to reproduce a production-image bug locally.
 #
 # Ports are bound to 127.0.0.1 only: nothing here is meant to be reachable from
@@ -88,11 +88,11 @@ services:
   lgtm:
     # Grafana + Tempo (traces) + Loki (logs) + Prometheus (metrics) + an OTel
     # collector, in one container. Services export OTLP to :4318 exactly as they do
-    # in production; only the endpoint differs. UI: http://localhost:3001 (admin/admin)
+    # in production; only the endpoint differs. UI: http://localhost:4703 (admin/admin)
     image: grafana/otel-lgtm:0.11.10
     profiles: [observability, full]
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:4703:3000"
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
     volumes: [lgtm_data:/data]
@@ -129,10 +129,36 @@ services:
     ports: ["127.0.0.1:4500:4500"]
     depends_on: *app-deps
 
-  web:
+  # Next.js frontends: one Dockerfile, APP picks which. Each listens on 3000 in its
+  # container; host ports match `bun dev` (app 4700, site 4701, admin 4702), and the
+  # NEXT_PUBLIC_* defaults in packages/config/src/web.ts already point at them.
+  app:
     profiles: [apps, full]
-    build: { context: ../.., dockerfile: infra/docker/web.Dockerfile }
-    ports: ["127.0.0.1:3000:3000"]
+    build: { context: ../.., dockerfile: infra/docker/web.Dockerfile, args: { APP: app } }
+    ports: ["127.0.0.1:4700:3000"]
+    depends_on: [api, auth]
+
+  site:
+    profiles: [apps, full]
+    build: { context: ../.., dockerfile: infra/docker/web.Dockerfile, args: { APP: site } }
+    ports: ["127.0.0.1:4701:3000"]
+
+  # Staff console: same image recipe, but signs in through the auth service's
+  # login-only `socialfly-admin` client (NEXT_PUBLIC_* are build args, not env).
+  admin:
+    profiles: [apps, full]
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        APP: admin
+        NEXT_PUBLIC_API_URL: http://localhost:4400
+        NEXT_PUBLIC_AUTH_URL: http://localhost:4800
+        NEXT_PUBLIC_AUTH_CLIENT_ID: socialfly-admin
+        NEXT_PUBLIC_APP_URL: http://localhost:4700
+        NEXT_PUBLIC_SITE_URL: http://localhost:4701
+        NEXT_PUBLIC_ADMIN_URL: http://localhost:4702
+    ports: ["127.0.0.1:4702:3000"]
     depends_on: [api, auth]
 
 volumes:

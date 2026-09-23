@@ -14,7 +14,8 @@ export const apiEnv = createEnv({
 		...aiEnv,
 		PORT: port(4400),
 		OTEL_SERVICE_NAME: z.string().default("socialfly-api"),
-		CORS_ORIGINS: csv("http://localhost:3000"),
+		// The product app and the admin console call the API from the browser.
+		CORS_ORIGINS: csv("http://localhost:4700,http://localhost:4702"),
 
 		MEDIA_MAX_UPLOAD_MB: z.coerce.number().int().positive().default(512),
 

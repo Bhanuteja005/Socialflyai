@@ -19,6 +19,9 @@ await migrateTestDatabase(process.env.DATABASE_URL);
 // they are closed once after the whole run — a per-file afterAll would close them under
 // the files that run after it. Imported lazily: the env above must be set first.
 afterAll(async () => {
-	const { database, jobs, redis } = await import("#src/infrastructure/index.ts");
-	await Promise.all([jobs.close(), redis.quit(), database.close()]);
+	const { database, jobs, queueConnection, queueStats, redis } = await import(
+		"#src/infrastructure/index.ts"
+	);
+	await Promise.all([jobs.close(), queueStats.close()]);
+	await Promise.all([queueConnection.quit(), redis.quit(), database.close()]);
 });

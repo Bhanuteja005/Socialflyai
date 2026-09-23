@@ -1,0 +1,39 @@
+{
+	"name": "@socialfly/ui",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": [
+		"**/*.css"
+	],
+	"exports": {
+		"./components/*": "./src/components/*.tsx",
+		"./utils": "./src/lib/utils.ts",
+		"./theme": "./src/theme/theme.ts",
+		"./theme-provider": "./src/theme/theme-provider.tsx",
+		"./theme.css": "./src/styles/theme.css"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"lucide-react": "^1.47.0",
+		"radix-ui": "^1.6.7",
+		"sonner": "^2.0.8",
+		"tailwind-merge": "^3.7.0"
+	},
+	"peerDependencies": {
+		"react": "19.3.0",
+		"react-dom": "19.3.0"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@types/react": "^19",
+		"@types/react-dom": "^19",
+		"react": "19.3.0",
+		"react-dom": "19.3.0",
+		"typescript": "5.9.3"
+	}
+}

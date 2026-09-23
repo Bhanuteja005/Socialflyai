@@ -47,6 +47,8 @@ export const aiGenerationKind = pgEnum("ai_generation_kind", [
 	"carousel_outline",
 	"image",
 	"carousel",
+	"video_script",
+	"video",
 ]);
 
 export const aiGenerationStatus = pgEnum("ai_generation_status", [

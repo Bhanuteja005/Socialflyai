@@ -1,3 +1,4 @@
+import { frontends } from "../lib/frontends";
 import { color, mark, section } from "../lib/ui";
 
 type Check = { label: string; url: string; required: boolean };
@@ -6,8 +7,12 @@ const CHECKS: Check[] = [
 	{ label: "Auth    /ready", url: "http://localhost:4800/ready", required: true },
 	{ label: "API     /ready", url: "http://localhost:4400/ready", required: true },
 	{ label: "Worker  /ready", url: "http://localhost:4500/ready", required: true },
-	{ label: "Web", url: "http://localhost:3000", required: false },
-	{ label: "Grafana", url: "http://localhost:3001/api/health", required: false },
+	...frontends().map((f) => ({
+		label: `${f.name[0]?.toUpperCase()}${f.name.slice(1)}`,
+		url: `http://localhost:${f.port}${f.probe}`,
+		required: false,
+	})),
+	{ label: "Grafana", url: "http://localhost:4703/api/health", required: false },
 ];
 
 /** Readiness of every local service — the same /ready probes production uses. */

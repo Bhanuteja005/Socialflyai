@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+	index,
+	numeric,
+	pgEnum,
+	pgTable,
+	text,
+	timestamp,
+	uniqueIndex,
+	uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { createdAt, id, timestamps } from "./columns";
 
@@ -13,6 +22,8 @@ export const organizations = pgTable(
 		/** IANA zone used for the calendar and "best time" defaults. */
 		timezone: text().notNull().default("UTC"),
 		createdBy: uuid().references(() => users.id, { onDelete: "set null" }),
+		/** Per-organization override of AI_ORG_MONTHLY_BUDGET_USD, set from the admin console. Null = default; 0 = unlimited. */
+		aiMonthlyBudgetUsd: numeric({ precision: 10, scale: 2, mode: "number" }),
 		deletedAt: timestamp({ withTimezone: true }),
 		...timestamps(),
 	},

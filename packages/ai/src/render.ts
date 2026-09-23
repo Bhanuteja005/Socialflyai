@@ -193,3 +193,20 @@ export async function renderCarousel(
 	}
 	return out;
 }
+
+/**
+ * Renders any element tree to a PNG of exactly width×height. Areas the tree leaves
+ * unpainted stay transparent, which the video renderer relies on for overlays.
+ */
+export async function renderElement(tree: RenderNode, width: number, height: number) {
+	const fonts = await loadFonts();
+	const svg = await satori(tree as unknown as Parameters<typeof satori>[0], {
+		width,
+		height,
+		fonts,
+	});
+	return svgToPng(svg, width);
+}
+
+export type RenderNode = Node;
+export { el, FONT_FAMILY };

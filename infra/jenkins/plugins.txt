@@ -1,0 +1,15 @@
+# Controller plugins, pinned (jenkins-plugin-cli resolves their dependencies).
+# Upgrade: bump here, rebuild, check Manage Jenkins → Plugins for warnings.
+workflow-aggregator:608.v67378e9d3db_1
+pipeline-model-definition:2.2293.v6e7193cec599
+git:5.10.1
+github-branch-source:1983.vfa_27ed961853
+docker-workflow:653.v2f2c08eff0ec
+configuration-as-code:2121.v86fe99d4b_b_a_b_
+job-dsl:3732.v9a_c49a_61a_313
+lockable-resources:1560.va_b_cd589f23eb_
+timestamper:1.30
+credentials-binding:728.v902a_273b_8947
+pipeline-stage-view:2.41
+pipeline-graph-view:1013.v9f83fd83c063
+ws-cleanup:0.49

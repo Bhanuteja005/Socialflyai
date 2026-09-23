@@ -1,0 +1,91 @@
+# Throwaway service stack for one CI build (used by the Jenkinsfile's Test stage).
+#
+#   docker compose -p <unique-project> -f infra/compose/ci.yaml up -d --wait postgres redis storage
+#   docker compose -p <unique-project> -f infra/compose/ci.yaml run --rm storage-init
+#   docker run --network container:$(docker compose -p <unique-project> -f infra/compose/ci.yaml ps -q postgres) ...
+#   docker compose -p <unique-project> -f infra/compose/ci.yaml down -v --remove-orphans
+#
+# Why one shared network namespace instead of service hostnames: every service
+# joins postgres' namespace and listens on the SAME ports as the local dev stack
+# (5434, 6380, 9000). The test container joins that namespace too, so the test
+# setups' localhost defaults work unchanged — no CI-only env, which Turbo's strict
+# env mode would strip anyway — and the api (Redis db 1) and worker (db 2) suites
+# keep their separate Redis databases. Nothing is published on the host, so any
+# number of builds run side by side; the project name (-p) keeps them apart.
+#
+# No bind mounts either: under Jenkins the compose CLI talks to the HOST Docker
+# daemon from inside the controller/agent container, where workspace paths do not
+# exist on the host. The init SQL is therefore passed through the environment.
+
+name: socialfly-ci
+
+x-healthcheck: &healthcheck
+  interval: 2s
+  timeout: 3s
+  retries: 60
+  start_period: 5s
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_USER: socialfly
+      POSTGRES_PASSWORD: socialfly
+      POSTGRES_DB: socialfly_test
+      # The server and psql both default to PGPORT: same port as the dev stack.
+      PGPORT: "5434"
+      # Migrations do not create extensions (managed Postgres enables them via
+      # server parameters), so the test database needs them up front.
+      CI_INIT_SQL: >-
+        CREATE EXTENSION IF NOT EXISTS vector;
+        CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        CREATE EXTENSION IF NOT EXISTS citext;
+    entrypoint:
+      - /bin/sh
+      - -c
+      - printf '%s\n' "$$CI_INIT_SQL" > /docker-entrypoint-initdb.d/ci.sql && exec docker-entrypoint.sh postgres
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      <<: *healthcheck
+      # TCP on purpose: during init the entrypoint's temporary server listens on
+      # the unix socket only, so "healthy" means the extensions already exist.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U socialfly -d socialfly_test"]
+
+  redis:
+    image: redis:7.4-alpine
+    network_mode: service:postgres
+    depends_on: [postgres]
+    command: ["redis-server", "--port", "6380", "--save", "", "--appendonly", "no", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+
+  storage:
+    image: rustfs/rustfs:1.0.0
+    network_mode: service:postgres
+    depends_on: [postgres]
+    environment:
+      RUSTFS_ACCESS_KEY: socialfly
+      RUSTFS_SECRET_KEY: socialfly-dev-secret
+      RUSTFS_CONSOLE_ENABLE: "false"
+
+  # One-shot (`compose run --rm storage-init`): the media bucket the worker suite uploads to.
+  storage-init:
+    image: amazon/aws-cli:2.36.50
+    network_mode: service:postgres
+    depends_on: [storage]
+    profiles: [init]
+    environment:
+      AWS_ACCESS_KEY_ID: socialfly
+      AWS_SECRET_ACCESS_KEY: socialfly-dev-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        s3="aws --endpoint-url http://127.0.0.1:9000 s3api"
+        for i in $$(seq 1 60); do $$s3 list-buckets >/dev/null 2>&1 && break; sleep 1; done
+        $$s3 head-bucket --bucket socialfly-media 2>/dev/null || $$s3 create-bucket --bucket socialfly-media
+        $$s3 put-bucket-policy --bucket socialfly-media --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::socialfly-media/*"]}]}'
+        echo "bucket socialfly-media ready"
+    restart: "no"

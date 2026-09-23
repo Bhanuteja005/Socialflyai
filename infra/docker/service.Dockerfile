@@ -40,6 +40,11 @@ ENV NODE_ENV=production \
 	SERVICE_PORT=${PORT}
 WORKDIR /app
 
+# The worker renders AI videos with ffmpeg. ffmpeg-static is a dev dependency (not
+# installed with --production), so the binary comes from Alpine and is found on PATH.
+# Only the worker gets it: the api and auth images stay ~100 MB smaller.
+RUN if [ "${APP}" = "worker" ]; then apk add --no-cache ffmpeg; fi
+
 COPY --from=deps --chown=bun:bun /app ./
 # Workspace packages are consumed as TypeScript source (no build step): copy them
 # plus the one app. drizzle/ ships inside packages/db so the image can migrate.

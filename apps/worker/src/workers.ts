@@ -103,7 +103,15 @@ export async function startWorkers() {
 				attemptsMade: job.attemptsMade,
 				maxAttempts: job.opts.attempts ?? 1,
 			}),
-		{ concurrency: env.AI_MEDIA_CONCURRENCY },
+		{
+			concurrency: env.AI_MEDIA_CONCURRENCY,
+			// A reel takes minutes (paid calls, then ffmpeg), and caption rendering is
+			// synchronous WASM that can delay BullMQ's lock renewal timer. With the default
+			// 30 s lock a healthy render could be declared stalled and handed to a second
+			// worker. 10 minutes only delays recovery from a crashed worker, which the
+			// status claim and maintenance timeout already make safe.
+			lockDuration: 10 * 60_000,
+		},
 	);
 
 	start(QUEUES.maintenance, async (job) => maintenance.run(maintenanceJobSchema.parse(job.data)), {

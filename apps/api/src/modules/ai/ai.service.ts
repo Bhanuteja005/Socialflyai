@@ -10,13 +10,15 @@ import {
 	type TextModel,
 	type TextResult,
 	usdToMicros,
+	videoScript,
+	type videoScriptInput,
 } from "@socialfly/ai";
-import { apiEnv as env } from "@socialfly/config";
 import { AppError, notFound } from "@socialfly/core/errors";
-import { and, type Database, desc, eq, gte, inArray, lt, schema, sql } from "@socialfly/db";
+import { and, type Database, desc, eq, inArray, lt, schema, sql } from "@socialfly/db";
 import type { JobProducer } from "@socialfly/queue";
 import type { z } from "zod";
 import { toMediaDto } from "#src/modules/media/media.service.ts";
+import { budgetPeriodStart, effectiveBudgetUsd } from "./ai.budget.ts";
 import type {
 	BrandProfileInput,
 	CarouselInput,
@@ -26,9 +28,10 @@ import type {
 	hashtagsInput,
 	ImageInput,
 	rewriteInput,
+	VideoInput,
 } from "./ai.schemas.ts";
 
-const { aiGenerations, brandProfiles, mediaAssets } = schema;
+const { aiGenerations, brandProfiles, mediaAssets, organizations } = schema;
 
 type GenerationRow = typeof aiGenerations.$inferSelect;
 type BrandRow = typeof brandProfiles.$inferSelect;
@@ -37,10 +40,6 @@ type GenerationKind = (typeof GENERATION_KINDS)[number];
 
 const notConfigured = (what: string) =>
 	new AppError(503, "ai_not_configured", `AI ${what} generation is not set up on this server`);
-
-/** Start of the budget period: the current calendar month in UTC, the same for every org. */
-const periodStart = (now = new Date()) =>
-	new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
 /**
  * Translates the provider-neutral failure kind into an HTTP answer. Keyed on `kind`,
@@ -148,18 +147,28 @@ export class AiService {
 			images: this.ai.images !== null,
 			// Carousels are rendered locally (no provider), so they are always available.
 			carousels: true as const,
+			// Also rendered locally; AI backgrounds and voiceover are gated by `images`/`voiceover`.
+			videos: true as const,
+			voiceover: this.ai.speech !== null,
 			budget: (await this.budget(orgId)).summary,
 		};
 	}
 
 	private async budget(orgId: string) {
-		const start = periodStart();
+		const start = budgetPeriodStart();
+		// One round trip: the override lives on the org row, the spend is summed from the ledger.
 		const [row] = await this.db
-			.select({ used: sql<string>`coalesce(sum(${aiGenerations.costMicros}), 0)` })
-			.from(aiGenerations)
-			.where(and(eq(aiGenerations.organizationId, orgId), gte(aiGenerations.createdAt, start)));
+			.select({
+				override: organizations.aiMonthlyBudgetUsd,
+				// Written out qualified: drizzle leaves columns unqualified in single-table queries,
+				// and an unqualified "id" inside the subquery would bind to ai_generations.id.
+				used: sql<string>`(select coalesce(sum(g.cost_micros), 0) from ai_generations g where g.organization_id = organizations.id and g.created_at >= ${start.toISOString()})`,
+			})
+			.from(organizations)
+			.where(eq(organizations.id, orgId))
+			.limit(1);
 		const usedMicros = Number(row?.used ?? 0);
-		const limitUsd = env.AI_ORG_MONTHLY_BUDGET_USD > 0 ? env.AI_ORG_MONTHLY_BUDGET_USD : null;
+		const limitUsd = effectiveBudgetUsd(row?.override ?? null);
 		const usedUsd = microsToUsd(usedMicros);
 		return {
 			summary: {
@@ -264,6 +273,13 @@ export class AiService {
 		return { generationId: r.generationId, ...r.output };
 	}
 
+	async videoScript(orgId: string, userId: string, input: z.output<typeof videoScriptInput>) {
+		const r = await this.runText(orgId, userId, "video_script", input, (m, b) =>
+			videoScript(m, b, input),
+		);
+		return { generationId: r.generationId, ...r.output };
+	}
+
 	/**
 	 * One text call, recorded either way: the ledger row is what the budget sums, and a
 	 * failed row keeps the audit trail honest about what users tried.
@@ -328,6 +344,44 @@ export class AiService {
 	/** Rendering slides costs nothing, so there is no provider or budget requirement. */
 	async startCarousel(orgId: string, userId: string, input: CarouselInput) {
 		return this.enqueue(orgId, userId, "carousel", input);
+	}
+
+	/**
+	 * Rendering is local, but AI backgrounds and voiceover are paid calls: each needs its
+	 * provider, and the budget is checked only when at least one of them will run.
+	 */
+	async startVideo(orgId: string, userId: string, input: VideoInput) {
+		const ownMedia = input.sceneMediaIds ?? [];
+		// A scene with its own library image never asks the image model.
+		const wantsAiImages = input.background === "ai" && input.scenes.some((_, i) => !ownMedia[i]);
+		const wantsVoice = input.voiceover.enabled && input.scenes.some((s) => s.narration.length > 0);
+		if (wantsAiImages && !this.ai.images) throw notConfigured("image");
+		if (input.voiceover.enabled && !this.ai.speech) throw notConfigured("voiceover");
+		await this.assertSceneMedia(orgId, ownMedia);
+		if (wantsAiImages || wantsVoice) await this.assertBudget(orgId);
+		return this.enqueue(orgId, userId, "video", input);
+	}
+
+	/**
+	 * Checked here so the user hears about a bad pick now, not minutes later from the
+	 * worker. Scoped to the org: another tenant's id is indistinguishable from a missing one.
+	 */
+	private async assertSceneMedia(orgId: string, ids: (string | null)[]) {
+		const wanted = [...new Set(ids.filter((id): id is string => id !== null))];
+		if (!wanted.length) return;
+		const rows = await this.loadMedia(orgId, wanted);
+		for (const id of wanted) {
+			const m = rows.get(id);
+			if (!m) throw notFound("Media");
+			if (m.kind !== "image" || m.status !== "ready") {
+				throw new AppError(
+					422,
+					"media_invalid",
+					"Scene backgrounds must be images that have finished uploading",
+					{ mediaId: id },
+				);
+			}
+		}
 	}
 
 	private async enqueue(

@@ -15,6 +15,8 @@ export const aiEnv = {
 	/** Image generation: tried in order, first configured provider that succeeds wins. */
 	OPENAI_API_KEY: z.string().default(""),
 	OPENAI_IMAGE_MODEL: z.string().default("gpt-image-1"),
+	/** Voiceover for AI videos (same OpenAI key). */
+	OPENAI_TTS_MODEL: z.string().default("gpt-4o-mini-tts"),
 	GEMINI_API_KEY: z.string().default(""),
 	GEMINI_IMAGE_MODEL: z.string().default("gemini-2.5-flash-image"),
 

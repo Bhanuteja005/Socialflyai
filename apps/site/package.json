@@ -1,0 +1,30 @@
+{
+	"name": "@socialfly/site",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "next dev --port 4701",
+		"build": "next build",
+		"start": "next start --port 4701",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@socialfly/config": "workspace:*",
+		"@socialfly/ui": "workspace:*",
+		"lucide-react": "^1.47.0",
+		"next": "16.3.5",
+		"radix-ui": "^1.6.7",
+		"react": "19.3.0",
+		"react-dom": "19.3.0"
+	},
+	"devDependencies": {
+		"@socialfly/tsconfig": "workspace:*",
+		"@tailwindcss/postcss": "^4.3.3",
+		"@types/node": "^24",
+		"@types/react": "^19",
+		"@types/react-dom": "^19",
+		"tailwindcss": "^4.3.3",
+		"typescript": "5.9.3"
+	}
+}

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { dockerAvailable } from "../lib/docker";
+import { frontendDir, frontends } from "../lib/frontends";
 import { ENV_FILE, loadRootEnv, ROOT } from "../lib/paths";
 import { color, fail, mark, section } from "../lib/ui";
 import { migrate } from "./db";
@@ -11,6 +12,8 @@ type App = { name: string; cwd: string; cmd: string[]; paint: (s: string) => str
 // Bun services run from the repo ROOT: `bun --watch` only watches files under its
 // working directory, and a change in packages/* must reload every app that uses it.
 const bunService = (app: string) => ["bun", "--watch", `apps/${app}/src/index.ts`];
+
+const FRONTEND_COLORS = [color.green, color.cyan, color.red];
 
 const APPS: App[] = [
 	{
@@ -34,13 +37,14 @@ const APPS: App[] = [
 		paint: color.yellow,
 		url: "http://localhost:4500/queues",
 	},
-	{
-		name: "web",
-		cwd: "apps/web",
+	// Next.js frontends run on Node via their own `dev` script (which pins the port).
+	...frontends().map((f, i) => ({
+		name: f.name,
+		cwd: frontendDir(f),
 		cmd: ["bun", "run", "dev"],
-		paint: color.green,
-		url: "http://localhost:3000",
-	},
+		paint: FRONTEND_COLORS[i % FRONTEND_COLORS.length] ?? color.green,
+		url: `http://localhost:${f.port}`,
+	})),
 ];
 
 /**

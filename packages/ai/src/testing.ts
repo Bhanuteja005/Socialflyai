@@ -1,6 +1,11 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { AiError } from "./errors";
+import { runFfmpeg } from "./ffmpeg";
 import { ASPECT_SIZES } from "./images";
 import { cropToAspect } from "./render";
+import type { GeneratedSpeech, SpeechModel, SpeechRequest } from "./speech";
 import type {
 	GeneratedImage,
 	ImageModel,
@@ -73,5 +78,43 @@ export class FakeImageModel implements ImageModel {
 			mimeType: "image/png",
 			...size,
 		};
+	}
+}
+
+/**
+ * Real MP3 audio (a quiet tone) whose length follows the text — ~15 characters per
+ * second like natural speech — so video tests exercise the narration-driven timing.
+ */
+export class FakeSpeechModel implements SpeechModel {
+	readonly id = "fake:speech";
+	readonly requests: SpeechRequest[] = [];
+
+	async generate(request: SpeechRequest): Promise<GeneratedSpeech> {
+		this.requests.push(request);
+		const seconds = Math.max(0.5, request.text.length / 15).toFixed(2);
+		const dir = await mkdtemp(join(tmpdir(), "sf-speech-"));
+		try {
+			const file = join(dir, "voice.mp3");
+			await runFfmpeg([
+				"-f",
+				"lavfi",
+				"-i",
+				`sine=frequency=330:duration=${seconds}`,
+				"-af",
+				"volume=0.1",
+				"-c:a",
+				"libmp3lame",
+				file,
+			]);
+			return {
+				model: this.id,
+				usage: { inputTokens: 0, outputTokens: 0 },
+				costMicros: request.text.length * 20,
+				bytes: new Uint8Array(await Bun.file(file).arrayBuffer()),
+				mimeType: "audio/mpeg",
+			};
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
 	}
 }
