@@ -75,12 +75,28 @@ export const FREE_TOOL_LINKS: NavLink[] = [
 
 export const INTEGRATIONS = ["Instagram", "Facebook", "Twitter/X", "LinkedIn", "TikTok", "YouTube"];
 
-/** Primary links shown in the top navigation bar. */
-export const PRIMARY_NAV: NavLink[] = [
-	{ label: "Features", href: "/features" },
-	{ label: "Solutions", href: "/solutions/creators" },
-	{ label: "Free Tools", href: "/free-tools" },
+export type NavGroup = {
+	label: string;
+	/** Landing page for the group ("See all"), when there is one. */
+	href?: string;
+	links: NavLink[];
+};
+
+/**
+ * Dropdown menus in the top bar. Every marketing page is reachable from here, not
+ * only from the footer — most visitors never scroll that far.
+ */
+export const NAV_GROUPS: NavGroup[] = [
+	{ label: "Features", href: "/features", links: FEATURE_LINKS },
+	{ label: "Solutions", links: SOLUTION_LINKS },
+	{ label: "Compare", links: COMPETITOR_LINKS },
+	{ label: "Free Tools", href: "/free-tools", links: FREE_TOOL_LINKS },
+];
+
+/** Plain links shown after the dropdowns. */
+export const NAV_LINKS: NavLink[] = [
 	{ label: "Blog", href: "/blog" },
+	{ label: "About", href: "/about" },
 	{ label: "Contact", href: "/contact" },
 ];
 

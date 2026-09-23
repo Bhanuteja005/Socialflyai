@@ -2,16 +2,13 @@ import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { MobileNav } from "./mobile-nav";
+import { NavMenus } from "./nav-menus";
 import { focusRing } from "./primitives";
-import { PRIMARY_NAV } from "./site-config";
 
 export function MarketingNavbar() {
 	return (
 		<header className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 py-3 sm:px-4 sm:py-4 lg:px-10">
-			<nav
-				aria-label="Main"
-				className="relative flex h-14 w-full max-w-[1160px] items-center justify-between gap-4 rounded-full border border-white/15 bg-black/70 pr-1.5 pl-5 shadow-[0_0_40px_rgba(0,0,0,0.6)] backdrop-blur-md sm:h-16 sm:pr-2 sm:pl-8"
-			>
+			<div className="relative flex h-14 w-full max-w-[1160px] items-center justify-between gap-4 rounded-full border border-white/15 bg-black/70 pr-1.5 pl-5 shadow-[0_0_40px_rgba(0,0,0,0.6)] backdrop-blur-md sm:h-16 sm:pr-2 sm:pl-8">
 				<Link href="/" className={`shrink-0 rounded-md ${focusRing}`}>
 					<Image
 						src="/assets/socialflyai_logo/socialflyai.svg"
@@ -23,18 +20,7 @@ export function MarketingNavbar() {
 					/>
 				</Link>
 
-				<ul className="hidden items-center gap-1 lg:flex">
-					{PRIMARY_NAV.map((link) => (
-						<li key={link.href}>
-							<Link
-								href={link.href}
-								className={`rounded-full px-3 py-2 text-sm text-white/70 transition-colors hover:text-white ${focusRing}`}
-							>
-								{link.label}
-							</Link>
-						</li>
-					))}
-				</ul>
+				<NavMenus />
 
 				<div className="flex items-center gap-1 sm:gap-2">
 					<Link
@@ -54,7 +40,7 @@ export function MarketingNavbar() {
 					</Link>
 					<MobileNav />
 				</div>
-			</nav>
+			</div>
 		</header>
 	);
 }
