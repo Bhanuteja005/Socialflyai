@@ -1,10 +1,25 @@
 "use client";
 
 import { Button } from "@socialfly/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/components/card";
-import { Alert, EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@socialfly/ui/components/card";
+import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@socialfly/ui/components/tabs";
-import { BarChart3, Info, Radio, RefreshCw, Send } from "lucide-react";
+import {
+	ArrowRight,
+	BarChart3,
+	Info,
+	LayoutDashboard,
+	Radio,
+	RefreshCw,
+	Rows3,
+	Send,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
@@ -16,8 +31,9 @@ import { formatDateTime, formatRelative } from "@/lib/format";
 import { useOrg } from "../org-provider";
 import { PageHeader } from "../page-header";
 import { ChannelFilter, RangePicker } from "./analytics-filters";
-import { DEFAULT_PRESET, readChannels, readRange } from "./analytics-utils";
+import { DEFAULT_PRESET, rangeLabel, readChannels, readRange } from "./analytics-utils";
 import { BestTimesPanel } from "./best-times";
+import { ChannelDetailDialog } from "./channel-detail";
 import { ChannelTable } from "./channel-table";
 import { DailyChart } from "./daily-chart";
 import { KpiCards, KpiSkeleton } from "./kpi-cards";
@@ -59,18 +75,23 @@ export function AnalyticsView() {
 		router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
 	};
 
-	const comparedTo = `vs previous ${range.days} days`;
+	const comparedTo = `vs prev. ${range.days}d`;
+	// The open channel lives in the URL so a channel's history can be linked to directly.
+	const channelParam = params.get("channel");
+	const openChannel =
+		overview.data?.byChannel.find((c) => c.channelId === channelParam) ??
+		channels.data?.find((c) => c.id === channelParam);
 	const lastCollectedAt = overview.data?.lastCollectedAt ?? null;
 
 	const header = (
 		<PageHeader
 			title="Analytics"
-			description="How your published posts are doing, across every channel."
+			description="Results from your published posts."
 			actions={
 				hasChannels ? (
 					<>
 						<span
-							className="text-muted-foreground text-xs"
+							className="font-mono text-muted-foreground text-xs"
 							title={lastCollectedAt ? formatDateTime(lastCollectedAt, org.timezone) : undefined}
 						>
 							{overview.isPending
@@ -147,32 +168,40 @@ export function AnalyticsView() {
 	return (
 		<>
 			{header}
-			<div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-				<RangePicker
-					// Remount when the URL range changes so the custom inputs reset to it.
-					key={`${range.from}:${range.to}`}
-					range={range}
-					onPreset={(days) =>
-						update({
-							range: days === DEFAULT_PRESET ? null : String(days),
-							from: null,
-							to: null,
-						})
-					}
-					onCustom={(from, to) => update({ range: "custom", from, to })}
-				/>
-				<ChannelFilter
-					channels={channels.data}
-					selected={selected}
-					onChange={(ids) => update({ channels: ids.length ? ids.join(",") : null })}
-				/>
-			</div>
-
 			<Tabs value={view} onValueChange={(v) => update({ view: v === "posts" ? "posts" : null })}>
-				<TabsList className="mb-5" aria-label="Analytics views">
-					<TabsTrigger value="overview">Overview</TabsTrigger>
-					<TabsTrigger value="posts">All posts</TabsTrigger>
-				</TabsList>
+				{/* One toolbar: the view on the left, what it's filtered to on the right. */}
+				<div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-border border-b pb-4">
+					<TabsList aria-label="Analytics views">
+						<TabsTrigger value="overview">
+							<LayoutDashboard aria-hidden="true" />
+							Overview
+						</TabsTrigger>
+						<TabsTrigger value="posts">
+							<Rows3 aria-hidden="true" />
+							All posts
+						</TabsTrigger>
+					</TabsList>
+					<div className="flex flex-wrap items-center gap-2">
+						<RangePicker
+							// Remount when the URL range changes so the custom inputs reset to it.
+							key={`${range.from}:${range.to}`}
+							range={range}
+							onPreset={(days) =>
+								update({
+									range: days === DEFAULT_PRESET ? null : String(days),
+									from: null,
+									to: null,
+								})
+							}
+							onCustom={(from, to) => update({ range: "custom", from, to })}
+						/>
+						<ChannelFilter
+							channels={channels.data}
+							selected={selected}
+							onChange={(ids) => update({ channels: ids.length ? ids.join(",") : null })}
+						/>
+					</div>
+				</div>
 				<TabsContent value="overview">
 					<Overview
 						overview={overview}
@@ -180,11 +209,12 @@ export function AnalyticsView() {
 						timeZone={org.timezone}
 						bestTimes={bestTimes}
 						onShowPosts={() => update({ view: "posts" })}
+						onSelectChannel={(id) => update({ channel: id })}
 					/>
 				</TabsContent>
 				<TabsContent value="posts">
-					<Card>
-						<CardHeader className="pb-4">
+					<Card className="overflow-hidden">
+						<CardHeader className="border-border border-b pb-4">
 							<CardTitle>All published posts</CardTitle>
 						</CardHeader>
 						<PostsTable
@@ -198,6 +228,20 @@ export function AnalyticsView() {
 					</Card>
 				</TabsContent>
 			</Tabs>
+			<ChannelDetailDialog
+				channel={
+					openChannel
+						? {
+								channelId: "channelId" in openChannel ? openChannel.channelId : openChannel.id,
+								name: openChannel.name,
+								provider: openChannel.provider,
+							}
+						: null
+				}
+				range={range}
+				rangeLabel={rangeLabel(range)}
+				onClose={() => update({ channel: null })}
+			/>
 		</>
 	);
 }
@@ -208,21 +252,23 @@ function Overview({
 	timeZone,
 	bestTimes,
 	onShowPosts,
+	onSelectChannel,
 }: {
 	overview: ReturnType<typeof useAnalyticsOverview>;
 	comparedTo: string;
 	timeZone: string;
 	bestTimes: ReturnType<typeof useBestTimes>;
 	onShowPosts: () => void;
+	onSelectChannel: (channelId: string) => void;
 }) {
 	if (overview.isPending) {
 		return (
-			<div className="grid gap-6" aria-busy="true">
+			<div className="grid grid-cols-[minmax(0,1fr)] gap-6" aria-busy="true">
 				<KpiSkeleton />
-				<Skeleton className="h-96" />
-				<div className="grid gap-6 lg:grid-cols-2">
-					<Skeleton className="h-64" />
-					<Skeleton className="h-64" />
+				<Skeleton className="h-96 rounded-2xl" />
+				<div className="grid gap-6 xl:grid-cols-2">
+					<Skeleton className="h-64 rounded-2xl" />
+					<Skeleton className="h-64 rounded-2xl" />
 				</div>
 			</div>
 		);
@@ -245,14 +291,28 @@ function Overview({
 	const published = (data.totals.posts ?? 0) > 0;
 
 	return (
-		<div className="grid gap-6" aria-busy={overview.isFetching || undefined}>
+		<div
+			className="grid grid-cols-[minmax(0,1fr)] gap-6"
+			aria-busy={overview.isFetching || undefined}
+		>
 			<KpiCards data={data} comparedTo={comparedTo} />
 			<SupportNotice data={data} />
 
 			{published ? (
 				<Card>
-					<CardHeader>
+					<CardHeader className="flex-row flex-wrap items-center justify-between gap-2 border-border border-b pb-4">
 						<CardTitle>Performance over time</CardTitle>
+						<ul
+							className="flex flex-wrap items-center gap-3 text-muted-foreground text-xs"
+							aria-hidden="true"
+						>
+							{LEGEND.map((l) => (
+								<li key={l.label} className="inline-flex items-center gap-1.5">
+									<span className="size-2 rounded-full" style={{ background: l.color }} />
+									{l.label}
+								</li>
+							))}
+						</ul>
 					</CardHeader>
 					<CardContent>
 						<DailyChart days={data.daily} />
@@ -266,28 +326,25 @@ function Overview({
 				/>
 			)}
 
-			<div className="grid items-start gap-6 xl:grid-cols-2">
-				<Card>
-					<CardHeader>
+			<div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
+				<Card className="overflow-hidden">
+					<CardHeader className="border-border border-b pb-4">
 						<CardTitle>Channels</CardTitle>
 					</CardHeader>
-					<div className="mt-3">
-						<ChannelTable rows={data.byChannel} />
-					</div>
+					<ChannelTable rows={data.byChannel} onSelect={(c) => onSelectChannel(c.channelId)} />
 				</Card>
-				<Card>
-					<CardHeader className="flex-row items-center justify-between">
+				<Card className="overflow-hidden">
+					<CardHeader className="flex-row items-center justify-between gap-2 border-border border-b pb-4">
 						<CardTitle>Top posts</CardTitle>
 						{data.topPosts.length ? (
-							<Button variant="link" size="sm" onClick={onShowPosts}>
-								All posts
+							<Button variant="ghost" size="xs" onClick={onShowPosts}>
+								View all
+								<ArrowRight aria-hidden="true" />
 							</Button>
 						) : null}
 					</CardHeader>
 					{data.topPosts.length ? (
-						<div className="mt-2">
-							<TopPosts posts={data.topPosts} timeZone={timeZone} />
-						</div>
+						<TopPosts posts={data.topPosts} timeZone={timeZone} />
 					) : (
 						<CardContent>
 							<EmptyState
@@ -302,8 +359,9 @@ function Overview({
 			</div>
 
 			<Card>
-				<CardHeader>
+				<CardHeader className="border-border border-b pb-4">
 					<CardTitle>Best time to post</CardTitle>
+					<CardDescription>Average engagements by weekday and hour</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<BestTimesPanel query={bestTimes} />
@@ -313,26 +371,31 @@ function Overview({
 	);
 }
 
-/** Says so when some or all of the shown channels can't report analytics at all. */
+const LEGEND = [
+	{ label: "Impressions", color: "var(--chart-1)" },
+	{ label: "Engagements", color: "var(--chart-2)" },
+	{ label: "Posts", color: "var(--chart-3)" },
+];
+
+/**
+ * Says so when some or all of the shown channels can't report analytics at all. One muted
+ * line, not an alert box: it explains the numbers, it isn't something to fix.
+ */
 function SupportNotice({ data }: { data: AnalyticsOverview }) {
 	const unsupported = useMemo(
 		() => data.byChannel.filter((c) => !c.analyticsSupported),
 		[data.byChannel],
 	);
 	if (!unsupported.length) return null;
-	if (unsupported.length === data.byChannel.length) {
-		return (
-			<Alert tone="warning" icon={Info} title="Analytics aren't available for these channels">
-				The platforms you picked don't share post metrics with apps like SocialFly, so there's
-				nothing to show. Choose other channels to see their results.
-			</Alert>
-		);
-	}
+	const all = unsupported.length === data.byChannel.length;
 	return (
-		<Alert tone="info" icon={Info}>
-			{unsupported.map((c) => c.name).join(", ")} {unsupported.length === 1 ? "doesn't" : "don't"}{" "}
-			share analytics, so {unsupported.length === 1 ? "it isn't" : "they aren't"} counted in these
-			totals.
-		</Alert>
+		<p role="status" className="-mt-2 flex items-start gap-2 text-muted-foreground text-xs">
+			<Info className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+			<span>
+				{all
+					? "These platforms don't share post metrics with SocialFly. Pick other channels to see their results."
+					: `${unsupported.map((c) => c.name).join(", ")} ${unsupported.length === 1 ? "doesn't" : "don't"} share analytics, so ${unsupported.length === 1 ? "it isn't" : "they aren't"} counted in these totals.`}
+			</span>
+		</p>
 	);
 }
