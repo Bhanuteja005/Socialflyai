@@ -117,11 +117,9 @@ export default function YouTubeVideoDownloaderPage() {
 			<ToolProse title="Supported File Formats">
 				<dl className="grid gap-4 sm:grid-cols-2">
 					{FORMATS.map((row) => (
-						<div key={row.type} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-							<dt className="font-bold text-white/40 text-xs uppercase tracking-widest">
-								{row.type}
-							</dt>
-							<dd className="mt-2 font-semibold text-white">{row.items}</dd>
+						<div key={row.type} className="rounded-2xl border border-border bg-surface-raised p-5">
+							<dt className="font-medium text-subtle-foreground text-xs font-mono">{row.type}</dt>
+							<dd className="mt-2 font-medium text-foreground">{row.items}</dd>
 						</div>
 					))}
 				</dl>
@@ -134,7 +132,7 @@ export default function YouTubeVideoDownloaderPage() {
 					{["SSL Encrypted Connection", "No Personal Data Required", "Automatic File Cleanup"].map(
 						(item) => (
 							<li key={item} className="flex items-center gap-3">
-								<CircleCheck className="size-5 shrink-0 text-primary" aria-hidden="true" />
+								<CircleCheck className="size-5 shrink-0 text-brand-text" aria-hidden="true" />
 								{item}
 							</li>
 						),

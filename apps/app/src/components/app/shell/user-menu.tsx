@@ -17,7 +17,7 @@ import { LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useCurrentUser, useSignOut } from "@/hooks/use-session";
 
-export function UserMenu() {
+export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
 	const user = useCurrentUser();
 	const signOut = useSignOut();
 	const { theme, setTheme } = useTheme();
@@ -28,13 +28,21 @@ export function UserMenu() {
 			<DropdownMenuTrigger asChild>
 				<button
 					type="button"
-					className="flex w-full cursor-pointer items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:bg-muted"
+					className={
+						collapsed
+							? "flex cursor-pointer items-center justify-center self-center rounded-[10px] p-1.5 transition-colors hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+							: "flex w-full cursor-pointer items-center gap-2.5 rounded-[10px] p-1.5 text-left transition-colors hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+					}
 				>
 					<Avatar src={user?.avatarUrl} name={label} size="sm" />
-					<span className="grid min-w-0 flex-1 leading-tight">
-						<span className="truncate font-medium text-sm">{user?.name || "Your account"}</span>
-						<span className="truncate text-muted-foreground text-xs">{user?.email}</span>
-					</span>
+					{collapsed ? null : (
+						<span className="grid min-w-0 flex-1 leading-tight">
+							<span className="truncate font-medium text-[13px]">
+								{user?.name || "Your account"}
+							</span>
+							<span className="truncate text-muted-foreground text-xs">{user?.email}</span>
+						</span>
+					)}
 					<span className="sr-only">Open account menu</span>
 				</button>
 			</DropdownMenuTrigger>

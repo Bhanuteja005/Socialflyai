@@ -4,8 +4,7 @@ import { Button } from "@socialfly/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/components/card";
 import { Alert, EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { NativeSelect } from "@socialfly/ui/components/select";
-import { Info, Megaphone, Plus } from "lucide-react";
-import Link from "next/link";
+import { Info } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAdAccounts, useAdsOverview } from "@/hooks/use-ads";
 import { adsProviderMeta, CAMPAIGN_STATUS, CAMPAIGN_STATUSES, formatMoney } from "@/lib/ads";
@@ -16,11 +15,12 @@ import { readRange } from "../analytics/analytics-utils";
 import { useOrg } from "../org-provider";
 import { ProviderIcon } from "../provider-icon";
 import { AdKpiRow, AdKpiSkeleton, SpendByCampaignChart, SpendChart } from "./ads-charts";
+import { AdsLanding } from "./ads-landing";
 import { AdsLayout } from "./ads-shared";
 import { CampaignsTable } from "./campaigns-table";
 
 export function AdsOverviewView() {
-	const { org, can } = useOrg();
+	const { org } = useOrg();
 	const params = useSearchParams();
 	const router = useRouter();
 	const pathname = usePathname();
@@ -65,35 +65,24 @@ export function AdsOverviewView() {
 	if (accounts.data.length === 0) {
 		return (
 			<AdsLayout description={description}>
-				<EmptyState
-					icon={Megaphone}
-					title="Connect an ad account to get started"
-					description={
-						can("admin")
-							? "Link a Meta, Google, LinkedIn, TikTok, Pinterest or X ad account. Connecting never spends money — every campaign is created paused and needs an admin to activate it."
-							: "An admin needs to connect an ad account first. Connecting never spends money."
-					}
-					action={
-						<Button asChild>
-							<Link href="/ads/accounts">
-								<Plus />
-								{can("admin") ? "Connect an ad account" : "See ad accounts"}
-							</Link>
-						</Button>
-					}
-				/>
+				<AdsLanding />
 			</AdsLayout>
 		);
 	}
 
 	return (
 		<AdsLayout description={description}>
-			<div className="grid gap-8">
-				<section aria-labelledby="ads-results" className="grid gap-4">
-					<div className="flex flex-wrap items-center justify-between gap-3">
-						<h2 id="ads-results" className="font-medium text-base">
-							Results
-						</h2>
+			<div className="grid grid-cols-[minmax(0,1fr)] gap-8">
+				<section aria-labelledby="ads-results" className="grid min-w-0 gap-4">
+					<div className="flex flex-wrap items-end justify-between gap-3">
+						<div className="grid gap-0.5">
+							<h2 id="ads-results" className="font-medium text-[15px]">
+								Results
+							</h2>
+							<p className="text-muted-foreground text-xs">
+								Delivery across every connected ad account
+							</p>
+						</div>
 						<RangePicker
 							key={`${range.from}-${range.to}`}
 							range={range}
@@ -104,13 +93,18 @@ export function AdsOverviewView() {
 					<OverviewResults from={range.from} to={range.to} />
 				</section>
 
-				<section aria-labelledby="ads-campaigns" className="grid gap-3">
-					<div className="flex flex-wrap items-center justify-between gap-3">
-						<h2 id="ads-campaigns" className="font-medium text-base">
-							Campaigns
-						</h2>
+				<section aria-labelledby="ads-campaigns" className="grid min-w-0 gap-3">
+					<div className="flex flex-wrap items-end justify-between gap-3">
+						<div className="grid gap-0.5">
+							<h2 id="ads-campaigns" className="font-medium text-[15px]">
+								Campaigns
+							</h2>
+							<p className="text-muted-foreground text-xs">
+								Drafts, approvals and everything running on the platforms
+							</p>
+						</div>
 						<div className="flex items-center gap-2">
-							<label htmlFor="ads-status-filter" className="text-muted-foreground text-xs">
+							<label htmlFor="ads-status-filter" className="sr-only">
 								Status
 							</label>
 							<NativeSelect
@@ -211,17 +205,18 @@ function CurrencyGroup({
 	return (
 		<div className="grid gap-4">
 			{showHeading ? (
-				<h3 className="font-medium text-muted-foreground text-sm">
+				<h3 className="font-medium text-muted-foreground text-[13px]">
 					Accounts billed in {totals.currency}
 				</h3>
 			) : null}
 			<AdKpiRow totals={totals} currency={totals.currency} />
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
 				<Card>
-					<CardHeader>
+					<CardHeader className="flex-row items-center justify-between border-border border-b pb-4">
 						<CardTitle>{days.length ? "Daily spend" : "Spend by campaign"}</CardTitle>
+						<span className="text-muted-foreground text-xs">{totals.currency}</span>
 					</CardHeader>
-					<CardContent>
+					<CardContent className="pt-4">
 						{days.length ? (
 							<SpendChart days={days} currency={totals.currency} />
 						) : (
@@ -237,27 +232,39 @@ function CurrencyGroup({
 					</CardContent>
 				</Card>
 				<Card>
-					<CardHeader>
+					<CardHeader className="border-border border-b pb-4">
 						<CardTitle>By platform</CardTitle>
 					</CardHeader>
-					<CardContent>
-						<ul className="grid gap-2.5">
-							{providers.map((p) => (
-								<li key={p.provider} className="flex items-center gap-2.5 text-sm">
-									<ProviderIcon provider={p.provider} size="sm" />
-									<span className="min-w-0 flex-1 truncate">
-										{adsProviderMeta(p.provider).name}
-									</span>
-									<span className="grid text-right">
-										<span className="font-medium tabular-nums">
-											{formatMoney(p.spend, totals.currency)}
-										</span>
-										<span className="text-muted-foreground text-xs tabular-nums">
-											{formatCompact(p.clicks)} clicks
-										</span>
-									</span>
-								</li>
-							))}
+					<CardContent className="pt-4">
+						<ul className="grid gap-4">
+							{providers.map((p) => {
+								// Share of this currency's spend; the bar is decorative, the amount is the data.
+								const share = totals.spend ? Math.min(1, p.spend / totals.spend) : 0;
+								return (
+									<li key={p.provider} className="grid gap-2">
+										<div className="flex items-center gap-2.5 text-sm">
+											<ProviderIcon provider={p.provider} size="md" />
+											<span className="grid min-w-0 flex-1">
+												<span className="truncate font-medium">
+													{adsProviderMeta(p.provider).name}
+												</span>
+												<span className="text-muted-foreground text-xs font-mono tabular-nums">
+													{formatCompact(p.clicks)} clicks
+												</span>
+											</span>
+											<span className="font-medium font-mono tabular-nums">
+												{formatMoney(p.spend, totals.currency)}
+											</span>
+										</div>
+										<div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-muted">
+											<div
+												className="h-full rounded-full bg-ink"
+												style={{ width: `${Math.round(share * 100)}%` }}
+											/>
+										</div>
+									</li>
+								);
+							})}
 						</ul>
 					</CardContent>
 				</Card>

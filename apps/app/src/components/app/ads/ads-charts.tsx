@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@socialfly/ui/components/feedback";
+import { StatCard } from "@socialfly/ui/components/page";
 import { useMemo } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { formatMoney } from "@/lib/ads";
@@ -22,25 +23,15 @@ export function AdKpi({
 	title?: string;
 	detail?: string;
 }) {
-	return (
-		<div className="grid content-start gap-1 rounded-lg border border-border bg-surface-raised p-4 shadow-xs">
-			<p className="text-muted-foreground text-xs">{label}</p>
-			<p className="font-semibold text-2xl tabular-nums tracking-tight" title={title}>
-				{value}
-			</p>
-			{detail ? <p className="text-subtle-foreground text-xs">{detail}</p> : null}
-		</div>
-	);
+	// Monochrome KPIs: no icon tiles or tints — the numbers carry the meaning.
+	return <StatCard label={label} value={<span title={title}>{value}</span>} hint={detail} />;
 }
 
 export function AdKpiSkeleton({ count = 4 }: { count?: number }) {
 	return (
-		<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+		<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
 			{Array.from({ length: count }, (_, i) => `k${i}`).map((k) => (
-				<div key={k} className="grid gap-2 rounded-lg border border-border p-4">
-					<Skeleton className="h-3 w-20" />
-					<Skeleton className="h-7 w-16" />
-				</div>
+				<StatCard key={k} label={<Skeleton className="h-3 w-20" />} value="" loading />
 			))}
 		</div>
 	);
@@ -64,7 +55,7 @@ export function AdKpiRow({ totals, currency }: { totals: Totals; currency: strin
 	const cpc =
 		totals.cpc ?? (totals.spend !== null && totals.clicks ? totals.spend / totals.clicks : null);
 	return (
-		<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+		<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
 			<AdKpi
 				label={`Spend (${currency})`}
 				value={formatMoney(totals.spend, currency)}

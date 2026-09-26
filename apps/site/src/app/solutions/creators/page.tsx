@@ -51,7 +51,7 @@ const data: SolutionPageData = {
 			],
 			visual: (
 				<MockupFrame title="AI hook suggestion" icon={Sparkles}>
-					<p className="rounded-xl border border-primary/20 bg-primary/5 p-4 font-medium text-sm text-white italic">
+					<p className="rounded-xl border border-border-strong bg-surface p-4 font-medium text-sm text-foreground italic">
 						&ldquo;Stop making this 1 massive mistake with your content strategy...&rdquo;
 					</p>
 				</MockupFrame>

@@ -51,6 +51,7 @@ const tileBackground: Record<string, string> = {
 };
 
 const sizes = {
+	"2xs": "size-3 rounded-[3px] [&_svg]:size-2.5",
 	xs: "size-4 rounded-[4px] [&_svg]:size-3",
 	sm: "size-5 rounded-[5px] [&_svg]:size-3.5",
 	md: "size-7 rounded-md [&_svg]:size-4.5",
@@ -74,7 +75,8 @@ export function ProviderIcon({
 	return (
 		<span
 			className={cn(
-				"inline-flex shrink-0 items-center justify-center text-white",
+				// The faint inner edge keeps black tiles (X, Threads) visible on dark surfaces.
+				"inline-flex shrink-0 items-center justify-center text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.14)]",
 				sizes[size],
 				className,
 			)}

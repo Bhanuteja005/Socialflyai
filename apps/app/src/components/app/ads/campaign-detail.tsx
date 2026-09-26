@@ -11,6 +11,7 @@ import {
 	AlertTriangle,
 	Archive,
 	ArrowLeft,
+	BarChart3,
 	Check,
 	CircleHelp,
 	ExternalLink,
@@ -268,14 +269,14 @@ export function CampaignDetailView({ id }: { id: string }) {
 				canRetry={editor}
 			/>
 
-			<div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+			<div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
 				<div className="grid gap-6">
 					{created ? <Metrics campaign={c} /> : null}
 					<Card>
-						<CardHeader>
+						<CardHeader className="pb-2">
 							<CardTitle>What was set up</CardTitle>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="grid gap-3">
 							<DraftSummary
 								state={fromCampaign(c, timeZone)}
 								currency={c.currency}
@@ -287,7 +288,7 @@ export function CampaignDetailView({ id }: { id: string }) {
 					</Card>
 				</div>
 				<Card className="lg:sticky lg:top-6">
-					<CardHeader>
+					<CardHeader className="pb-2">
 						<CardTitle>Status</CardTitle>
 					</CardHeader>
 					<CardContent>
@@ -591,16 +592,18 @@ function StatusTimeline({
 					</li>
 				))}
 			</ol>
-			<dl className="grid gap-1 border-border border-t pt-3 text-xs">
+			<dl className="grid gap-2 rounded-lg bg-surface p-3 text-xs">
 				<div className="flex justify-between gap-2">
 					<dt className="text-muted-foreground">Spent to date</dt>
-					<dd className="font-medium tabular-nums">
+					<dd className="font-medium font-mono tabular-nums">
 						{c.spendToDate === null ? "—" : formatMoney(c.spendToDate, c.currency)}
 					</dd>
 				</div>
 				<div className="flex justify-between gap-2">
 					<dt className="text-muted-foreground">On the platform</dt>
-					<dd>{c.platformStatus ? c.platformStatus.replace(/_/g, " ").toLowerCase() : "—"}</dd>
+					<dd className="capitalize">
+						{c.platformStatus ? c.platformStatus.replace(/_/g, " ").toLowerCase() : "—"}
+					</dd>
 				</div>
 				<div className="flex justify-between gap-2">
 					<dt className="text-muted-foreground">Last change</dt>
@@ -621,7 +624,7 @@ function DeclarationRecord({
 }) {
 	const d = c.declarations;
 	return (
-		<div className="mt-3 grid gap-1 rounded-lg border border-border p-4 text-sm">
+		<div className="grid gap-1 rounded-lg bg-surface p-4 text-sm">
 			<h3 className="font-medium">Special ad categories</h3>
 			{d?.notPoliticalOrSpecialCategory ? (
 				<>
@@ -648,21 +651,25 @@ function Metrics({ campaign: c }: { campaign: AdCampaignDetail }) {
 	const { totals, daily } = c.metrics;
 	return (
 		<section aria-labelledby="campaign-results" className="grid gap-4">
-			<h2 id="campaign-results" className="font-medium text-base">
+			<h2 id="campaign-results" className="font-medium text-[15px]">
 				Results
 			</h2>
 			<AdKpiRow totals={totals} currency={c.currency} />
 			<Card>
-				<CardHeader>
+				<CardHeader className="flex-row items-center justify-between pb-2">
 					<CardTitle>Daily delivery</CardTitle>
+					<span className="text-muted-foreground text-xs">{c.currency}</span>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="pt-4">
 					{daily.length ? (
 						<CampaignDailyChart days={daily} currency={c.currency} />
 					) : (
-						<p className="text-muted-foreground text-sm">
-							No delivery yet. Numbers appear a few hours after the campaign starts running.
-						</p>
+						<EmptyState
+							compact
+							icon={BarChart3}
+							title="No delivery yet"
+							description="Numbers appear a few hours after the campaign starts running."
+						/>
 					)}
 				</CardContent>
 			</Card>

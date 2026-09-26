@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@socialfly/ui/components/badge";
-import { Alert, EmptyState } from "@socialfly/ui/components/feedback";
+import { EmptyState } from "@socialfly/ui/components/feedback";
 import { Tabs, TabsList, TabsTrigger } from "@socialfly/ui/components/tabs";
 import { CheckCircle2, CircleHelp } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +21,7 @@ import {
 	tdClass,
 	thClass,
 } from "../common";
+import { Monogram, Toolbar } from "./parts";
 
 type Filter = AdminTargetStatus | "all";
 const FILTERS: { value: Filter; label: string }[] = [
@@ -44,33 +45,47 @@ export function PublishingView() {
 		<>
 			<PageHeader
 				title="Publishing"
-				description="Post targets that need a human, across every organization. Newest first."
+				description="Post targets that need a human, across every organization."
 			/>
-			<Alert tone="info" icon={CircleHelp} className="mb-4" title="What “unconfirmed” means">
-				The platform call was sent but we never learned whether it succeeded (a timeout or dropped
-				connection). SocialFly never retries these automatically, because a retry could post twice.
-				The customer must check the platform first, then retry from the post only if it really
-				didn't go out.
-			</Alert>
-			<Tabs
-				value={filter}
-				onValueChange={(v) => {
-					const next = new URLSearchParams(params.toString());
-					if (v === "all") next.delete("status");
-					else next.set("status", v);
-					const qs = next.toString();
-					router.replace(qs ? `${pathname}?${qs}` : pathname);
-				}}
-				className="mb-4"
+			<Toolbar
+				aside={
+					query.data
+						? `${items.length} ${query.hasNextPage ? "loaded" : items.length === 1 ? "target" : "targets"}`
+						: null
+				}
 			>
-				<TabsList aria-label="Filter by status">
-					{FILTERS.map((f) => (
-						<TabsTrigger key={f.value} value={f.value}>
-							{f.label}
-						</TabsTrigger>
-					))}
-				</TabsList>
-			</Tabs>
+				<Tabs
+					value={filter}
+					onValueChange={(v) => {
+						const next = new URLSearchParams(params.toString());
+						if (v === "all") next.delete("status");
+						else next.set("status", v);
+						const qs = next.toString();
+						router.replace(qs ? `${pathname}?${qs}` : pathname);
+					}}
+				>
+					<TabsList aria-label="Filter by status">
+						{FILTERS.map((f) => (
+							<TabsTrigger key={f.value} value={f.value}>
+								{f.value === "failed" ? (
+									<span className="size-1.5 rounded-full bg-danger" aria-hidden="true" />
+								) : f.value === "unconfirmed" ? (
+									<span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />
+								) : null}
+								{f.label}
+							</TabsTrigger>
+						))}
+					</TabsList>
+				</Tabs>
+			</Toolbar>
+			<p className="mb-4 flex items-start gap-2 rounded-2xl border border-border bg-surface-raised px-4 py-3 text-[13px] text-muted-foreground">
+				<CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				<span>
+					<span className="font-medium text-foreground">Unconfirmed</span>: the call was sent but
+					its outcome is unknown. Never retried automatically (a retry could post twice); the
+					customer checks the platform first.
+				</span>
+			</p>
 			{query.isError && !query.data ? (
 				<QueryError error={query.error} onRetry={() => void query.refetch()} />
 			) : query.isPending ? (
@@ -85,7 +100,7 @@ export function PublishingView() {
 				/>
 			) : (
 				<TableCard>
-					<table className={tableClass}>
+					<table className={`${tableClass} relative`}>
 						<caption className="sr-only">Failed and unconfirmed post targets</caption>
 						<thead>
 							<tr>
@@ -111,16 +126,21 @@ export function PublishingView() {
 						</thead>
 						<tbody>
 							{items.map((t) => (
-								<tr key={t.id} className="hover:bg-muted/40">
+								<tr key={t.id} className="transition-colors hover:bg-surface">
 									<td className={tdClass}>
-										<Link
-											href={`/organizations/${t.organization.id}`}
-											className="font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-										>
-											{t.organization.name}
-										</Link>
-										<div className="text-muted-foreground text-xs">
-											Post <ShortId id={t.postId} />
+										<div className="flex items-center gap-3">
+											<Monogram name={t.organization.name} />
+											<div className="grid min-w-0 gap-0.5">
+												<Link
+													href={`/organizations/${t.organization.id}`}
+													className="font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+												>
+													{t.organization.name}
+												</Link>
+												<div className="text-muted-foreground text-xs">
+													Post <ShortId id={t.postId} />
+												</div>
+											</div>
 										</div>
 									</td>
 									<td className={tdClass}>
@@ -137,7 +157,11 @@ export function PublishingView() {
 									<td className={`${tdClass} max-w-sm`}>
 										{t.errorCode || t.errorMessage ? (
 											<div className="grid gap-0.5 text-xs">
-												{t.errorCode ? <code className="font-mono">{t.errorCode}</code> : null}
+												{t.errorCode ? (
+													<code className="w-fit rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+														{t.errorCode}
+													</code>
+												) : null}
 												{t.errorMessage ? (
 													<span className="break-words text-muted-foreground">
 														{t.errorMessage}
@@ -148,12 +172,12 @@ export function PublishingView() {
 											<None />
 										)}
 									</td>
-									<td className={`${tdClass} text-right tabular-nums`}>{t.attempts}</td>
-									<td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+									<td className={`${tdClass} text-right font-mono tabular-nums`}>{t.attempts}</td>
+									<td
+										className={`${tdClass} whitespace-nowrap font-mono text-muted-foreground text-xs`}
+									>
 										<span title={formatDateTime(t.updatedAt)}>{formatRelative(t.updatedAt)}</span>
-										{t.scheduledAt ? (
-											<div className="text-xs">Scheduled {formatDateTime(t.scheduledAt)}</div>
-										) : null}
+										{t.scheduledAt ? <div>Scheduled {formatDateTime(t.scheduledAt)}</div> : null}
 									</td>
 								</tr>
 							))}

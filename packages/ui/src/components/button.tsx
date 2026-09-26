@@ -5,14 +5,16 @@ import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
 export const buttonVariants = cva(
-	"relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium text-sm transition-[background-color,border-color,color,box-shadow,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+	"relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium text-[13px] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
 	{
 		variants: {
 			variant: {
-				primary: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover",
+				// docs/design.md: `primary` is ink for everyday actions; `brand` is the logo green for the
+				// one hero action on a screen (e.g. "New post").
+				primary: "bg-ink text-ink-foreground hover:bg-ink-hover",
+				brand: "bg-primary text-primary-foreground hover:bg-primary-hover",
 				secondary: "bg-muted text-foreground hover:bg-border",
-				outline:
-					"border border-border bg-surface-raised text-foreground shadow-xs hover:border-border-strong hover:bg-muted",
+				outline: "border border-border-strong bg-surface-raised text-foreground hover:bg-muted",
 				ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
 				danger: "bg-danger text-white shadow-xs hover:opacity-90",
 				"danger-outline":
@@ -20,13 +22,13 @@ export const buttonVariants = cva(
 				link: "text-primary-text underline-offset-4 hover:underline",
 			},
 			size: {
-				xs: "h-7 rounded-sm px-2 text-xs [&_svg]:size-3.5",
-				sm: "h-8 px-3",
+				xs: "h-7 px-2.5 text-xs [&_svg]:size-3.5",
+				sm: "h-8 px-3.5",
 				md: "h-9 px-4",
-				lg: "h-11 px-5 text-[15px]",
+				lg: "h-10 px-5 text-sm",
 				icon: "size-9",
 				"icon-sm": "size-8",
-				"icon-xs": "size-7 rounded-sm [&_svg]:size-3.5",
+				"icon-xs": "size-7 [&_svg]:size-3.5",
 			},
 		},
 		compoundVariants: [{ variant: "link", className: "h-auto px-0" }],

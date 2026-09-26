@@ -66,8 +66,8 @@ export default function AICaptionGeneratorPage() {
 					<>
 						Match the speed of your creativity with AI-generated captions in seconds. Scale your
 						video presence on every platform with effortless precision.
-						<span className="mt-4 block text-base text-white/50">
-							Trusted by <span className="font-bold text-white">25,000+ Creators</span>
+						<span className="mt-4 block text-base text-muted-foreground">
+							Trusted by <span className="font-medium text-foreground">25,000+ Creators</span>
 						</span>
 					</>
 				}
@@ -77,15 +77,15 @@ export default function AICaptionGeneratorPage() {
 				]}
 			>
 				<MockupFrame>
-					<div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-[radial-gradient(circle_at_30%_20%,rgba(11,226,125,0.18),transparent_60%),linear-gradient(135deg,#0d1a13,#050505)]">
-						<div className="flex size-16 items-center justify-center rounded-full border border-primary/30 bg-black/60 sm:size-20">
+					<div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl">
+						<div className="flex size-16 items-center justify-center rounded-full border border-border-strong bg-surface-raised/90 sm:size-20">
 							<Play className="ml-1 size-7 fill-current text-primary sm:size-8" />
 						</div>
 						<div className="absolute inset-x-4 bottom-4 flex flex-col items-center gap-2 sm:bottom-8">
-							<p className="rounded-lg bg-black/70 px-3 py-1.5 font-semibold text-sm text-white sm:text-lg">
+							<p className="rounded-lg bg-surface-raised px-3 py-1.5 font-medium text-sm text-foreground sm:text-lg">
 								"Artificial intelligence is fundamentally..."
 							</p>
-							<p className="rounded-lg bg-primary px-3 py-1.5 font-semibold text-black text-sm sm:text-lg">
+							<p className="rounded-lg bg-primary px-3 py-1.5 font-medium text-primary-foreground text-sm sm:text-lg">
 								"...changing how we create."
 							</p>
 						</div>
@@ -124,14 +124,14 @@ export default function AICaptionGeneratorPage() {
 								{ENGAGEMENT.map(({ icon: Icon, title, description }) => (
 									<li
 										key={title}
-										className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+										className="flex items-start gap-4 rounded-2xl border border-border bg-surface-raised p-6"
 									>
-										<span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+										<span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-foreground">
 											<Icon className="size-6" aria-hidden="true" />
 										</span>
 										<div>
-											<p className="font-bold text-lg text-white">{title}</p>
-											<p className="mt-1 text-white/60">{description}</p>
+											<p className="font-medium text-lg text-foreground">{title}</p>
+											<p className="mt-1 text-muted-foreground">{description}</p>
 										</div>
 									</li>
 								))}

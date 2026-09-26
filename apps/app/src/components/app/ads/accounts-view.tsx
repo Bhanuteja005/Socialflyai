@@ -73,13 +73,24 @@ export function AdAccountsView() {
 	return (
 		<AdsLayout description="Ad accounts this organization can create campaigns in.">
 			<section aria-labelledby="ad-accounts-heading" className="mb-10">
-				<h2 id="ad-accounts-heading" className="mb-3 font-medium text-muted-foreground text-sm">
-					Connected ad accounts
-				</h2>
+				<div className="mb-3 grid gap-0.5">
+					<h2 id="ad-accounts-heading" className="font-medium text-[15px]">
+						Connected ad accounts
+					</h2>
+					<p className="text-muted-foreground text-xs">
+						Campaigns are created in these accounts, billed in each account's own currency.
+					</p>
+				</div>
 				{accounts.isPending ? (
-					<div className="grid gap-2">
+					<div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border">
 						{["a", "b"].map((k) => (
-							<Skeleton key={k} className="h-16" />
+							<div key={k} className="flex items-center gap-3 bg-surface-raised px-4 py-3.5">
+								<Skeleton className="size-10 rounded-lg" />
+								<div className="grid flex-1 gap-1.5">
+									<Skeleton className="h-3.5 w-40" />
+									<Skeleton className="h-3 w-64 max-w-full" />
+								</div>
+							</div>
 						))}
 					</div>
 				) : accounts.isError ? (
@@ -94,6 +105,7 @@ export function AdAccountsView() {
 					/>
 				) : accounts.data.length === 0 ? (
 					<EmptyState
+						compact
 						icon={Megaphone}
 						title="No ad accounts yet"
 						description="Connect an ad account below. Connecting never spends money — campaigns are always created paused."
@@ -103,10 +115,15 @@ export function AdAccountsView() {
 				)}
 			</section>
 			<section aria-labelledby="ad-connect-heading">
-				<div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-					<h2 id="ad-connect-heading" className="font-medium text-muted-foreground text-sm">
-						Ad platforms
-					</h2>
+				<div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+					<div className="grid gap-0.5">
+						<h2 id="ad-connect-heading" className="font-medium text-[15px]">
+							Ad platforms
+						</h2>
+						<p className="text-muted-foreground text-xs">
+							Connect an account on any platform your server is set up for.
+						</p>
+					</div>
 					{ADS_DOCS_URL ? (
 						<a
 							href={ADS_DOCS_URL}
@@ -135,9 +152,9 @@ function ProvidersGrid() {
 
 	if (providers.isPending) {
 		return (
-			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{["a", "b", "c"].map((k) => (
-					<Skeleton key={k} className="h-40" />
+					<Skeleton key={k} className="h-40 rounded-xl" />
 				))}
 			</div>
 		);
@@ -160,7 +177,7 @@ function ProvidersGrid() {
 	const sorted = [...providers.data].sort((a, b) => Number(b.configured) - Number(a.configured));
 
 	return (
-		<ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+		<ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			{sorted.map((p) => (
 				<ProviderCard
 					key={p.id}
@@ -205,16 +222,30 @@ function ProviderCard({
 	return (
 		<li
 			className={cn(
-				"flex flex-col gap-3 rounded-lg border border-border p-4",
-				p.configured ? "bg-surface-raised shadow-xs" : "bg-surface",
+				"flex flex-col gap-4 rounded-xl border border-border p-5",
+				p.configured ? "bg-surface-raised" : "bg-surface",
 			)}
 		>
-			<div className="flex items-center gap-3">
-				<ProviderIcon provider={p.id} size="md" />
-				<p className="flex-1 font-medium text-sm">{p.displayName}</p>
-				{p.configured ? null : <Badge tone="outline">Not configured</Badge>}
+			<div className="flex items-start gap-3">
+				<ProviderIcon
+					provider={p.id}
+					size="lg"
+					className={p.configured ? undefined : "opacity-80 grayscale-[35%]"}
+				/>
+				<div className="grid min-w-0 flex-1 gap-1">
+					<p className="font-medium text-sm">{p.displayName}</p>
+					{p.configured ? (
+						<Badge tone="success" dot className="w-fit">
+							Ready to connect
+						</Badge>
+					) : (
+						<Badge tone="outline" className="w-fit">
+							Not configured
+						</Badge>
+					)}
+				</div>
 			</div>
-			<p className="text-muted-foreground text-xs leading-relaxed">{meta.description}</p>
+			<p className="text-muted-foreground text-[13px] leading-relaxed">{meta.description}</p>
 			{p.configured ? (
 				<div className="mt-auto">
 					{allowed ? (
@@ -226,14 +257,14 @@ function ProviderCard({
 					)}
 				</div>
 			) : (
-				<div className="mt-auto grid gap-2 text-xs">
+				<div className="mt-auto grid gap-2.5 rounded-lg bg-muted/60 p-3 text-xs">
 					{meta.env.length ? (
-						<div className="grid gap-1">
-							<p className="text-muted-foreground">Set on the API server:</p>
+						<div className="grid gap-1.5">
+							<p className="font-medium text-muted-foreground">Set on the API server</p>
 							<ul className="flex flex-wrap gap-1">
 								{meta.env.map((v) => (
 									<li key={v}>
-										<code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+										<code className="rounded-md border border-border bg-surface-raised px-1.5 py-0.5 font-mono text-[11px]">
 											{v}
 										</code>
 									</li>
@@ -242,7 +273,7 @@ function ProviderCard({
 						</div>
 					) : null}
 					{meta.approval ? (
-						<p className="text-muted-foreground">
+						<p className="text-muted-foreground leading-relaxed">
 							<span className="font-medium text-foreground">Approval: </span>
 							{meta.approval}
 						</p>
@@ -252,7 +283,7 @@ function ProviderCard({
 							href={ADS_DOCS_URL}
 							target="_blank"
 							rel="noreferrer"
-							className="w-fit text-primary-text underline-offset-2 hover:underline"
+							className="w-fit font-medium text-foreground underline underline-offset-2"
 						>
 							How to set up {meta.name}
 							<span className="sr-only"> (opens in a new tab)</span>
@@ -284,7 +315,7 @@ function AccountList({ accounts }: { accounts: AdAccount[] }) {
 
 	return (
 		<>
-			<ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface-raised">
+			<ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface-raised">
 				{accounts.map((a) => (
 					<AccountRow
 						key={a.id}
@@ -328,12 +359,12 @@ function AccountRow({
 	return (
 		<li
 			className={cn(
-				"grid gap-2 px-4 py-3.5",
+				"grid gap-2.5 px-4 py-4 sm:px-5",
 				(needsReauth || needsIdentity) && "bg-warning-soft/30",
 			)}
 		>
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:flex-nowrap">
-				<ProviderIcon provider={a.provider} size="md" />
+				<ProviderIcon provider={a.provider} size="lg" />
 				<div className="grid min-w-0 flex-1 gap-0.5">
 					<div className="flex min-w-0 flex-wrap items-center gap-2">
 						<p className="truncate font-medium text-sm">{a.name}</p>
@@ -378,7 +409,7 @@ function AccountRow({
 				) : null}
 			</div>
 			{needsReauth ? (
-				<p className="flex items-start gap-1.5 text-warning text-xs">
+				<p className="flex items-start gap-1.5 text-warning text-xs sm:pl-14">
 					<AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden="true" />
 					<span>
 						{a.lastError ?? "Access expired."} Campaigns can't be created, activated or paused from
@@ -386,10 +417,10 @@ function AccountRow({
 					</span>
 				</p>
 			) : a.lastError ? (
-				<p className="text-danger text-xs">{a.lastError}</p>
+				<p className="text-danger text-xs sm:pl-14">{a.lastError}</p>
 			) : null}
 			{needsIdentity ? (
-				<p className="flex items-start gap-1.5 text-warning text-xs">
+				<p className="flex items-start gap-1.5 text-warning text-xs sm:pl-14">
 					<AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden="true" />
 					<span>
 						Choose the {a.identityRequired.map((k) => identityLabel(a.provider, k)).join(" and ")}{" "}

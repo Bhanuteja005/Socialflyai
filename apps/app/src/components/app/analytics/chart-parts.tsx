@@ -6,13 +6,17 @@ import { type ReactNode, useId } from "react";
 import { Line, LineChart, YAxis } from "recharts";
 
 /** Axis/grid styling shared by every cartesian chart: hairline, recessive, tabular ticks. */
-export const axisTick = { fill: "var(--subtle-foreground)", fontSize: 11 } as const;
+export const axisTick = {
+	fill: "var(--subtle-foreground)",
+	fontSize: 11,
+	fontFamily: "var(--font-dm-mono), ui-monospace, monospace",
+} as const;
 export const axisLine = { stroke: "var(--chart-axis)" } as const;
 
 /** Card-styled tooltip body; text wears text tokens, the swatch carries identity. */
 export function TooltipBox({ title, rows }: { title: ReactNode; rows: TooltipRow[] }) {
 	return (
-		<div className="min-w-40 rounded-md border border-border bg-surface-raised px-3 py-2 text-xs shadow-md">
+		<div className="min-w-40 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs shadow-md">
 			<p className="mb-1.5 font-medium text-foreground">{title}</p>
 			<ul className="grid gap-1">
 				{rows.map((r) => (
@@ -25,7 +29,7 @@ export function TooltipBox({ title, rows }: { title: ReactNode; rows: TooltipRow
 							/>
 						) : null}
 						<span className="flex-1 text-muted-foreground">{r.label}</span>
-						<span className="font-medium text-foreground tabular-nums">{r.value}</span>
+						<span className="font-mono text-foreground tabular-nums">{r.value}</span>
 					</li>
 				))}
 			</ul>
@@ -65,7 +69,7 @@ export function ChartFigure({
 						<span className="group-open:hidden">Show as table</span>
 						<span className="hidden group-open:inline">Hide table</span>
 					</summary>
-					<div className="scrollbar-thin mt-2 max-h-72 overflow-auto rounded-md border border-border">
+					<div className="scrollbar-thin mt-2 max-h-72 overflow-auto rounded-xl border border-border [contain:inline-size]">
 						{table}
 					</div>
 				</details>
@@ -110,7 +114,10 @@ export function DataTable({
 							<td
 								// biome-ignore lint/suspicious/noArrayIndexKey: fixed column order
 								key={i}
-								className={cn("px-3 py-1.5 tabular-nums", i === 0 ? "text-left" : "text-right")}
+								className={cn(
+									"px-3 py-1.5",
+									i === 0 ? "text-left" : "text-right font-mono tabular-nums",
+								)}
 							>
 								{cell}
 							</td>
@@ -123,47 +130,84 @@ export function DataTable({
 }
 
 /**
- * Change vs the previous period. Up is good for every metric we show, so direction
- * picks the tone; the arrow and the sign carry it too, never colour alone.
+ * Relative change as a short label. Past ~10× a percentage stops meaning anything
+ * ("+2624.8%"), so big jumps read as a multiple instead.
+ */
+export function formatChange(value: number) {
+	const abs = Math.abs(value);
+	if (value >= 9) return `${Math.round(1 + value)}×`;
+	if (abs >= 1) return `${Math.round(abs * 100)}%`;
+	return `${(abs * 100).toFixed(1)}%`;
+}
+
+/**
+ * Change vs the previous period as a small mono arrow + value plus a short "vs …" note, on
+ * one line. Up is good for every metric we show, so direction tints the text; the arrow and
+ * the screen-reader word carry it too, never colour alone.
  */
 export function Delta({
 	value,
 	format,
 	comparedTo,
+	isNew,
 	className,
 }: {
 	/** Relative change (0.12 = +12%) or, with a custom format, any signed number. */
 	value: number | null;
 	format?: (v: number) => string;
 	comparedTo: string;
+	/** Nothing in the previous period but something now: "New" beats "no comparison". */
+	isNew?: boolean;
 	className?: string;
 }) {
-	if (value === null || !Number.isFinite(value)) {
-		return (
-			<span className={cn("inline-flex items-center gap-1 text-subtle-foreground", className)}>
-				<Minus className="size-3.5" aria-hidden="true" />
-				No earlier data to compare
-			</span>
-		);
-	}
-	const text = format ? format(value) : `${Math.abs(value * 100).toFixed(1)}%`;
-	const flat = Math.abs(value) < 0.0005;
-	const up = value > 0;
-	const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
+	const known = value !== null && Number.isFinite(value);
+	const flat = known && Math.abs(value) < 0.0005;
+	const up = known && !flat && value > 0;
+	const tone = isNew
+		? "text-success"
+		: !known || flat
+			? "text-subtle-foreground"
+			: up
+				? "text-success"
+				: "text-danger";
+	const Icon = isNew ? ArrowUpRight : !known || flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
+	const text = isNew
+		? "New"
+		: !known
+			? null
+			: flat
+				? format
+					? format(0)
+					: "0%"
+				: format
+					? format(value)
+					: formatChange(value);
 	return (
 		<span
-			className={cn(
-				"inline-flex items-center gap-1",
-				flat ? "text-muted-foreground" : up ? "text-success" : "text-danger",
-				className,
-			)}
+			className={cn("inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap", className)}
+			title={!known && !isNew ? "No earlier data to compare" : undefined}
 		>
-			<Icon className="size-3.5" aria-hidden="true" />
-			<span className="font-medium tabular-nums">
-				<span className="sr-only">{flat ? "unchanged" : up ? "up" : "down"} </span>
-				{flat ? "0%" : text}
+			<span
+				className={cn(
+					"inline-flex h-5 shrink-0 items-center gap-0.5 font-mono text-[11.5px] tabular-nums",
+					tone,
+				)}
+			>
+				<Icon className="size-3" aria-hidden="true" />
+				<span className="sr-only">
+					{isNew
+						? "new"
+						: !known
+							? "no earlier data"
+							: flat
+								? "unchanged"
+								: up
+									? "up"
+									: "down"}{" "}
+				</span>
+				{text}
 			</span>
-			<span className="text-muted-foreground">{comparedTo}</span>
+			<span className="truncate text-muted-foreground">{comparedTo}</span>
 		</span>
 	);
 }

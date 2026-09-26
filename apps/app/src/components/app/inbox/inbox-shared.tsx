@@ -60,8 +60,12 @@ export const SENTIMENTS = Object.keys(SENTIMENT) as InboxSentiment[];
 
 export function SentimentBadge({ sentiment }: { sentiment: InboxSentiment | null }) {
 	if (!sentiment) return null;
-	const meta = SENTIMENT[sentiment];
-	return <Badge tone={meta.tone}>{meta.label}</Badge>;
+	// A quiet mono label: the list shows it on every row, so it must not shout.
+	return (
+		<span className="shrink-0 font-mono text-[11px] text-muted-foreground lowercase">
+			{SENTIMENT[sentiment].label}
+		</span>
+	);
 }
 
 // ── Relevance ───────────────────────────────────────────────────────────────
@@ -83,13 +87,16 @@ export function RelevanceChip({
 	if (relevance === null) return null;
 	const band = relevanceBand(relevance);
 	const chip = (
-		<Badge tone={band.tone} className="tabular-nums" tabIndex={reason ? 0 : undefined}>
+		<span
+			className="inline-flex h-5 shrink-0 items-center rounded-full border border-border px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums"
+			tabIndex={reason ? 0 : undefined}
+		>
 			{relevance}
 			<span className="sr-only">
 				{" "}
 				relevance ({band.label.toLowerCase()}){reason ? `: ${reason}` : ""}
 			</span>
-		</Badge>
+		</span>
 	);
 	return reason ? <Tooltip content={`${band.label} relevance — ${reason}`}>{chip}</Tooltip> : chip;
 }
@@ -98,7 +105,7 @@ export function RelevanceChip({
 
 export const REPLY_STATUS: Record<InboxReplyStatus, { label: string; tone: BadgeTone }> = {
 	draft: { label: "Draft", tone: "neutral" },
-	pending_approval: { label: "Pending approval", tone: "violet" },
+	pending_approval: { label: "Pending approval", tone: "warning" },
 	approved: { label: "Approved", tone: "info" },
 	rejected: { label: "Rejected", tone: "danger" },
 	queued: { label: "Queued", tone: "info" },
@@ -122,7 +129,7 @@ export function ReplyIndicator({ reply }: { reply: InboxItem["latestReply"] }) {
 	if (!reply) return null;
 	if (reply.status === "sent") return <Badge tone="success">Replied</Badge>;
 	if (reply.status === "draft") return <Badge tone="neutral">Draft</Badge>;
-	if (reply.status === "pending_approval") return <Badge tone="violet">Pending</Badge>;
+	if (reply.status === "pending_approval") return <Badge tone="warning">Pending</Badge>;
 	if (reply.status === "failed" || reply.status === "unconfirmed" || reply.status === "rejected")
 		return <Badge tone={REPLY_STATUS[reply.status].tone}>{REPLY_STATUS[reply.status].label}</Badge>;
 	return <Badge tone="info">Sending</Badge>;
@@ -215,5 +222,15 @@ export function AuthorLine({
 			)}
 			{handle ? <span className="truncate text-muted-foreground text-xs">{handle}</span> : null}
 		</span>
+	);
+}
+
+// ── Keyboard hints ──────────────────────────────────────────────────────────
+
+export function Kbd({ children }: { children: string }) {
+	return (
+		<kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-surface-raised px-1 font-mono text-[11px] text-muted-foreground">
+			{children}
+		</kbd>
 	);
 }

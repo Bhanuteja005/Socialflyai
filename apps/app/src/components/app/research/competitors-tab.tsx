@@ -37,14 +37,11 @@ export function CompetitorsTab() {
 	const items = competitors.data?.items ?? [];
 
 	return (
-		<Card>
-			<CardHeader className="flex-row flex-wrap items-start justify-between gap-3">
+		<Card className="overflow-hidden">
+			<CardHeader className="flex-row flex-wrap items-start justify-between gap-3 border-border border-b pb-4">
 				<div className="grid gap-1">
 					<CardTitle>Competitors</CardTitle>
-					<CardDescription>
-						Brands we look for in AI answers so you can compare your share of voice. Aliases catch
-						other spellings (e.g. "Acme" and "Acme Inc").
-					</CardDescription>
+					<CardDescription>Brands we compare you with in AI answers.</CardDescription>
 				</div>
 				{editor && items.length ? (
 					<Button size="sm" onClick={() => setEditing("new")}>
@@ -54,13 +51,13 @@ export function CompetitorsTab() {
 				) : null}
 			</CardHeader>
 
-			<div className="mt-4">
+			<div>
 				{competitors.isPending ? (
-					<div className="px-5 pb-5">
+					<div className="p-5">
 						<ListSkeleton />
 					</div>
 				) : competitors.isError ? (
-					<div className="px-5 pb-5">
+					<div className="p-5">
 						<LoadError
 							title="Couldn't load competitors"
 							error={competitors.error}
@@ -68,11 +65,11 @@ export function CompetitorsTab() {
 						/>
 					</div>
 				) : items.length === 0 ? (
-					<div className="px-5 pb-5">
+					<div className="p-5">
 						<EmptyState
 							icon={Swords}
 							title="No competitors yet"
-							description="Add the brands you compete with, or pick them from your brand research on the Brand tab."
+							description="Add the brands you compete with, or pick them from your brand research."
 							action={
 								editor ? (
 									<Button size="sm" onClick={() => setEditing("new")}>
@@ -84,14 +81,23 @@ export function CompetitorsTab() {
 						/>
 					</div>
 				) : (
-					<ul className="divide-y divide-border border-border border-t">
+					<ul className="divide-y divide-border">
 						{items.map((c) => (
-							<li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+							<li
+								key={c.id}
+								className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface"
+							>
+								<span
+									aria-hidden="true"
+									className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground text-sm uppercase"
+								>
+									{c.name.trim().charAt(0) || "?"}
+								</span>
 								<div className="grid min-w-0 flex-1 gap-0.5">
 									<p className="flex flex-wrap items-center gap-2 font-medium text-sm">
 										{c.name}
 										{c.source === "ai" ? (
-											<Badge tone="violet">
+											<Badge tone="neutral">
 												<Sparkles aria-hidden="true" />
 												AI-suggested
 											</Badge>
@@ -108,7 +114,7 @@ export function CompetitorsTab() {
 									</p>
 								</div>
 								{editor ? (
-									<div className="flex gap-1">
+									<div className="flex shrink-0 gap-1">
 										<Button
 											variant="ghost"
 											size="icon-sm"

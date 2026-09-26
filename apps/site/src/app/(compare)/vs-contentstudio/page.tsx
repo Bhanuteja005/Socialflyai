@@ -23,7 +23,7 @@ const data: CompetitorPageData = {
 			"ContentStudio focused on what was popular. SocialflyAI focuses on what makes your brand unique. Experience an AI-first workspace that generates original content instead of just curating the web.",
 		socialProof: (
 			<>
-				<span className="font-bold text-white">4.9/5</span> rated by 2k+ creators
+				<span className="font-mono text-foreground tabular-nums">4.9/5</span> rated by 2k+ creators
 			</>
 		),
 	},

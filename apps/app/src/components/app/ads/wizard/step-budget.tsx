@@ -11,7 +11,7 @@ import { fromLocalInputValue } from "@/lib/timezone";
 import { parseAmount, type StepErrors, type WizardState } from "./wizard-state";
 
 const segment =
-	"inline-flex h-8 flex-1 cursor-pointer items-center justify-center rounded-md px-3 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground has-[:checked]:bg-surface-raised has-[:checked]:text-foreground has-[:checked]:shadow-xs has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring";
+	"inline-flex h-8 flex-1 cursor-pointer items-center justify-center rounded-full px-3 font-medium text-muted-foreground text-[13px] transition-colors hover:text-foreground has-[:checked]:bg-ink has-[:checked]:text-ink-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring";
 
 export function StepBudget({
 	state,
@@ -44,7 +44,7 @@ export function StepBudget({
 		<div className="grid gap-6">
 			<fieldset className="grid gap-2">
 				<legend className="mb-1 font-medium text-sm">Budget type</legend>
-				<div className="inline-flex max-w-sm gap-0.5 rounded-lg bg-muted p-0.5">
+				<div className="inline-flex max-w-sm gap-0.5 rounded-full bg-muted p-0.5">
 					<label className={segment}>
 						<input
 							type="radio"
@@ -89,7 +89,7 @@ export function StepBudget({
 					<Input
 						id="ad-budget"
 						inputMode="decimal"
-						className="pl-9 tabular-nums"
+						className="pl-9 font-mono tabular-nums"
 						placeholder="25.00"
 						value={state.budget}
 						onChange={(e) => update({ budget: e.target.value })}

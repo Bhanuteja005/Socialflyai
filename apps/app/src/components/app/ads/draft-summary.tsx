@@ -35,7 +35,7 @@ function Section({
 		<section
 			className={cn(
 				"grid gap-3 rounded-lg border p-4",
-				flagged ? "border-danger/40 bg-danger-soft/20" : "border-border",
+				flagged ? "border-danger/40 bg-danger-soft/20" : "border-transparent bg-surface",
 			)}
 			aria-label={title}
 		>
@@ -217,7 +217,7 @@ export function DraftSummary({
 						{
 							label: state.budgetType === "daily" ? "Daily budget" : "Lifetime budget",
 							value: (
-								<span className="font-medium tabular-nums">
+								<span className="font-medium font-mono tabular-nums">
 									{amount === null ? "—" : formatMoney(amount, currency)}
 								</span>
 							),

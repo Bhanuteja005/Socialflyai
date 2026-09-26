@@ -38,18 +38,16 @@ export function MockupFrame({
 			aria-label={label}
 			aria-hidden={label ? undefined : true}
 			className={cn(
-				"relative w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-3 shadow-2xl backdrop-blur-sm sm:p-6",
+				"relative w-full overflow-hidden rounded-3xl border border-border bg-surface-raised p-2 sm:p-3",
 				className,
 			)}
 		>
-			<div className="rounded-2xl border border-white/5 bg-[#0A0F0C] p-4 text-left sm:p-6">
+			<div className="rounded-2xl bg-surface p-4 text-left sm:p-6">
 				{title ? (
-					<div className="mb-5 flex items-center justify-between gap-3 border-white/5 border-b pb-4">
+					<div className="mb-5 flex items-center justify-between gap-3 border-border border-b pb-4">
 						<div className="flex min-w-0 items-center gap-3">
-							{Icon ? <Icon className="size-5 shrink-0 text-primary" /> : null}
-							<span className="truncate font-bold text-sm text-white uppercase tracking-widest">
-								{title}
-							</span>
+							{Icon ? <Icon className="size-4 shrink-0 text-muted-foreground" /> : null}
+							<span className="truncate font-medium text-sm text-foreground">{title}</span>
 						</div>
 						{aside}
 					</div>
@@ -69,9 +67,9 @@ export type MockupRow = {
 };
 
 const toneClass = {
-	success: { dot: "bg-primary", text: "text-primary" },
-	warning: { dot: "bg-yellow-500", text: "text-yellow-500" },
-	muted: { dot: "bg-white/30", text: "text-white/50" },
+	success: { dot: "bg-success", text: "text-success" },
+	warning: { dot: "bg-warning", text: "text-warning" },
+	muted: { dot: "bg-muted", text: "text-muted-foreground" },
 } as const;
 
 /** List of rows with initials avatar and a status pill. */
@@ -84,16 +82,16 @@ export function ListMockup({ rows }: { rows: MockupRow[] }) {
 				return (
 					<li
 						key={row.title}
-						className="flex items-center justify-between gap-3 rounded-lg bg-white/5 p-3"
+						className="flex items-center justify-between gap-3 rounded-lg bg-surface-raised p-3"
 					>
 						<div className="flex min-w-0 items-center gap-3">
-							<div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-white/10 font-bold text-white text-xs">
+							<div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-muted font-medium text-foreground text-xs">
 								{initials}
 							</div>
 							<div className="min-w-0">
-								<p className="truncate font-bold text-sm text-white">{row.title}</p>
+								<p className="truncate font-medium text-sm text-foreground">{row.title}</p>
 								{row.subtitle ? (
-									<p className="truncate font-bold text-[10px] text-white/50 uppercase">
+									<p className="truncate font-medium text-[10px] text-muted-foreground">
 										{row.subtitle}
 									</p>
 								) : null}
@@ -102,9 +100,7 @@ export function ListMockup({ rows }: { rows: MockupRow[] }) {
 						{row.status ? (
 							<div className="flex shrink-0 items-center gap-2">
 								<span className={cn("size-1.5 rounded-full", tone.dot)} />
-								<span className={cn("font-bold text-[10px] uppercase tracking-widest", tone.text)}>
-									{row.status}
-								</span>
+								<span className={cn("font-mono text-[11px]", tone.text)}>{row.status}</span>
 							</div>
 						) : null}
 					</li>
@@ -129,14 +125,14 @@ export function ChatMockup({ messages }: { messages: ChatMessage[] }) {
 						className={cn(
 							"max-w-[85%] rounded-2xl px-4 py-3 text-sm",
 							message.ai
-								? "rounded-br-sm border border-primary/30 bg-primary/10 text-white"
-								: "rounded-bl-sm bg-white/5 text-white/80",
+								? "rounded-br-sm border border-border-strong bg-muted text-foreground"
+								: "rounded-bl-sm bg-surface-raised text-foreground",
 						)}
 					>
 						<p
 							className={cn(
-								"mb-1 flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-widest",
-								message.ai ? "text-primary" : "text-white/40",
+								"mb-1 flex items-center gap-1.5 font-mono text-[11px]",
+								message.ai ? "text-brand-text" : "text-subtle-foreground",
 							)}
 						>
 							{message.ai ? <Sparkles className="size-3" /> : null}
@@ -169,14 +165,14 @@ export function CalendarMockup({
 				const scheduled = posts.filter((post) => post.day === dayIndex);
 				return (
 					<div key={day} className="min-w-0">
-						<p className="mb-2 text-center font-bold text-[9px] text-white/40 uppercase sm:text-[10px]">
+						<p className="mb-2 text-center font-medium text-[9px] text-subtle-foreground sm:text-[10px]">
 							{day}
 						</p>
-						<div className="flex h-28 flex-col gap-1.5 rounded-lg border border-white/5 bg-white/[0.02] p-1 sm:h-36 sm:p-1.5">
+						<div className="flex h-28 flex-col gap-1.5 rounded-lg border border-border bg-surface-raised p-1 sm:h-36 sm:p-1.5">
 							{scheduled.map((post) => (
 								<div
 									key={post.label}
-									className="truncate rounded-md border border-primary/30 bg-primary/10 px-1 py-1 font-semibold text-[8px] text-primary sm:px-1.5 sm:text-[10px]"
+									className="truncate rounded-md border border-border-strong bg-muted px-1 py-1 font-medium text-[8px] text-brand-text sm:px-1.5 sm:text-[10px]"
 								>
 									{post.label}
 								</div>
@@ -199,14 +195,14 @@ export function HeatmapMockup() {
 				{DAYS.map((day) => (
 					<span
 						key={day}
-						className="text-center font-bold text-[9px] text-white/40 uppercase sm:text-[10px]"
+						className="text-center font-medium text-[9px] text-subtle-foreground sm:text-[10px]"
 					>
 						{day}
 					</span>
 				))}
 				{hours.map((hour, row) => (
 					<div key={hour} className="contents">
-						<span className="pr-1 text-right font-bold text-[9px] text-white/40 sm:text-[10px]">
+						<span className="pr-1 text-right font-medium text-[9px] text-subtle-foreground sm:text-[10px]">
 							{hour}
 						</span>
 						{DAYS.map((day, col) => {
@@ -217,9 +213,11 @@ export function HeatmapMockup() {
 									key={day}
 									className={cn(
 										"aspect-square rounded-[4px]",
-										peak && "ring-2 ring-primary ring-offset-1 ring-offset-[#0A0F0C]",
+										peak && "ring-2 ring-primary ring-offset-1 ring-offset-surface",
 									)}
-									style={{ backgroundColor: `rgba(11, 226, 125, ${0.08 + intensity * 0.7})` }}
+									style={{
+										backgroundColor: `color-mix(in srgb, var(--foreground) ${Math.round(6 + intensity * 70)}%, transparent)`,
+									}}
 								/>
 							);
 						})}
@@ -255,9 +253,7 @@ export function BarChartMockup({
 				))}
 			</div>
 			{caption ? (
-				<p className="mt-3 font-bold text-[10px] text-white/40 uppercase tracking-widest">
-					{caption}
-				</p>
+				<p className="mt-3 font-mono text-[11px] text-subtle-foreground">{caption}</p>
 			) : null}
 		</div>
 	);
@@ -272,14 +268,14 @@ export function MetricTiles({ tiles, className }: { tiles: MetricTile[]; classNa
 			{tiles.map(({ label, value, note, icon: Icon }) => (
 				<div
 					key={label}
-					className="rounded-2xl border border-white/5 bg-[#0A0F0C] p-5 text-left sm:p-6"
+					className="rounded-2xl border border-border bg-surface p-5 text-left sm:p-6"
 				>
 					<div className="mb-4 flex items-center justify-between gap-2">
-						{Icon ? <Icon className="size-5 text-primary" aria-hidden="true" /> : <span />}
-						{note ? <span className="font-bold text-primary text-xs">{note}</span> : null}
+						{Icon ? <Icon className="size-5 text-muted-foreground" aria-hidden="true" /> : <span />}
+						{note ? <span className="font-mono text-success text-xs">{note}</span> : null}
 					</div>
-					<p className="font-bold text-sm text-white/50 uppercase tracking-widest">{label}</p>
-					<p className="mt-1 font-bold text-3xl text-white">{value}</p>
+					<p className="text-muted-foreground text-sm">{label}</p>
+					<p className="mt-1 font-mono text-3xl text-brand-text tabular-nums">{value}</p>
 				</div>
 			))}
 		</div>
@@ -298,30 +294,33 @@ export function DashboardMockup({ className }: { className?: string }) {
 		<div
 			aria-hidden="true"
 			className={cn(
-				"relative flex aspect-[16/10] w-full overflow-hidden rounded-3xl border border-white/5 bg-[#050505] shadow-2xl ring-1 ring-white/10",
+				"relative flex aspect-[16/10] w-full overflow-hidden rounded-3xl border border-border bg-surface ring-1 ring-border",
 				className,
 			)}
 		>
-			<div className="z-20 flex w-12 flex-col items-center gap-5 border-white/5 border-r bg-black py-5 sm:w-16 sm:gap-6 sm:py-6">
-				<div className="flex size-7 items-center justify-center rounded-lg bg-primary shadow-[0_0_15px_rgba(11,226,125,0.4)] sm:size-8">
-					<Zap className="size-4 fill-current text-black" />
+			<div className="z-20 flex w-12 flex-col items-center gap-5 border-border border-r bg-canvas py-5 sm:w-16 sm:gap-6 sm:py-6">
+				<div className="flex size-7 items-center justify-center rounded-lg bg-primary sm:size-8">
+					<Zap className="size-4 fill-current text-primary-foreground" />
 				</div>
 				{nav.map(({ id, Icon }, index) => (
 					<Icon
 						key={id}
-						className={cn("size-4 sm:size-[18px]", index === 1 ? "text-primary" : "text-white/15")}
+						className={cn(
+							"size-4 sm:size-[18px]",
+							index === 1 ? "text-brand-text" : "text-subtle-foreground",
+						)}
 					/>
 				))}
 			</div>
 
-			<div className="relative flex flex-1 flex-col bg-[#080808] bg-[radial-gradient(at_0%_0%,rgba(11,226,75,0.05)_0px,transparent_50%),radial-gradient(at_100%_0%,rgba(11,226,125,0.05)_0px,transparent_50%)]">
-				<div className="flex h-10 items-center justify-between border-white/5 border-b px-4 sm:h-14 sm:px-6">
-					<div className="relative h-1.5 w-20 overflow-hidden rounded-full bg-white/5 sm:w-32">
+			<div className="relative flex flex-1 flex-col bg-surface">
+				<div className="flex h-10 items-center justify-between border-border border-b px-4 sm:h-14 sm:px-6">
+					<div className="relative h-1.5 w-20 overflow-hidden rounded-full bg-surface-raised sm:w-32">
 						<div className="absolute inset-y-0 left-0 w-3/4 bg-primary/30" />
 					</div>
-					<div className="flex h-6 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-2 font-bold text-[8px] text-primary sm:h-7 sm:px-3 sm:text-[9px]">
+					<div className="flex h-6 items-center gap-1.5 rounded-lg border border-border-strong bg-muted px-2 font-medium text-[8px] text-brand-text sm:h-7 sm:px-3 sm:text-[9px]">
 						<Plus className="size-2.5" strokeWidth={3} />
-						DRAFT POST
+						Draft post
 					</div>
 				</div>
 
@@ -329,63 +328,65 @@ export function DashboardMockup({ className }: { className?: string }) {
 					{["01", "02", "03"].map((day) => (
 						<div
 							key={day}
-							className="flex h-16 flex-col justify-between rounded-xl border border-white/5 bg-white/[0.01] p-2 sm:h-28 sm:p-3"
+							className="flex h-16 flex-col justify-between rounded-xl border border-border bg-surface-raised p-2 sm:h-28 sm:p-3"
 						>
 							<div className="flex items-start justify-between">
-								<div className="size-4 rounded-md border border-white/5 bg-white/5 sm:size-5" />
-								<span className="font-medium text-[7px] text-white/20 sm:text-[8px]">
-									{day} / FEB
+								<div className="size-4 rounded-md border border-border bg-surface-raised sm:size-5" />
+								<span className="font-medium text-[7px] text-subtle-foreground sm:text-[8px]">
+									{day} Feb
 								</span>
 							</div>
 							<div className="space-y-1">
-								<div className="h-1 w-full rounded-full bg-white/5" />
-								<div className="h-1 w-2/3 rounded-full bg-white/5 opacity-40" />
+								<div className="h-1 w-full rounded-full bg-surface-raised" />
+								<div className="h-1 w-2/3 rounded-full bg-surface-raised opacity-40" />
 							</div>
 						</div>
 					))}
 				</div>
 
-				<div className="absolute top-1/2 left-1/2 z-30 w-[70%] max-w-[320px] -translate-x-1/2 -translate-y-[35%] rounded-2xl border border-white/10 bg-black/90 p-3 shadow-2xl sm:p-6">
+				<div className="absolute top-1/2 left-1/2 z-30 w-[70%] max-w-[320px] -translate-x-1/2 -translate-y-[35%] rounded-2xl border border-border bg-surface-raised p-3 sm:p-6">
 					<div className="mb-3 flex items-center gap-2 sm:mb-6 sm:gap-3">
-						<div className="flex size-7 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 sm:size-9">
-							<Sparkles className="size-4 text-primary sm:size-5" />
+						<div className="flex size-7 items-center justify-center rounded-xl border border-border-strong bg-muted sm:size-9">
+							<Sparkles className="size-4 text-brand-text sm:size-5" />
 						</div>
 						<div>
-							<p className="font-bold text-[9px] text-white tracking-tight sm:text-[11px]">
+							<p className="font-medium text-[9px] text-foreground tracking-tight sm:text-[11px]">
 								AI Content Sync
 							</p>
-							<p className="font-medium text-[7px] text-white/30 sm:text-[8px]">
+							<p className="font-medium text-[7px] text-subtle-foreground sm:text-[8px]">
 								Optimization Layer 2.4
 							</p>
 						</div>
 					</div>
-					<div className="mb-3 rounded-xl border border-white/5 bg-white/[0.02] p-2 sm:mb-6 sm:p-3">
+					<div className="mb-3 rounded-xl border border-border bg-surface-raised p-2 sm:mb-6 sm:p-3">
 						<div className="mb-2 flex items-center justify-between">
-							<span className="font-bold text-[7px] text-white/40 uppercase tracking-widest sm:text-[9px]">
+							<span className="font-medium text-[7px] text-subtle-foreground font-mono sm:text-[9px]">
 								Predictive score
 							</span>
-							<span className="font-black text-[9px] text-primary sm:text-[11px]">98.2%</span>
+							<span className="font-mono text-[9px] text-foreground tabular-nums sm:text-[11px]">
+								98.2%
+							</span>
 						</div>
-						<div className="h-1 w-full overflow-hidden rounded-full bg-white/5">
-							<div className="h-full w-[98%] bg-primary shadow-[0_0_8px_#0BE27D]" />
+						<div className="h-1 w-full overflow-hidden rounded-full bg-surface-raised">
+							<div className="h-full w-[98%] bg-primary" />
 						</div>
 					</div>
 					<div className="flex gap-2">
-						<div className="flex h-7 flex-1 items-center justify-center rounded-lg bg-white font-black text-[7px] text-black sm:h-9 sm:text-[10px]">
-							GENERATE VARIATIONS
+						<div className="flex h-7 flex-1 items-center justify-center rounded-lg bg-ink font-medium text-[7px] text-ink-foreground sm:h-9 sm:text-[10px]">
+							Generate variations
 						</div>
-						<div className="flex size-7 items-center justify-center rounded-lg border border-white/5 bg-white/5 text-white/30 sm:size-9">
+						<div className="flex size-7 items-center justify-center rounded-lg border border-border bg-surface-raised text-subtle-foreground sm:size-9">
 							<Share2 className="size-3.5" />
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-auto flex h-10 items-center gap-4 border-white/5 border-t px-4 sm:h-12 sm:px-6">
-					<span className="font-bold text-[7px] text-white/15 uppercase tracking-[0.2em] sm:text-[8px]">
+				<div className="mt-auto flex h-10 items-center gap-4 border-border border-t px-4 sm:h-12 sm:px-6">
+					<span className="font-medium text-[7px] text-subtle-foreground font-mono sm:text-[8px]">
 						Timeline
 					</span>
-					<div className="flex h-px flex-1 items-center bg-white/10">
-						<div className="ml-[70%] size-2 rounded-full bg-primary shadow-[0_0_10px_#0BE27D]" />
+					<div className="flex h-px flex-1 items-center bg-muted">
+						<div className="ml-[70%] size-2 rounded-full bg-primary" />
 					</div>
 				</div>
 			</div>

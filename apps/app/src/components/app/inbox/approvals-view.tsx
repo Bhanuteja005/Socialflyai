@@ -97,16 +97,16 @@ function ApprovalCard({
 	}
 
 	return (
-		<li className="grid gap-3 rounded-lg border border-border bg-surface-raised p-4 shadow-xs">
+		<li className="grid gap-3 rounded-2xl border border-border bg-surface-raised p-5">
 			<div className="flex items-start gap-3">
-				<AuthorAvatar item={item} />
+				<AuthorAvatar item={item} size="md" />
 				<div className="grid min-w-0 flex-1 gap-1">
 					<div className="flex min-w-0 items-center gap-2">
 						<AuthorLine item={item} className="flex-1" />
 						<time
 							dateTime={item.postedAt}
 							title={formatDateTime(item.postedAt)}
-							className="shrink-0 text-subtle-foreground text-xs"
+							className="shrink-0 font-mono text-[11px] text-subtle-foreground tabular-nums"
 						>
 							{formatRelative(item.postedAt)}
 						</time>
@@ -144,9 +144,9 @@ function ApprovalCard({
 				</div>
 			</div>
 
-			<div className="ml-10 grid gap-2 rounded-lg border border-violet/25 bg-violet-soft/30 p-3">
+			<div className="grid gap-2 rounded-xl bg-surface p-3.5 sm:ml-12">
 				<p className="flex flex-wrap items-center gap-1.5 text-xs">
-					<Badge tone="violet" dot>
+					<Badge tone="warning" dot>
 						Pending approval
 					</Badge>
 					{reply.source === "ai" ? (
@@ -181,7 +181,10 @@ function ApprovalCard({
 						/>
 						<p
 							id={`${id}-count`}
-							className={cn("text-xs tabular-nums", over ? "text-danger" : "text-muted-foreground")}
+							className={cn(
+								"font-mono text-[11px] tabular-nums",
+								over ? "text-danger" : "text-muted-foreground",
+							)}
 						>
 							{length.toLocaleString()} / {limit.toLocaleString()}
 						</p>
@@ -196,7 +199,7 @@ function ApprovalCard({
 				)}
 			</div>
 
-			<div className="ml-10 flex flex-wrap gap-2">
+			<div className="flex flex-wrap gap-2 sm:ml-12">
 				{editing ? (
 					<>
 						<Button

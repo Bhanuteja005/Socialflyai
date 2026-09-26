@@ -1,6 +1,6 @@
 import { Mail, MapPin, MessageSquare } from "lucide-react";
 import { pageMetadata } from "@/components/marketing/metadata";
-import { Accent, Container, Glow, headingDisplay } from "@/components/marketing/primitives";
+import { Accent, Container, headingDisplay, PixelField } from "@/components/marketing/primitives";
 import { ContactForm } from "./contact-form";
 
 export const metadata = pageMetadata({
@@ -33,14 +33,14 @@ const CONTACTS = [
 export default function ContactPage() {
 	return (
 		<section className="relative overflow-hidden pt-32 pb-16 lg:pt-44 lg:pb-24">
-			<Glow />
+			<PixelField />
 			<Container className="relative">
 				<div className="grid grid-cols-1 items-start gap-12 md:grid-cols-2 lg:gap-16">
 					<div>
 						<h1 className={`${headingDisplay} lg:text-7xl`}>
 							Let&apos;s <Accent>Connect.</Accent>
 						</h1>
-						<p className="mt-8 max-w-md text-lg text-white/60 leading-8">
+						<p className="mt-8 max-w-md text-lg text-muted-foreground leading-8">
 							Questions about your plan? Collaboration ideas? Or just want to talk about the future
 							of AI social media? Reach out below.
 						</p>
@@ -48,22 +48,20 @@ export default function ContactPage() {
 						<address className="mt-12 space-y-8 not-italic">
 							{CONTACTS.map(({ label, value, href, icon: Icon }) => (
 								<div key={label} className="flex items-start gap-4">
-									<div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5">
-										<Icon className="size-5 text-primary" aria-hidden="true" />
+									<div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised">
+										<Icon className="size-5 text-brand-text" aria-hidden="true" />
 									</div>
 									<div className="min-w-0">
-										<p className="font-bold text-[10px] text-white/50 uppercase tracking-widest">
-											{label}
-										</p>
+										<p className="font-mono text-[11px] text-muted-foreground">{label}</p>
 										{href ? (
 											<a
 												href={href}
-												className="break-words font-bold text-lg text-white hover:text-primary"
+												className="break-words font-medium text-lg text-foreground hover:text-brand-text"
 											>
 												{value}
 											</a>
 										) : (
-											<p className="font-bold text-lg text-white">{value}</p>
+											<p className="font-medium text-lg text-foreground">{value}</p>
 										)}
 									</div>
 								</div>
@@ -71,7 +69,7 @@ export default function ContactPage() {
 						</address>
 					</div>
 
-					<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-md sm:p-8">
+					<div className="rounded-3xl border border-border bg-surface-raised p-6 sm:p-8">
 						<h2 className="sr-only">Send us a message</h2>
 						<ContactForm />
 					</div>

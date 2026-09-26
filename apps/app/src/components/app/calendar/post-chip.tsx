@@ -6,9 +6,21 @@ import { POST_STATUS } from "@/lib/status";
 import { postExcerpt, TargetStack } from "../posts/post-row";
 import { ProviderIcon } from "../provider-icon";
 
+/** Soft status tint so a month reads at a glance (the left bar carries the same colour). */
+const STATUS_TINT: Record<Post["status"], string> = {
+	draft: "bg-muted/70",
+	pending_approval: "bg-warning-soft",
+	scheduled: "bg-info-soft",
+	publishing: "bg-warning-soft",
+	published: "bg-success-soft",
+	partially_published: "bg-warning-soft",
+	failed: "bg-danger-soft",
+	canceled: "bg-muted/70",
+};
+
 const STATUS_BORDER: Record<Post["status"], string> = {
 	draft: "border-l-subtle-foreground",
-	pending_approval: "border-l-violet",
+	pending_approval: "border-l-warning",
 	scheduled: "border-l-info",
 	publishing: "border-l-warning",
 	published: "border-l-success",
@@ -24,21 +36,24 @@ export function PostChip({ post, timeZone }: { post: Post; timeZone: string }) {
 		<Link
 			href={`/posts/${post.id}`}
 			className={cn(
-				"flex min-w-0 items-center gap-1.5 rounded-[5px] border border-border border-l-[3px] bg-surface-raised px-1.5 py-1 text-[11px] leading-tight shadow-xs transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+				"grid min-w-0 gap-0.5 rounded-md border-l-[3px] px-1.5 py-1 text-[11px] leading-tight transition-[filter] hover:brightness-95 focus-visible:outline-2 focus-visible:outline-ring dark:hover:brightness-125",
+				STATUS_TINT[post.status],
 				STATUS_BORDER[post.status],
 				post.status === "canceled" && "opacity-60",
 			)}
 			title={`${POST_STATUS[post.status].label}: ${postExcerpt(post)}`}
 		>
-			<span className="shrink-0 font-medium text-muted-foreground tabular-nums">
-				{post.scheduledAt ? formatTime(post.scheduledAt, timeZone) : ""}
+			<span className="flex items-center justify-between gap-1">
+				<span className="font-semibold tabular-nums">
+					{post.scheduledAt ? formatTime(post.scheduledAt, timeZone) : ""}
+				</span>
+				<span className="flex shrink-0 -space-x-1">
+					{providers.map((p) => (
+						<ProviderIcon key={p} provider={p} size="2xs" className="ring-1 ring-surface-raised" />
+					))}
+				</span>
 			</span>
-			<span className="min-w-0 flex-1 truncate">{postExcerpt(post)}</span>
-			<span className="hidden shrink-0 -space-x-1 xl:flex">
-				{providers.map((p) => (
-					<ProviderIcon key={p} provider={p} size="xs" className="ring-1 ring-surface-raised" />
-				))}
-			</span>
+			<span className="min-w-0 truncate text-foreground/80">{postExcerpt(post)}</span>
 			<span className="sr-only">{POST_STATUS[post.status].label}</span>
 		</Link>
 	);
@@ -50,7 +65,7 @@ export function PostCard({ post, timeZone }: { post: Post; timeZone: string }) {
 		<Link
 			href={`/posts/${post.id}`}
 			className={cn(
-				"grid gap-2 rounded-md border border-border border-l-[3px] bg-surface-raised p-2.5 shadow-xs transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+				"grid gap-2 rounded-lg border border-border border-l-[3px] bg-surface-raised p-2.5 shadow-xs transition-colors hover:border-border-strong hover:shadow-sm focus-visible:outline-2 focus-visible:outline-ring",
 				STATUS_BORDER[post.status],
 			)}
 		>

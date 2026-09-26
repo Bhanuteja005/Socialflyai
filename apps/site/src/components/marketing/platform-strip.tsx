@@ -21,19 +21,17 @@ export function PlatformStrip({
 	className?: string;
 }) {
 	return (
-		<section aria-label={label} className={cn("border-white/5 border-y py-12", className)}>
+		<section aria-label={label} className={cn("border-border border-y py-12", className)}>
 			<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
-				<p className="mb-8 text-center font-semibold text-sm text-white/50 uppercase tracking-wider">
-					{label}
-				</p>
+				<p className="mb-8 text-center font-mono text-muted-foreground text-xs">{label}</p>
 				<ul className="grid grid-cols-2 items-center gap-6 min-[480px]:grid-cols-4 lg:grid-cols-8">
 					{PLATFORMS.map((platform) => (
 						<li
 							key={platform.name}
-							className="flex items-center justify-center gap-2 opacity-60 grayscale transition hover:opacity-100 hover:grayscale-0"
+							className="flex items-center justify-center gap-2 opacity-80 transition hover:opacity-100"
 						>
 							<Image src={platform.logo} alt="" width={24} height={24} className="size-6" />
-							<span className="font-semibold text-sm text-white">{platform.name}</span>
+							<span className="text-muted-foreground text-sm">{platform.name}</span>
 						</li>
 					))}
 				</ul>

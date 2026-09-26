@@ -24,75 +24,93 @@
  * Tailwind utilities (bg-background, text-muted-foreground, border-border ...).
  */
 :root {
-	--background: #ffffff;
-	--foreground: #0b0b0d;
-	--surface: #fafafa;
+	/* Monochrome system (docs/design.md §3). Layers: canvas → surface-raised panels → surface wells. */
+	--canvas: #f4f7f5;
+	--background: #f4f7f5;
+	--foreground: #1a1a1a;
+	--surface: #f6f6f5;
 	--surface-raised: #ffffff;
-	--muted: #f4f4f5;
-	--muted-foreground: #63636b;
-	--subtle-foreground: #8b8b94;
-	--border: #e6e6ea;
-	--border-strong: #d4d4da;
-	--input: #e2e2e7;
+	--muted: #f1f1f0;
+	--muted-foreground: #666663;
+	--subtle-foreground: #8c8c88;
+	--border: rgb(0 0 0 / 0.09);
+	--border-strong: rgb(37 37 34 / 0.18);
+	--input: rgb(37 37 34 / 0.18);
 	--ring: #0bbf6b;
 
+	--ink: #1a1a1a;
+	--ink-hover: #333331;
+	--ink-foreground: #f8f8f7;
+
+	/* Primary is ink: the product is black and white; color is reserved for meaning. */
+	/* Brand green (logo). Fills carry dark text; green *text* on white uses --primary-text. */
 	--primary: #0be27d;
 	--primary-hover: #09cf72;
 	--primary-foreground: #04150c;
 	--primary-soft: rgb(11 226 125 / 0.12);
-	--primary-text: #07904f;
+	--primary-text: #07804a;
 
-	--success: #14a44d;
-	--success-soft: rgb(20 164 77 / 0.1);
-	--warning: #b76e00;
-	--warning-soft: rgb(245 158 11 / 0.14);
-	--danger: #dc2626;
-	--danger-soft: rgb(220 38 38 / 0.09);
-	--info: #2563eb;
-	--info-soft: rgb(37 99 235 / 0.09);
-	--violet: #7c3aed;
-	--violet-soft: rgb(124 58 237 / 0.1);
+	--success: #118453;
+	--success-soft: rgb(17 132 83 / 0.09);
+	--warning: #ba6603;
+	--warning-soft: rgb(186 102 3 / 0.1);
+	--danger: #c0362f;
+	--danger-soft: rgb(192 54 47 / 0.08);
+	--info: #1a7da6;
+	--info-soft: rgb(26 125 166 / 0.09);
+	--violet: #6d3fd6;
+	--violet-soft: rgb(109 63 214 / 0.09);
 
-	--shadow-color: 220 3% 15%;
-	--overlay: rgb(10 10 12 / 0.45);
+	--glow-strong: rgb(11 226 125 / 0.16);
+	--glow-soft: rgb(11 226 125 / 0.09);
+	--shadow-color: 60 4% 12%;
+	--overlay: rgb(10 10 10 / 0.36);
 }
 
 .dark {
-	--background: #09090b;
-	--foreground: #f4f4f6;
-	--surface: #0e0e11;
-	--surface-raised: #131317;
-	--muted: #1a1a1f;
-	--muted-foreground: #a0a0aa;
-	--subtle-foreground: #71717b;
-	--border: #232329;
-	--border-strong: #303038;
-	--input: #2a2a31;
+	--canvas: #000000;
+	--background: #000000;
+	--foreground: #f3f3ef;
+	--surface: #121311;
+	--surface-raised: #181917;
+	--muted: #222320;
+	--muted-foreground: #a5a5a0;
+	--subtle-foreground: #7f807b;
+	--border: rgb(255 255 255 / 0.1);
+	--border-strong: rgb(255 255 255 / 0.17);
+	--input: rgb(255 255 255 / 0.17);
 	--ring: #0be27d;
+
+	--ink: #f3f3ef;
+	--ink-hover: #d8d8d3;
+	--ink-foreground: #151613;
 
 	--primary: #0be27d;
 	--primary-hover: #34ea95;
 	--primary-foreground: #03120a;
-	--primary-soft: rgb(11 226 125 / 0.12);
+	--primary-soft: rgb(11 226 125 / 0.13);
 	--primary-text: #3ff09c;
 
-	--success: #34d399;
-	--success-soft: rgb(52 211 153 / 0.12);
-	--warning: #fbbf24;
-	--warning-soft: rgb(251 191 36 / 0.12);
-	--danger: #f87171;
-	--danger-soft: rgb(248 113 113 / 0.12);
-	--info: #60a5fa;
-	--info-soft: rgb(96 165 250 / 0.12);
-	--violet: #a78bfa;
-	--violet-soft: rgb(167 139 250 / 0.13);
+	--success: #45e39e;
+	--success-soft: rgb(69 227 158 / 0.12);
+	--warning: #f0c249;
+	--warning-soft: rgb(240 194 73 / 0.12);
+	--danger: #f08a84;
+	--danger-soft: rgb(240 138 132 / 0.12);
+	--info: #6fcdf0;
+	--info-soft: rgb(111 205 240 / 0.12);
+	--violet: #b69cff;
+	--violet-soft: rgb(182 156 255 / 0.13);
 
+	--glow-strong: rgb(11 226 125 / 0.14);
+	--glow-soft: rgb(11 226 125 / 0.07);
 	--shadow-color: 0 0% 0%;
 	--overlay: rgb(0 0 0 / 0.6);
 	color-scheme: dark;
 }
 
 @theme inline {
+	--color-canvas: var(--canvas);
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-surface: var(--surface);
@@ -104,6 +122,9 @@
 	--color-border-strong: var(--border-strong);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	--color-ink: var(--ink);
+	--color-ink-hover: var(--ink-hover);
+	--color-ink-foreground: var(--ink-foreground);
 	--color-primary: var(--primary);
 	--color-primary-hover: var(--primary-hover);
 	--color-primary-foreground: var(--primary-foreground);
@@ -121,25 +142,39 @@
 	--color-violet-soft: var(--violet-soft);
 	--color-overlay: var(--overlay);
 
-	--font-sans: var(--font-onest), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-	--font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, monospace;
+	--font-sans:
+		var(--font-sans-flex), "Google Sans Flex", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+		sans-serif;
+	--font-mono:
+		var(--font-dm-mono), "DM Mono", ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
+	/* Titles only (docs/design.md §2); falls back to mono so a failed load still reads as a title. */
+	--font-pixel:
+		var(--font-geist-pixel), "Geist Pixel", var(--font-dm-mono), ui-monospace, monospace;
 }
 
 @theme {
 	--radius-xs: 4px;
-	--radius-sm: 6px;
-	--radius-md: 8px;
+	--radius-sm: 7px;
+	--radius-md: 10px;
 	--radius-lg: 12px;
 	--radius-xl: 16px;
+	--radius-2xl: 20px;
+	--radius-3xl: 24px;
+	--radius-4xl: 32px;
 
-	--shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.06);
+	--shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.05);
+	--shadow-card:
+		0 1px 2px hsl(var(--shadow-color) / 0.04), 0 1px 1px hsl(var(--shadow-color) / 0.02);
+	--shadow-panel:
+		0 0 0 1px hsl(var(--shadow-color) / 0.04), 0 1px 3px hsl(var(--shadow-color) / 0.05),
+		0 8px 24px -12px hsl(var(--shadow-color) / 0.08);
 	--shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.08), 0 1px 2px hsl(var(--shadow-color) / 0.04);
 	--shadow-md:
 		0 4px 12px -2px hsl(var(--shadow-color) / 0.1), 0 2px 4px -2px hsl(var(--shadow-color) / 0.06);
 	--shadow-lg:
 		0 16px 40px -8px hsl(var(--shadow-color) / 0.22), 0 4px 12px -4px hsl(var(--shadow-color) / 0.1);
 
-	--animate-fade-in: fade-in 160ms ease-out;
+	--animate-fade-in: fade-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 	--animate-scale-in: scale-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
 	--animate-slide-up: slide-up 200ms cubic-bezier(0.16, 1, 0.3, 1);
 	--animate-shimmer: shimmer 1.6s ease-in-out infinite;
@@ -199,7 +234,6 @@
 		background-color: var(--background);
 		color: var(--foreground);
 		font-family: var(--font-sans);
-		font-feature-settings: "cv11", "ss01";
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 	}
@@ -231,6 +265,14 @@
 			transition-duration: 0.01ms !important;
 		}
 	}
+}
+
+/* Soft brand-green light at the top of a surface (docs/design.md §4). Decorative only. */
+@utility bg-glow {
+	background-image:
+		radial-gradient(60% 70% at 50% 0%, var(--glow-strong), transparent 72%),
+		radial-gradient(32% 45% at 88% 4%, var(--glow-soft), transparent 70%),
+		radial-gradient(30% 40% at 10% 0%, var(--glow-soft), transparent 70%);
 }
 
 @utility scrollbar-thin {

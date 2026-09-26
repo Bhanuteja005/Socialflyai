@@ -81,7 +81,7 @@ export default function LinkedInTextGeneratorPage() {
 				<ul className="space-y-3">
 					{PRACTICES.map((item) => (
 						<li key={item} className="flex items-start gap-3">
-							<CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+							<CircleCheck className="mt-0.5 size-5 shrink-0 text-brand-text" aria-hidden="true" />
 							<span>{item}</span>
 						</li>
 					))}

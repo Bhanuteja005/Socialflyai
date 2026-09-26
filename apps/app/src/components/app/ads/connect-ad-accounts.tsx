@@ -2,12 +2,13 @@
 
 import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
-import { Card, CardContent, CardFooter } from "@socialfly/ui/components/card";
+import { Card, CardFooter } from "@socialfly/ui/components/card";
 import { Checkbox } from "@socialfly/ui/components/controls";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { toast } from "@socialfly/ui/components/toast";
+import { cn } from "@socialfly/ui/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, PauseCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -70,17 +71,23 @@ export function ConnectAdAccounts() {
 	});
 
 	const back = (
-		<Button variant="ghost" size="sm" asChild>
-			<Link href="/ads/accounts">
-				<ArrowLeft />
-				Ad accounts
-			</Link>
-		</Button>
+		<Link href="/ads/accounts" className="inline-flex items-center gap-1 hover:text-foreground">
+			<ArrowLeft className="size-3.5" aria-hidden="true" />
+			Ad accounts
+		</Link>
 	);
 
 	if (!admin) {
 		return (
-			<EmptyState icon={AlertCircle} title="Only admins can connect ad accounts" action={back} />
+			<EmptyState
+				icon={AlertCircle}
+				title="Only admins can connect ad accounts"
+				action={
+					<Button variant="outline" asChild>
+						<Link href="/ads/accounts">Back to ad accounts</Link>
+					</Button>
+				}
+			/>
 		);
 	}
 
@@ -110,9 +117,16 @@ export function ConnectAdAccounts() {
 					}
 				/>
 			) : isPending ? (
-				<div className="grid gap-2">
+				<div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border">
 					{["a", "b", "c"].map((k) => (
-						<Skeleton key={k} className="h-14" />
+						<div key={k} className="flex items-center gap-3 bg-surface-raised px-5 py-4">
+							<Skeleton className="size-4 rounded" />
+							<Skeleton className="size-7 rounded-md" />
+							<div className="grid flex-1 gap-1.5">
+								<Skeleton className="h-3.5 w-40" />
+								<Skeleton className="h-3 w-56 max-w-full" />
+							</div>
+						</div>
 					))}
 				</div>
 			) : data.accounts.length === 0 ? (
@@ -120,59 +134,81 @@ export function ConnectAdAccounts() {
 					icon={AlertCircle}
 					title="No ad accounts on this login"
 					description="Create an ad account in the platform's ads manager, or sign in with a login that has access to one."
-					action={back}
+					action={
+						<Button variant="outline" asChild>
+							<Link href="/ads/accounts">Back to ad accounts</Link>
+						</Button>
+					}
 				/>
 			) : (
 				<Card>
-					<CardContent className="p-0">
-						<ul className="divide-y divide-border">
-							{data.accounts.map((account) => {
-								const id = `ad-acct-${account.externalId}`;
-								const usable = account.status === "active";
-								return (
-									<li key={account.externalId}>
-										<label
-											htmlFor={id}
-											className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-muted/60"
-										>
-											<Checkbox
-												id={id}
-												checked={chosen.has(account.externalId)}
-												onCheckedChange={(v) =>
-													setChosen((prev) => {
-														const next = new Set(prev);
-														if (v === true) next.add(account.externalId);
-														else next.delete(account.externalId);
-														return next;
-													})
-												}
-											/>
-											<ProviderIcon provider={data.provider} size="sm" />
-											<span className="grid min-w-0 flex-1">
-												<span className="truncate font-medium text-sm">{account.name}</span>
-												<span className="truncate text-muted-foreground text-xs">
-													{account.currency}
-													{account.timezone ? ` · ${account.timezone}` : ""} · ID{" "}
-													{account.externalId}
-												</span>
+					<div className="flex items-center gap-3 border-border border-b px-5 py-4">
+						<ProviderIcon provider={data.provider} size="lg" />
+						<div className="grid min-w-0 flex-1">
+							<p className="font-medium text-sm">{providerName}</p>
+							<p className="text-muted-foreground text-xs">
+								{pluralize(data.accounts.length, "ad account")} on this login
+							</p>
+						</div>
+					</div>
+					<ul className="divide-y divide-border">
+						{data.accounts.map((account) => {
+							const id = `ad-acct-${account.externalId}`;
+							const usable = account.status === "active";
+							const checked = chosen.has(account.externalId);
+							return (
+								<li key={account.externalId}>
+									<label
+										htmlFor={id}
+										className={cn(
+											"flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors",
+											checked ? "bg-muted/60" : "hover:bg-surface",
+										)}
+									>
+										<Checkbox
+											id={id}
+											checked={checked}
+											onCheckedChange={(v) =>
+												setChosen((prev) => {
+													const next = new Set(prev);
+													if (v === true) next.add(account.externalId);
+													else next.delete(account.externalId);
+													return next;
+												})
+											}
+										/>
+										<span className="grid min-w-0 flex-1">
+											<span className="truncate font-medium text-sm">{account.name}</span>
+											<span className="truncate text-muted-foreground text-xs">
+												{account.currency}
+												{account.timezone ? ` · ${account.timezone}` : ""} · ID{" "}
+												<span className="font-mono">{account.externalId}</span>
 											</span>
+										</span>
+										<span className="flex shrink-0 flex-wrap justify-end gap-1.5">
 											{account.alreadyConnected ? (
 												<Badge tone="outline">Already connected</Badge>
 											) : null}
 											{usable ? null : (
-												<Badge tone={account.status === "pending" ? "info" : "warning"}>
+												<Badge tone={account.status === "pending" ? "info" : "warning"} dot>
 													{account.status === "pending" ? "Pending review" : "Disabled"}
 												</Badge>
 											)}
-										</label>
-									</li>
-								);
-							})}
-						</ul>
-					</CardContent>
+										</span>
+									</label>
+								</li>
+							);
+						})}
+					</ul>
 					<CardFooter className="justify-between">
-						<p className="text-muted-foreground text-xs">
-							{pluralize(chosen.size, "account")} selected · Connecting never spends money
+						<p className="flex items-center gap-1.5 text-muted-foreground text-xs">
+							<PauseCircle className="size-3.5 shrink-0" aria-hidden="true" />
+							<span>
+								<span className="font-medium text-foreground font-mono tabular-nums">
+									{pluralize(chosen.size, "account")} selected
+								</span>{" "}
+								· Connecting never spends money
+							</span>
 						</p>
 						<Button
 							loading={confirm.isPending}

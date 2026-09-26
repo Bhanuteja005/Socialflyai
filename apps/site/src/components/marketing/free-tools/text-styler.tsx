@@ -87,10 +87,10 @@ export function TextStyler() {
 							aria-pressed={style === option.id}
 							onClick={() => setStyle(option.id)}
 							className={cn(
-								"rounded-2xl border px-6 py-3 font-bold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+								"rounded-2xl border px-6 py-3 font-medium text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 								style === option.id
-									? "border-primary bg-primary text-black"
-									: "border-white/10 bg-black/40 text-white/60 hover:border-white/30",
+									? "border-brand bg-brand text-brand-foreground"
+									: "border-border bg-surface-raised/90 text-muted-foreground hover:border-border-strong",
 							)}
 						>
 							{option.label}
@@ -107,13 +107,15 @@ export function TextStyler() {
 							key={preset.label}
 							type="button"
 							onClick={() => setInput(preset.text)}
-							className="rounded-2xl border border-white/10 bg-black/40 p-4 text-left transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-primary"
+							className="rounded-2xl border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-ring"
 						>
-							<span className="flex items-center justify-between font-bold text-sm text-white">
+							<span className="flex items-center justify-between font-medium text-sm text-foreground">
 								{preset.label}
 								<span aria-hidden="true">{preset.emoji}</span>
 							</span>
-							<span className="mt-2 line-clamp-2 block text-white/50 text-xs">{preset.text}</span>
+							<span className="mt-2 line-clamp-2 block text-muted-foreground text-xs">
+								{preset.text}
+							</span>
 						</button>
 					))}
 				</div>
@@ -125,7 +127,7 @@ export function TextStyler() {
 						<label htmlFor={`${id}-input`} className={toolLabel}>
 							Original text
 						</label>
-						<span className="mb-2 text-white/40 text-xs">{input.length} characters</span>
+						<span className="mb-2 text-subtle-foreground text-xs">{input.length} characters</span>
 					</div>
 					<textarea
 						id={`${id}-input`}
@@ -147,7 +149,7 @@ export function TextStyler() {
 						rows={8}
 						aria-live="polite"
 						placeholder="Your formatted text will appear here..."
-						className={`${toolControl} min-h-56 resize-y text-primary`}
+						className={`${toolControl} min-h-56 resize-y text-brand-text`}
 					/>
 				</div>
 			</div>
@@ -181,7 +183,7 @@ export function TextStyler() {
 				</button>
 				<Link
 					href={SIGNUP_URL}
-					className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-primary text-sm hover:underline sm:ml-auto"
+					className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-medium text-brand-text text-sm hover:underline sm:ml-auto"
 				>
 					<Share2 className="size-4" aria-hidden="true" />
 					Post to 10 social networks

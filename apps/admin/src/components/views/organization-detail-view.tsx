@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@socialfly/ui/components/avatar";
 import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
 import {
@@ -17,7 +18,7 @@ import { ArrowLeft, Radio, Users } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useOrganization, useUpdateOrgBudget } from "@/hooks/use-admin";
-import type { OrgDetail } from "@/lib/api-types";
+import type { OrgChannel, OrgDetail } from "@/lib/api-types";
 import { isApiError } from "@/lib/errors";
 import {
 	formatDate,
@@ -28,7 +29,8 @@ import {
 	humanize,
 } from "@/lib/format";
 import { CHANNEL_STATUS, POST_STATUS, statusMeta } from "@/lib/status";
-import { None, PageHeader, QueryError, TableCard, tableClass, tdClass, thClass } from "../common";
+import { PageHeader, QueryError, ShortId } from "../common";
+import { Distribution, Monogram } from "./parts";
 
 type Mode = "default" | "unlimited" | "custom";
 
@@ -85,27 +87,32 @@ function BudgetCard({ org }: { org: OrgDetail }) {
 
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>AI spend vs budget</CardTitle>
-				<CardDescription>
-					Since {formatDate(aiBudget.periodStart)} (resets on the 1st, UTC). Enforced before every
-					paid AI call.
+			<CardHeader className="border-border border-b pb-4">
+				<div className="flex items-center justify-between gap-2">
+					<CardTitle>AI spend vs budget</CardTitle>
+					<Badge tone={aiBudget.overrideUsd === null ? "neutral" : "outline"}>
+						{aiBudget.overrideUsd === null ? "Server default" : "Override"}
+					</Badge>
+				</div>
+				<CardDescription className="text-xs">
+					Since <span className="font-mono">{formatDate(aiBudget.periodStart)}</span>, resets on the
+					1st (UTC).
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="grid gap-5">
 				<div className="grid gap-2">
 					<div className="flex flex-wrap items-baseline justify-between gap-2">
 						<p>
-							<span className="font-semibold text-2xl tabular-nums">
+							<span className="font-medium font-mono text-[26px] tabular-nums leading-8 tracking-[-0.02em]">
 								{formatUsd(aiBudget.usedUsd)}
 							</span>{" "}
 							<span className="text-muted-foreground text-sm">
 								{limit === null ? "used · no limit" : `of ${formatUsd(limit)} used`}
 							</span>
 						</p>
-						<Badge tone={aiBudget.overrideUsd === null ? "neutral" : "violet"}>
-							{aiBudget.overrideUsd === null ? "Server default" : "Override"}
-						</Badge>
+						{limit !== null && limit > 0 ? (
+							<span className="font-mono text-muted-foreground text-xs tabular-nums">{pct}%</span>
+						) : null}
 					</div>
 					{limit !== null && limit > 0 ? (
 						<div
@@ -119,7 +126,7 @@ function BudgetCard({ org }: { org: OrgDetail }) {
 							<div
 								className={cn(
 									"h-full rounded-full",
-									pct >= 100 ? "bg-danger" : pct >= 80 ? "bg-warning" : "bg-primary",
+									pct >= 100 ? "bg-danger" : pct >= 80 ? "bg-warning" : "bg-foreground/70",
 								)}
 								style={{ width: `${pct}%` }}
 							/>
@@ -129,13 +136,15 @@ function BudgetCard({ org }: { org: OrgDetail }) {
 
 				<form onSubmit={onSubmit} className="grid gap-3" noValidate>
 					<fieldset className="grid gap-2">
-						<legend className="mb-2 font-medium text-sm">Monthly budget override</legend>
+						<legend className="mb-2 font-medium text-[13px]">Monthly budget override</legend>
 						{options.map((o) => (
 							<label
 								key={o.value}
 								className={cn(
-									"flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition-colors",
-									mode === o.value ? "border-ring bg-muted/50" : "border-border hover:bg-muted/40",
+									"flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
+									mode === o.value
+										? "border-foreground/40 bg-surface"
+										: "border-border hover:border-border-strong hover:bg-surface",
 								)}
 							>
 								<input
@@ -144,7 +153,7 @@ function BudgetCard({ org }: { org: OrgDetail }) {
 									value={o.value}
 									checked={mode === o.value}
 									onChange={() => setMode(o.value)}
-									className="mt-0.5 accent-current"
+									className="mt-0.5 accent-foreground"
 								/>
 								<span className="grid gap-0.5">
 									<span className="font-medium">{o.label}</span>
@@ -186,8 +195,8 @@ function BudgetCard({ org }: { org: OrgDetail }) {
 							) : null}
 						</div>
 					) : null}
-					<div className="flex flex-wrap items-center gap-2">
-						<Button type="submit" disabled={unchanged || Boolean(amountError)}>
+					<div className="flex flex-wrap items-center gap-3 pt-1">
+						<Button type="submit" size="sm" disabled={unchanged || Boolean(amountError)}>
 							Save budget
 						</Button>
 						{unchanged ? (
@@ -224,47 +233,81 @@ function BudgetCard({ org }: { org: OrgDetail }) {
 	);
 }
 
-function PostsByStatus({ counts }: { counts: Record<string, number> }) {
-	const entries = Object.entries(counts).filter(([, n]) => n > 0);
+function Section({
+	title,
+	count,
+	children,
+}: {
+	title: string;
+	count: number;
+	children: ReactNode;
+}) {
+	const id = `section-${title.toLowerCase().replace(/\s+/g, "-")}`;
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>Posts by status</CardTitle>
+			<CardHeader className="flex-row items-center justify-between border-border border-b pb-4">
+				<CardTitle id={id} className="flex items-center gap-2">
+					{title}
+					<Badge tone="neutral" className="font-mono tabular-nums">
+						{formatNumber(count)}
+					</Badge>
+				</CardTitle>
 			</CardHeader>
-			<CardContent>
-				{entries.length === 0 ? (
-					<p className="text-muted-foreground text-sm">No posts yet.</p>
-				) : (
-					<dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-						{entries.map(([key, n]) => {
-							const m = statusMeta(POST_STATUS, key);
-							return (
-								<div key={key} className="flex items-center justify-between gap-2">
-									<dt>
-										<Badge tone={m.tone} dot>
-											{m.label}
-										</Badge>
-									</dt>
-									<dd className="text-sm tabular-nums">{formatNumber(n)}</dd>
-								</div>
-							);
-						})}
-					</dl>
-				)}
-			</CardContent>
+			<section aria-labelledby={id}>{children}</section>
 		</Card>
 	);
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-	const id = `section-${title.toLowerCase().replace(/\s+/g, "-")}`;
+function Fact({ label, value }: { label: string; value: ReactNode }) {
 	return (
-		<section aria-labelledby={id} className="grid gap-3">
-			<h2 id={id} className="font-semibold text-[15px] tracking-tight">
-				{title}
-			</h2>
-			{children}
-		</section>
+		<div className="grid min-w-0 gap-0.5">
+			<dt className="truncate text-muted-foreground text-xs">{label}</dt>
+			<dd className="font-mono text-lg tabular-nums leading-7">{value}</dd>
+		</div>
+	);
+}
+
+function ChannelRow({ channel: c }: { channel: OrgChannel }) {
+	const s = statusMeta(CHANNEL_STATUS, c.status);
+	const expired = c.tokenExpiresAt !== null && new Date(c.tokenExpiresAt).getTime() < Date.now();
+	return (
+		<li className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-surface">
+			<span
+				className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+				aria-hidden="true"
+			>
+				<Radio className="size-4" />
+			</span>
+			<div className="grid min-w-0 flex-1 gap-0.5">
+				<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+					<span className="truncate font-medium text-sm">{c.name}</span>
+					<Badge tone={s.tone} dot>
+						{s.label}
+					</Badge>
+				</div>
+				<div className="text-muted-foreground text-xs">
+					{humanize(c.provider)}
+					{c.username ? ` · @${c.username.replace(/^@/, "")}` : ""}
+					<span aria-hidden="true"> · </span>
+					{c.tokenExpiresAt ? (
+						<span
+							className={expired ? "text-danger" : undefined}
+							title={formatDateTime(c.tokenExpiresAt)}
+						>
+							Token {expired ? "expired" : "expires"} {formatRelative(c.tokenExpiresAt)}
+						</span>
+					) : (
+						<span>Token has no expiry</span>
+					)}
+				</div>
+				{c.lastError ? (
+					<p className="mt-1.5 break-words rounded-lg bg-danger-soft px-2 py-1 text-danger text-xs">
+						<span className="sr-only">Last error: </span>
+						{c.lastError}
+					</p>
+				) : null}
+			</div>
+		</li>
 	);
 }
 
@@ -283,10 +326,13 @@ export function OrganizationDetailView({ id }: { id: string }) {
 
 	if (isPending) {
 		return (
-			<div className="grid gap-4">
-				<Skeleton className="h-10 w-64" />
-				<Skeleton className="h-48" />
-				<Skeleton className="h-48" />
+			<div className="grid gap-6" aria-hidden="true">
+				<Skeleton className="h-4 w-28" />
+				<Skeleton className="h-40 rounded-3xl" />
+				<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+					<Skeleton className="h-80 rounded-2xl" />
+					<Skeleton className="h-80 rounded-2xl" />
+				</div>
 			</div>
 		);
 	}
@@ -306,146 +352,134 @@ export function OrganizationDetailView({ id }: { id: string }) {
 		);
 	}
 
+	const posts = Object.values(org.postsByStatus).reduce((a, b) => a + b, 0);
+	const needsReauth = org.channels.filter((c) => c.status === "needs_reauth").length;
+
 	return (
 		<>
-			<PageHeader
-				eyebrow={back}
-				title={org.name}
-				description={
-					<>
-						<span className="font-mono">{org.slug}</span> · {org.timezone} · created{" "}
-						{formatDate(org.createdAt)}
-					</>
-				}
-				actions={
-					org.deletedAt ? <Badge tone="danger">Deleted {formatDate(org.deletedAt)}</Badge> : null
-				}
-			/>
+			<div className="mb-4 text-muted-foreground text-sm">{back}</div>
+			{/* Who this tenant is, then the handful of numbers support asks for first. */}
+			<Card className="mb-6 overflow-hidden rounded-3xl">
+				<div className="flex items-start gap-4 p-5">
+					<Monogram name={org.name} size="lg" />
+					<div className="grid min-w-0 flex-1 gap-1">
+						<div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+							<h1 className="font-normal font-pixel text-[22px] leading-7 sm:text-[26px] sm:leading-8">
+								{org.name}
+							</h1>
+							{org.deletedAt ? (
+								<Badge tone="danger" dot>
+									Deleted {formatDate(org.deletedAt)}
+								</Badge>
+							) : (
+								<Badge tone="success" dot>
+									Active
+								</Badge>
+							)}
+						</div>
+						<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-sm">
+							<code className="font-mono text-[13px]">{org.slug}</code>
+							<span aria-hidden="true">·</span>
+							<span>{org.timezone}</span>
+							<span aria-hidden="true">·</span>
+							<span>
+								Created <span className="font-mono">{formatDate(org.createdAt)}</span>
+							</span>
+							<span aria-hidden="true">·</span>
+							<ShortId id={org.id} />
+						</p>
+					</div>
+				</div>
+				<dl className="grid grid-cols-2 gap-4 border-border border-t bg-surface px-5 py-4 sm:grid-cols-4">
+					<Fact label="Members" value={formatNumber(org.members.length)} />
+					<Fact
+						label="Channels"
+						value={
+							<span className="flex flex-wrap items-baseline gap-x-2">
+								{formatNumber(org.channels.length)}
+								{needsReauth ? (
+									<span className="font-sans text-warning text-xs">
+										{needsReauth} need{needsReauth === 1 ? "s" : ""} reconnect
+									</span>
+								) : null}
+							</span>
+						}
+					/>
+					<Fact label="Posts" value={formatNumber(posts)} />
+					<Fact label="AI spend this month" value={formatUsd(org.aiBudget.usedUsd)} />
+				</dl>
+			</Card>
 			{org.deletedAt ? (
 				<Alert tone="warning" className="mb-6" title="This organization is deleted">
 					It is kept for history; its members can no longer use it.
 				</Alert>
 			) : null}
-			<div className="grid gap-8">
-				<div className="grid gap-6 lg:grid-cols-2">
-					<BudgetCard key={`${org.aiBudget.overrideUsd}`} org={org} />
-					<PostsByStatus counts={org.postsByStatus} />
+			<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+				<div className="grid min-w-0 gap-6">
+					<Section title="Channels" count={org.channels.length}>
+						{org.channels.length === 0 ? (
+							<div className="p-5">
+								<EmptyState icon={Radio} title="No channels connected" compact />
+							</div>
+						) : (
+							<ul className="divide-y divide-border">
+								{org.channels.map((c) => (
+									<ChannelRow key={c.id} channel={c} />
+								))}
+							</ul>
+						)}
+					</Section>
+
+					<Section title="Members" count={org.members.length}>
+						{org.members.length === 0 ? (
+							<div className="p-5">
+								<EmptyState icon={Users} title="No members" compact />
+							</div>
+						) : (
+							<ul className="divide-y divide-border">
+								{org.members.map((m) => (
+									<li
+										key={m.userId}
+										className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface"
+									>
+										<Avatar name={m.name || m.email} size="sm" />
+										<div className="grid min-w-0 flex-1 gap-0.5">
+											<div className="truncate font-medium text-sm">{m.name || m.email}</div>
+											<div className="truncate text-muted-foreground text-xs">
+												{m.name ? `${m.email} · ` : ""}Joined {formatDate(m.joinedAt)}
+											</div>
+										</div>
+										<Badge tone={m.role === "owner" ? "outline" : "neutral"}>
+											{humanize(m.role)}
+										</Badge>
+									</li>
+								))}
+							</ul>
+						)}
+					</Section>
 				</div>
 
-				<Section title={`Members (${org.members.length})`}>
-					{org.members.length === 0 ? (
-						<EmptyState icon={Users} title="No members" compact />
-					) : (
-						<TableCard>
-							<table className={tableClass}>
-								<thead>
-									<tr>
-										<th scope="col" className={thClass}>
-											Member
-										</th>
-										<th scope="col" className={thClass}>
-											Role
-										</th>
-										<th scope="col" className={thClass}>
-											Joined
-										</th>
-									</tr>
-								</thead>
-								<tbody>
-									{org.members.map((m) => (
-										<tr key={m.userId}>
-											<td className={tdClass}>
-												<div className="font-medium">{m.name || m.email}</div>
-												{m.name ? (
-													<div className="text-muted-foreground text-xs">{m.email}</div>
-												) : null}
-											</td>
-											<td className={tdClass}>
-												<Badge tone={m.role === "owner" ? "primary" : "neutral"}>
-													{humanize(m.role)}
-												</Badge>
-											</td>
-											<td className={`${tdClass} text-muted-foreground`}>
-												{formatDate(m.joinedAt)}
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</TableCard>
-					)}
-				</Section>
-
-				<Section title={`Channels (${org.channels.length})`}>
-					{org.channels.length === 0 ? (
-						<EmptyState icon={Radio} title="No channels connected" compact />
-					) : (
-						<TableCard>
-							<table className={tableClass}>
-								<thead>
-									<tr>
-										<th scope="col" className={thClass}>
-											Channel
-										</th>
-										<th scope="col" className={thClass}>
-											Status
-										</th>
-										<th scope="col" className={thClass}>
-											Last error
-										</th>
-										<th scope="col" className={thClass}>
-											Token expires
-										</th>
-									</tr>
-								</thead>
-								<tbody>
-									{org.channels.map((c) => {
-										const s = statusMeta(CHANNEL_STATUS, c.status);
-										const expired =
-											c.tokenExpiresAt !== null &&
-											new Date(c.tokenExpiresAt).getTime() < Date.now();
-										return (
-											<tr key={c.id}>
-												<td className={tdClass}>
-													<div className="font-medium">{c.name}</div>
-													<div className="text-muted-foreground text-xs">
-														{humanize(c.provider)}
-														{c.username ? ` · @${c.username.replace(/^@/, "")}` : ""}
-													</div>
-												</td>
-												<td className={tdClass}>
-													<Badge tone={s.tone} dot>
-														{s.label}
-													</Badge>
-												</td>
-												<td className={`${tdClass} max-w-sm`}>
-													{c.lastError ? (
-														<span className="break-words text-danger text-xs">{c.lastError}</span>
-													) : (
-														<None />
-													)}
-												</td>
-												<td className={`${tdClass} whitespace-nowrap`}>
-													{c.tokenExpiresAt ? (
-														<span
-															className={expired ? "text-danger" : "text-muted-foreground"}
-															title={formatDateTime(c.tokenExpiresAt)}
-														>
-															{expired ? "Expired " : ""}
-															{formatRelative(c.tokenExpiresAt)}
-														</span>
-													) : (
-														<None label="No expiry" />
-													)}
-												</td>
-											</tr>
-										);
-									})}
-								</tbody>
-							</table>
-						</TableCard>
-					)}
-				</Section>
+				<div className="grid min-w-0 gap-6">
+					<BudgetCard key={`${org.aiBudget.overrideUsd}`} org={org} />
+					<Card>
+						<CardHeader className="flex-row items-center justify-between border-border border-b pb-4">
+							<CardTitle>Posts by status</CardTitle>
+							<span className="text-muted-foreground text-xs">
+								<span className="font-mono text-foreground tabular-nums">
+									{formatNumber(posts)}
+								</span>{" "}
+								posts
+							</span>
+						</CardHeader>
+						<CardContent>
+							<Distribution
+								counts={org.postsByStatus}
+								meta={(k) => statusMeta(POST_STATUS, k)}
+								hideEmpty
+							/>
+						</CardContent>
+					</Card>
+				</div>
 			</div>
 		</>
 	);

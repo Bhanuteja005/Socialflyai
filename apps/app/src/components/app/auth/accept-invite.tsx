@@ -90,8 +90,7 @@ export function AcceptInvite() {
 	return (
 		<StatusPanel icon={Users} title="Join your team">
 			<p>
-				You've been invited to collaborate on SocialFly. You're signed in as{" "}
-				<span className="font-medium text-foreground">{email}</span>.
+				You're signed in as <span className="font-medium text-foreground">{email}</span>.
 			</p>
 			<div className="grid gap-2">
 				<Button size="lg" loading={pending} onClick={accept}>

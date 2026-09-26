@@ -21,13 +21,15 @@ export function AiUsage({ budget, className }: { budget?: AiBudget; className?: 
 		<div className={cn("grid gap-1 text-muted-foreground text-xs", className)}>
 			<p className={cn(exhausted && "text-danger")}>
 				AI usage this month:{" "}
-				<span className="font-medium text-foreground tabular-nums">{formatUsd(b.usedUsd)}</span>
+				<span className="font-medium font-mono text-foreground tabular-nums">
+					{formatUsd(b.usedUsd)}
+				</span>
 				{limit === null ? (
 					" (no limit)"
 				) : (
 					<>
 						{" "}
-						of <span className="tabular-nums">{formatUsd(limit)}</span>
+						of <span className="font-mono tabular-nums">{formatUsd(limit)}</span>
 					</>
 				)}
 			</p>
@@ -53,7 +55,7 @@ export function AiUsage({ budget, className }: { budget?: AiBudget; className?: 
 	);
 }
 
-/** Shown in place of AI controls when the server has no key for that feature. */
+/** Shown in place of AI controls when the server has no key for that feature. Deliberately quiet. */
 export function AiNotConfigured({
 	children,
 	className,
@@ -62,9 +64,16 @@ export function AiNotConfigured({
 	className?: string;
 }) {
 	return (
-		<Alert tone="info" icon={Sparkles} title="AI isn't configured" className={className}>
-			{children}
-		</Alert>
+		<div
+			role="status"
+			className={cn("flex items-start gap-2 text-muted-foreground text-xs", className)}
+		>
+			<Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+			<p className="min-w-0 leading-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-[11px] [&_code]:text-foreground">
+				<span className="mr-1 font-medium">AI isn't configured.</span>
+				{children}
+			</p>
+		</div>
 	);
 }
 

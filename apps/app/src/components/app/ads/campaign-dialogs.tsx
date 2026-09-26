@@ -74,7 +74,7 @@ export function ActivateDialog({
 								{
 									label: c.dailyBudget !== null ? "Daily budget" : "Lifetime budget",
 									value: (
-										<span className="font-semibold tabular-nums">
+										<span className="font-medium font-mono tabular-nums">
 											{formatMoney(amount, c.currency)}
 										</span>
 									),
@@ -226,7 +226,7 @@ export function RetryUnconfirmedDialog({
 							href={c.manageUrl}
 							target="_blank"
 							rel="noreferrer"
-							className="w-fit text-primary-text underline underline-offset-2"
+							className="w-fit text-foreground underline underline-offset-2"
 						>
 							Open {platform} ads manager
 						</a>

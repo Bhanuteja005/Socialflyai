@@ -112,16 +112,15 @@ export function ListeningPanel({ onShowDiscussions }: { onShowDiscussions: () =>
 				<CardHeader>
 					<CardTitle>Listening</CardTitle>
 					<CardDescription>
-						Find public conversations where your brand could help — questions about your category,
-						competitor mentions, pain points you solve. Matches land in{" "}
+						Public conversations where your brand could help land in{" "}
 						<button
 							type="button"
 							onClick={onShowDiscussions}
-							className="cursor-pointer text-primary-text underline-offset-2 hover:underline"
+							className="cursor-pointer text-foreground underline underline-offset-2"
 						>
 							Discussions
 						</button>
-						, scored for relevance. Up to {MAX_LISTENING} active queries.
+						. Up to <span className="font-mono">{MAX_LISTENING}</span> active queries.
 					</CardDescription>
 				</CardHeader>
 
@@ -193,7 +192,7 @@ export function ListeningPanel({ onShowDiscussions }: { onShowDiscussions: () =>
 						</div>
 					) : (
 						<>
-							<p className="px-5 pb-2 text-muted-foreground text-xs tabular-nums">
+							<p className="px-5 pb-2 font-mono text-muted-foreground text-xs tabular-nums">
 								{activeCount} of {MAX_LISTENING} active
 								{items.length > activeCount ? ` · ${items.length - activeCount} paused` : ""}
 							</p>
@@ -348,7 +347,11 @@ function ListeningRow({
 							</span>
 						</p>
 					</div>
-					{item.newCount ? <Badge tone="primary">{item.newCount} new</Badge> : null}
+					{item.newCount ? (
+						<Badge tone="primary" className="font-mono">
+							{item.newCount} new
+						</Badge>
+					) : null}
 					{editor ? (
 						<div className="flex items-center gap-1">
 							<Switch

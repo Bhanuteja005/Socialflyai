@@ -14,6 +14,7 @@ import { Skeleton } from "@socialfly/ui/components/feedback";
 import { toast } from "@socialfly/ui/components/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Laptop, LogOut, Smartphone } from "lucide-react";
+import { useState } from "react";
 import { useSignOut } from "@/hooks/use-session";
 import { type ActiveSession, authClient } from "@/lib/auth-client";
 import { errorMessage } from "@/lib/errors";
@@ -46,7 +47,11 @@ function describeAgent(ua: string | null) {
 	return { label: os ? `${browser} on ${os}` : browser, mobile: /Mobile|iPhone|Android/.test(ua) };
 }
 
+/** Long session lists (many devices) collapse behind "Show all". */
+const SHOWN = 5;
+
 export function SessionsCard() {
+	const [showAll, setShowAll] = useState(false);
 	const queryClient = useQueryClient();
 	const signOut = useSignOut();
 	const sessions = useQuery({
@@ -89,41 +94,50 @@ export function SessionsCard() {
 				) : sessions.isError ? (
 					<p className="px-5 text-danger text-sm">{errorMessage(sessions.error)}</p>
 				) : (
-					<ul className="divide-y divide-border">
-						{sessions.data.map((s) => {
-							const agent = describeAgent(s.userAgent);
-							const Icon = agent.mobile ? Smartphone : Laptop;
-							return (
-								<li key={s.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-									<span className="flex size-9 items-center justify-center rounded-md bg-muted">
-										<Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-									</span>
-									<div className="grid min-w-0 flex-1">
-										<p className="flex items-center gap-2 font-medium text-sm">
-											{agent.label}
-											{s.current ? <Badge tone="primary">This device</Badge> : null}
-										</p>
-										<p className="truncate text-muted-foreground text-xs">
-											{s.ip ? `${s.ip} · ` : ""}
-											{s.lastUsedAt
-												? `Active ${formatRelative(s.lastUsedAt)}`
-												: `Signed in ${formatRelative(s.authenticatedAt)}`}
-										</p>
-									</div>
-									{s.current ? null : (
-										<Button
-											variant="outline"
-											size="sm"
-											loading={revoke.isPending && revoke.variables === s.id}
-											onClick={() => revoke.mutate(s.id)}
-										>
-											Sign out
-										</Button>
-									)}
-								</li>
-							);
-						})}
-					</ul>
+					<>
+						<ul className="divide-y divide-border">
+							{(showAll ? sessions.data : sessions.data.slice(0, SHOWN)).map((s) => {
+								const agent = describeAgent(s.userAgent);
+								const Icon = agent.mobile ? Smartphone : Laptop;
+								return (
+									<li key={s.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+										<span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+											<Icon className="size-4 text-muted-foreground" aria-hidden="true" />
+										</span>
+										<div className="grid min-w-0 flex-1">
+											<p className="flex items-center gap-2 font-medium text-sm">
+												{agent.label}
+												{s.current ? <Badge tone="primary">This device</Badge> : null}
+											</p>
+											<p className="truncate text-muted-foreground text-xs">
+												{s.ip ? `${s.ip} · ` : ""}
+												{s.lastUsedAt
+													? `Active ${formatRelative(s.lastUsedAt)}`
+													: `Signed in ${formatRelative(s.authenticatedAt)}`}
+											</p>
+										</div>
+										{s.current ? null : (
+											<Button
+												variant="outline"
+												size="sm"
+												loading={revoke.isPending && revoke.variables === s.id}
+												onClick={() => revoke.mutate(s.id)}
+											>
+												Sign out
+											</Button>
+										)}
+									</li>
+								);
+							})}
+						</ul>
+						{sessions.data.length > SHOWN ? (
+							<div className="border-border border-t px-5 pt-2">
+								<Button variant="ghost" size="sm" onClick={() => setShowAll((v) => !v)}>
+									{showAll ? "Show fewer" : `Show all ${sessions.data.length} sessions`}
+								</Button>
+							</div>
+						) : null}
+					</>
 				)}
 			</CardContent>
 			<CardFooter className="justify-start">

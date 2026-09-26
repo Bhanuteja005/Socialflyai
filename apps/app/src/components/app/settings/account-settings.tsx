@@ -23,9 +23,7 @@ import { useCurrentUser } from "@/hooks/use-session";
 import { authClient, passwordProblems, type SessionState } from "@/lib/auth-client";
 import { errorMessage } from "@/lib/errors";
 import { qk } from "@/lib/query-keys";
-import { PageHeader } from "../page-header";
 import { SessionsCard } from "./sessions-card";
-import { SettingsNav } from "./settings-nav";
 
 function ProfileCard() {
 	const user = useCurrentUser();
@@ -211,9 +209,7 @@ function PasswordCard() {
 
 export function AccountSettings() {
 	return (
-		<div className="max-w-3xl">
-			<PageHeader title="Settings" />
-			<SettingsNav />
+		<div className="min-w-0">
 			<div className="grid gap-6">
 				<ProfileCard />
 				<PasswordCard />

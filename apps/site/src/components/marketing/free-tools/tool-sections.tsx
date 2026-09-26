@@ -32,13 +32,13 @@ export function ToolFeatureGrid({
 					{items.map(({ icon: Icon, title: itemTitle, description: itemDescription }) => (
 						<li
 							key={itemTitle}
-							className="rounded-3xl border border-white/10 bg-white/5 p-6 transition-colors hover:border-primary/40 sm:p-8"
+							className="rounded-3xl border border-border bg-surface-raised p-6 sm:p-7"
 						>
-							<div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-								<Icon className="size-6" aria-hidden="true" />
+							<div className="mb-5 flex size-10 items-center justify-center rounded-xl bg-muted text-foreground">
+								<Icon className="size-5" aria-hidden="true" />
 							</div>
-							<h3 className="mb-2 font-bold text-lg text-white">{itemTitle}</h3>
-							<p className="text-sm text-white/60 leading-relaxed">{itemDescription}</p>
+							<h3 className="mb-2 font-medium text-base text-foreground">{itemTitle}</h3>
+							<p className="text-sm text-muted-foreground leading-relaxed">{itemDescription}</p>
 						</li>
 					))}
 				</ul>
@@ -67,25 +67,23 @@ export function ToolGuide({
 					{items.map((item, index) => (
 						<li
 							key={item.title}
-							className="flex gap-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8"
+							className="flex gap-5 rounded-3xl border border-border bg-surface-raised p-6 sm:p-8"
 						>
 							{numbered ? (
 								<span
 									aria-hidden="true"
-									className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-black"
+									className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-foreground text-sm"
 								>
 									{index + 1}
 								</span>
 							) : null}
 							<div>
-								<h3 className="mb-2 font-bold text-lg text-white">{item.title}</h3>
-								<p className="text-white/60 leading-relaxed">{item.description}</p>
+								<h3 className="mb-2 font-medium text-base text-foreground">{item.title}</h3>
+								<p className="text-muted-foreground leading-relaxed">{item.description}</p>
 								{item.example ? (
 									<p className="mt-3 text-sm">
-										<span className="font-bold text-white/40 uppercase tracking-widest">
-											Example:{" "}
-										</span>
-										<code className="text-primary">{item.example}</code>
+										<span className="font-mono text-subtle-foreground">Example: </span>
+										<code className="font-mono text-foreground">{item.example}</code>
 									</p>
 								) : null}
 							</div>
@@ -103,7 +101,7 @@ export function ToolProse({ title, children }: { title: ReactNode; children: Rea
 		<section className="py-20 sm:py-24">
 			<Container size="md">
 				<SectionHeading title={title} className="mb-12" />
-				<div className="space-y-6 text-white/60 leading-relaxed [&_h3]:mt-10 [&_h3]:font-bold [&_h3]:text-white [&_h3]:text-xl">
+				<div className="space-y-6 text-muted-foreground leading-relaxed [&_h3]:mt-10 [&_h3]:font-medium [&_h3]:text-foreground [&_h3]:text-xl">
 					{children}
 				</div>
 			</Container>

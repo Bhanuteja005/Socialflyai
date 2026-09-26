@@ -13,23 +13,19 @@ export function ComingSoonPanel({
 	description?: string;
 }) {
 	return (
-		<div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-8 text-center shadow-2xl backdrop-blur-md sm:p-12">
-			<div
-				aria-hidden="true"
-				className="pointer-events-none absolute -top-24 left-1/2 h-48 w-80 -translate-x-1/2 rounded-full bg-primary/20 blur-[80px]"
-			/>
+		<div className="relative overflow-hidden rounded-3xl border border-border bg-surface-raised p-8 text-center sm:p-12">
 			<div className="relative">
-				<div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-3xl border border-primary/30 bg-primary/10 text-primary">
-					<Icon className="size-8" aria-hidden="true" />
+				<div className="mx-auto mb-6 flex size-14 items-center justify-center rounded-2xl border border-border bg-surface text-foreground">
+					<Icon className="size-5" aria-hidden="true" />
 				</div>
-				<p className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1 font-bold text-primary text-xs uppercase tracking-widest">
+				<p className="mb-4 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 font-mono text-muted-foreground text-xs">
 					<Clock className="size-3.5" aria-hidden="true" />
 					Coming soon
 				</p>
-				<h2 className="font-medium text-2xl text-white tracking-tight sm:text-3xl">
+				<h2 className="font-normal font-pixel text-[28px] text-foreground leading-tight sm:text-[32px]">
 					The {toolName} is on its way
 				</h2>
-				<p className="mx-auto mt-4 max-w-xl text-white/60 leading-relaxed">{description}</p>
+				<p className="mx-auto mt-4 max-w-xl text-muted-foreground leading-relaxed">{description}</p>
 				<div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
 					<CtaLink href={SIGNUP_URL} size="md">
 						Start for free

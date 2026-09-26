@@ -114,9 +114,11 @@ export function UtmGenerator() {
 							<label htmlFor={id} className={toolLabel}>
 								{field.label}{" "}
 								{field.required ? (
-									<span className="text-primary">*</span>
+									<span className="text-brand-text">*</span>
 								) : (
-									<span className="text-white/30 normal-case tracking-normal">(Optional)</span>
+									<span className="text-subtle-foreground normal-case tracking-normal">
+										(Optional)
+									</span>
 								)}
 							</label>
 							<input
@@ -135,7 +137,7 @@ export function UtmGenerator() {
 							/>
 							<p
 								id={`${id}-hint`}
-								className={`mt-2 text-xs ${showError ? "text-red-400" : "text-white/40"}`}
+								className={`mt-2 text-xs ${showError ? "text-danger" : "text-subtle-foreground"}`}
 							>
 								{showError ? "Please enter a valid website URL." : field.hint}
 							</p>
@@ -144,15 +146,17 @@ export function UtmGenerator() {
 				})}
 			</div>
 
-			<div className="mt-8 border-white/10 border-t pt-8">
+			<div className="mt-8 border-border border-t pt-8">
 				<label htmlFor={`${baseId}-result`} className={toolLabel}>
 					Generated UTM URL
 				</label>
 				<output
 					id={`${baseId}-result`}
 					aria-live="polite"
-					className={`block min-h-[100px] break-all rounded-2xl border bg-black/60 p-5 text-base ${
-						generatedUrl ? "border-primary/30 text-primary" : "border-white/10 text-white/30 italic"
+					className={`block min-h-[100px] break-all rounded-2xl border bg-surface p-5 text-base ${
+						generatedUrl
+							? "border-border-strong text-brand-text"
+							: "border-border text-subtle-foreground italic"
 					}`}
 				>
 					{generatedUrl || "Fill in the required fields above to generate a URL..."}

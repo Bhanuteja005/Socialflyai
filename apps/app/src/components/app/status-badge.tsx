@@ -48,14 +48,19 @@ export function ChannelAvatar({
 	size = "md",
 }: {
 	channel: { name: string; avatarUrl: string | null; provider: string };
-	size?: "sm" | "md" | "lg";
+	size?: "xs" | "sm" | "md" | "lg";
 }) {
 	return (
 		<Avatar
 			src={channel.avatarUrl}
 			name={channel.name}
 			size={size}
-			badge={<ProviderIcon provider={channel.provider} size={size === "lg" ? "sm" : "xs"} />}
+			badge={
+				<ProviderIcon
+					provider={channel.provider}
+					size={size === "lg" ? "sm" : size === "xs" ? "2xs" : "xs"}
+				/>
+			}
 		/>
 	);
 }

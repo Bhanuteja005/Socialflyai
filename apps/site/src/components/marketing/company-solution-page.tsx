@@ -32,11 +32,7 @@ export function SolutionPage({ data }: { data: SolutionPageData }) {
 			>
 				<MetricTiles
 					tiles={hero.metrics}
-					className={
-						hero.metrics.length === 3
-							? "rounded-[32px] border border-white/10 bg-white/5 p-4 lg:grid-cols-3 lg:p-8"
-							: "rounded-[32px] border border-white/10 bg-white/5 p-4 lg:p-8"
-					}
+					className={hero.metrics.length === 3 ? "lg:grid-cols-3" : undefined}
 				/>
 			</PageHero>
 			<FeatureSplitSection items={features} />
@@ -64,7 +60,10 @@ export function TagPanel({
 		<MockupFrame title={title} icon={icon}>
 			<ul className="flex flex-wrap gap-2">
 				{tags.map((tag) => (
-					<li key={tag} className="rounded-full bg-white/5 px-3 py-1 text-white/60 text-xs">
+					<li
+						key={tag}
+						className="rounded-full bg-muted px-3 py-1 font-mono text-muted-foreground text-xs"
+					>
 						{tag}
 					</li>
 				))}
@@ -87,10 +86,10 @@ export function ProgressPanel({
 }) {
 	return (
 		<MockupFrame title={title} icon={icon}>
-			<div className="h-2 w-full overflow-hidden rounded bg-white/5">
-				<div className="h-full bg-primary" style={{ width: `${percent}%` }} />
+			<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+				<div className="h-full rounded-full bg-ink" style={{ width: `${percent}%` }} />
 			</div>
-			<p className="mt-3 text-right font-black text-[10px] text-white/50 uppercase">{caption}</p>
+			<p className="mt-3 text-right font-mono text-muted-foreground text-xs">{caption}</p>
 		</MockupFrame>
 	);
 }

@@ -13,7 +13,7 @@ import { useGenerationRun } from "@/hooks/use-ai";
 import { api, call } from "@/lib/api-client";
 import type { AiCapabilities, AspectRatio, ImageInput } from "@/lib/api-types";
 import { AiNotConfigured } from "../ai/ai-shared";
-import { composeHref, GenerationProgress } from "./generation-status";
+import { composeHref, GenerationProgress, StepNumber } from "./generation-status";
 
 type Ratio = { value: AspectRatio; label: string; w: number; h: number };
 const SQUARE: Ratio = { value: "1:1", label: "Square", w: 1, h: 1 };
@@ -36,9 +36,7 @@ export function ImageStudio({ caps }: { caps: AiCapabilities }) {
 	if (!caps.images) {
 		return (
 			<AiNotConfigured>
-				Image generation needs an image model. Add <code>OPENAI_API_KEY</code> or{" "}
-				<code>GEMINI_API_KEY</code> to the server's environment to turn it on. Carousels work
-				without it.
+				Add <code>OPENAI_API_KEY</code> or <code>GEMINI_API_KEY</code> to enable images.
 			</AiNotConfigured>
 		);
 	}
@@ -66,7 +64,10 @@ export function ImageStudio({ caps }: { caps: AiCapabilities }) {
 			<Card>
 				<form onSubmit={onSubmit} noValidate>
 					<CardHeader>
-						<CardTitle>Describe your image</CardTitle>
+						<CardTitle className="flex items-center">
+							<StepNumber n={1} />
+							Describe your image
+						</CardTitle>
 					</CardHeader>
 					<CardContent className="grid gap-4">
 						<Field
@@ -80,6 +81,7 @@ export function ImageStudio({ caps }: { caps: AiCapabilities }) {
 								value={prompt}
 								maxLength={2000}
 								placeholder="A cosy home office at sunrise, laptop open, plants on the desk"
+								className="min-h-32 text-[15px] leading-relaxed"
 								onChange={(e) => setPrompt(e.target.value)}
 								disabled={run.busy}
 								{...fieldAria("image-prompt", promptError, true)}
@@ -97,7 +99,7 @@ export function ImageStudio({ caps }: { caps: AiCapabilities }) {
 									<RadioGroup.Item
 										key={r.value}
 										value={r.value}
-										className="group grid cursor-pointer justify-items-center gap-1.5 rounded-lg border border-border bg-surface-raised px-2 py-3 text-center transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60 data-[state=checked]:border-primary data-[state=checked]:bg-primary-soft"
+										className="group grid cursor-pointer justify-items-center gap-1.5 rounded-lg border border-border bg-surface-raised px-2 py-3 text-center transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60 data-[state=checked]:border-foreground data-[state=checked]:bg-muted"
 									>
 										<span className="flex h-8 items-center" aria-hidden="true">
 											<span
@@ -109,7 +111,9 @@ export function ImageStudio({ caps }: { caps: AiCapabilities }) {
 											/>
 										</span>
 										<span className="font-medium text-xs">{r.label}</span>
-										<span className="text-[11px] text-muted-foreground">{r.value}</span>
+										<span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+											{r.value}
+										</span>
 									</RadioGroup.Item>
 								))}
 							</RadioGroup.Root>
@@ -136,12 +140,15 @@ export function ImageStudio({ caps }: { caps: AiCapabilities }) {
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Result</CardTitle>
+					<CardTitle className="flex items-center">
+						<StepNumber n={2} />
+						Result
+					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					{!run.generation && !run.startError ? (
 						<div
-							className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border border-dashed bg-surface text-center text-muted-foreground text-sm"
+							className="mx-auto flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-border border-dashed bg-surface text-center text-muted-foreground text-sm"
 							style={{ aspectRatio: `${shown.w} / ${shown.h}`, maxHeight: 480 }}
 						>
 							<ImageIcon className="size-6 text-subtle-foreground" aria-hidden="true" />

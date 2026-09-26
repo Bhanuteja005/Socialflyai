@@ -1,15 +1,18 @@
 "use client";
 
+import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
+import { SectionHeader } from "@socialfly/ui/components/page";
 import { toast } from "@socialfly/ui/components/toast";
-import { Radio } from "lucide-react";
+import { Plus, Radio } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useChannels } from "@/hooks/queries";
 import { connectErrorMessage } from "@/hooks/use-connect-channel";
 import { errorMessage } from "@/lib/errors";
 import { providerName } from "@/lib/providers";
+import { useOrg } from "../org-provider";
 import { PageHeader } from "../page-header";
 import { ChannelList } from "./channel-list";
 import { ConnectGrid } from "./connect-grid";
@@ -38,22 +41,52 @@ function useConnectResultToast() {
 
 export function ChannelsView() {
 	useConnectResultToast();
+	const { can } = useOrg();
 	const { data: channels, isPending, isError, error, refetch } = useChannels();
+	const broken = channels?.filter((c) => c.status === "needs_reauth").length ?? 0;
 
 	return (
 		<>
 			<PageHeader
 				title="Channels"
 				description="The social accounts this organization publishes to."
+				actions={
+					can("admin") ? (
+						<Button asChild>
+							<a href="#connect">
+								<Plus />
+								Connect channel
+							</a>
+						</Button>
+					) : null
+				}
 			/>
 			<section aria-labelledby="connected-heading" className="mb-10">
-				<h2 id="connected-heading" className="mb-3 font-medium text-muted-foreground text-sm">
-					Connected
-				</h2>
+				<SectionHeader
+					title={<span id="connected-heading">Connected accounts</span>}
+					description={
+						channels?.length
+							? `${channels.length} connected${broken ? ` · ${broken} to reconnect` : ""}`
+							: undefined
+					}
+					actions={
+						channels?.length ? (
+							broken ? (
+								<Badge tone="warning" dot>
+									Action needed
+								</Badge>
+							) : (
+								<Badge tone="success" dot>
+									All healthy
+								</Badge>
+							)
+						) : null
+					}
+				/>
 				{isPending ? (
-					<div className="grid gap-2">
-						{["a", "b"].map((k) => (
-							<Skeleton key={k} className="h-16" />
+					<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+						{["a", "b", "c"].map((k) => (
+							<Skeleton key={k} className="h-32 rounded-xl" />
 						))}
 					</div>
 				) : isError ? (
@@ -76,10 +109,11 @@ export function ChannelsView() {
 					<ChannelList channels={channels} />
 				)}
 			</section>
-			<section aria-labelledby="connect-heading">
-				<h2 id="connect-heading" className="mb-3 font-medium text-muted-foreground text-sm">
-					Connect a new channel
-				</h2>
+			<section id="connect" aria-labelledby="connect-heading" className="scroll-mt-20">
+				<SectionHeader
+					title={<span id="connect-heading">Add a channel</span>}
+					description="Posting to a platform needs its account connected here once."
+				/>
 				<ConnectGrid />
 			</section>
 		</>

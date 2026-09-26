@@ -32,42 +32,19 @@ function ChannelRow({ channel, onDisconnect }: { channel: Channel; onDisconnect:
 	return (
 		<li
 			className={cn(
-				"flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:flex-nowrap",
-				needsReauth && "bg-warning-soft/40",
+				"flex flex-col rounded-xl border bg-surface-raised shadow-card transition-[border-color,box-shadow] hover:shadow-sm",
+				needsReauth ? "border-warning/40" : "border-border hover:border-border-strong",
 			)}
 		>
-			<ChannelAvatar channel={channel} />
-			<div className="grid min-w-0 flex-1 gap-0.5">
-				<div className="flex min-w-0 items-center gap-2">
-					<p className="truncate font-medium text-sm">{channel.name}</p>
-					<ChannelStatusBadge status={channel.status} />
-				</div>
-				<p className="truncate text-muted-foreground text-xs">
-					{providerName(channel.provider)}
-					{channel.username ? ` · @${channel.username.replace(/^@/, "")}` : ""}
-					{` · Connected ${formatRelative(channel.createdAt)}`}
-				</p>
-				{needsReauth ? (
-					<p className="flex items-start gap-1.5 text-warning text-xs">
-						<AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-						<span>
-							{channel.lastError ?? "Access expired."} Scheduled posts to this channel will fail
-							until you reconnect.
-						</span>
+			<div className="flex items-start gap-3 p-4">
+				<ChannelAvatar channel={channel} size="lg" />
+				<div className="grid min-w-0 flex-1 gap-0.5 pt-0.5">
+					<p className="truncate font-semibold text-sm">{channel.name}</p>
+					<p className="truncate text-muted-foreground text-xs">
+						{providerName(channel.provider)}
+						{channel.username ? ` · @${channel.username.replace(/^@/, "")}` : ""}
 					</p>
-				) : null}
-			</div>
-			<div className="ml-auto flex items-center gap-1.5">
-				{needsReauth && can("admin") ? (
-					<Button
-						size="sm"
-						loading={connect.isPending}
-						onClick={() => connect.mutate(channel.provider)}
-					>
-						<RefreshCw />
-						Reconnect
-					</Button>
-				) : null}
+				</div>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${channel.name}`}>
@@ -99,6 +76,31 @@ function ChannelRow({ channel, onDisconnect }: { channel: Channel; onDisconnect:
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
+			{needsReauth ? (
+				<p className="mx-4 mb-3 flex items-start gap-1.5 rounded-lg bg-warning-soft px-2.5 py-2 text-warning text-xs">
+					<AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+					<span>
+						{channel.lastError ?? "Access expired."} Scheduled posts to this channel will fail until
+						you reconnect.
+					</span>
+				</p>
+			) : null}
+			<div className="mt-auto flex items-center justify-between gap-2 border-border border-t px-4 py-2.5">
+				<span className="flex items-center gap-2 text-muted-foreground text-xs">
+					<ChannelStatusBadge status={channel.status} />
+					{needsReauth ? null : <>Connected {formatRelative(channel.createdAt)}</>}
+				</span>
+				{needsReauth && can("admin") ? (
+					<Button
+						size="xs"
+						loading={connect.isPending}
+						onClick={() => connect.mutate(channel.provider)}
+					>
+						<RefreshCw />
+						Reconnect
+					</Button>
+				) : null}
+			</div>
 		</li>
 	);
 }
@@ -123,7 +125,7 @@ export function ChannelList({ channels }: { channels: Channel[] }) {
 
 	return (
 		<>
-			<ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface-raised">
+			<ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 				{channels.map((channel) => (
 					<ChannelRow key={channel.id} channel={channel} onDisconnect={() => setTarget(channel)} />
 				))}

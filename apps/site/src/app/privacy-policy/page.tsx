@@ -13,9 +13,9 @@ export const metadata = pageMetadata({
 	path: "/privacy-policy",
 });
 
-const note = "text-xs italic text-white/40";
-const emphasis = "font-medium italic text-primary";
-const subheading = "mb-2 font-semibold text-base text-white/90";
+const note = "text-xs italic text-subtle-foreground";
+const emphasis = "font-medium italic text-brand-text";
+const subheading = "mb-2 font-medium text-base text-foreground";
 const support = (
 	<LegalLink href="mailto:support@socialflyai.com">support@socialflyai.com</LegalLink>
 );
@@ -91,7 +91,7 @@ const SECTIONS: LegalSection[] = [
 					SocialflyAI uses Google APIs, including the YouTube Data API, to allow users to connect
 					their YouTube accounts and manage or publish content.
 				</p>
-				<p className="mb-4 font-medium text-white/80">
+				<p className="mb-4 font-medium text-foreground">
 					By using SocialFlyAI, you agree to be bound by the{" "}
 					<LegalLink href="https://www.youtube.com/t/terms">YouTube Terms of Service</LegalLink>.
 				</p>
@@ -110,8 +110,8 @@ const SECTIONS: LegalSection[] = [
 					</LegalLink>
 					, including the Limited Use requirements.
 				</p>
-				<div className="space-y-3 border-white/10 border-t pt-5">
-					<h3 className="font-semibold text-sm text-white/90">Google API Services Disclosure</h3>
+				<div className="space-y-3 border-border border-t pt-5">
+					<h3 className="font-medium text-sm text-foreground">Google API Services Disclosure</h3>
 					<p>
 						SocialFlyAI&apos;s use and transfer of information received from Google APIs to any
 						other app will adhere to the Google API Services User Data Policy, including the Limited
@@ -295,10 +295,10 @@ const SECTIONS: LegalSection[] = [
 		content: (
 			<div className="space-y-2">
 				<p>
-					<span className="font-medium text-white/80">Email:</span> {support}
+					<span className="font-medium text-foreground">Email:</span> {support}
 				</p>
 				<p>
-					<span className="font-medium text-white/80">Location:</span> Hyderabad, Telangana, India
+					<span className="font-medium text-foreground">Location:</span> Hyderabad, Telangana, India
 				</p>
 			</div>
 		),
