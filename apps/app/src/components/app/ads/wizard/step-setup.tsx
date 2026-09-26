@@ -12,7 +12,7 @@ import { AccountStatusBadge } from "../ads-shared";
 import type { StepErrors, WizardState } from "./wizard-state";
 
 const choice =
-	"flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-within:outline-2 focus-within:outline-ring hover:border-border-strong has-[:checked]:border-primary has-[:checked]:bg-primary-soft/40 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50";
+	"flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-within:outline-2 focus-within:outline-ring hover:border-border-strong has-[:checked]:border-foreground has-[:checked]:bg-muted/40 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50";
 
 export function StepSetup({
 	state,

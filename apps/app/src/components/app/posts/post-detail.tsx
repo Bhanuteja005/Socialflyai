@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/components/card";
 import { ConfirmDialog } from "@socialfly/ui/components/dialog";
@@ -13,11 +14,11 @@ import { useState } from "react";
 import { usePost } from "@/hooks/queries";
 import { useAdAccounts } from "@/hooks/use-ads";
 import { api, call, callVoid } from "@/lib/api-client";
-import type { PostDetail } from "@/lib/api-types";
+import type { PostDetail, TargetStatus } from "@/lib/api-types";
 import { errorMessage, isApiError } from "@/lib/errors";
-import { formatDateTime, formatRelative, zoneLabel } from "@/lib/format";
+import { formatDateTime, formatRelative, pluralize, textLength, zoneLabel } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
-import { isPostEditable } from "@/lib/status";
+import { isPostEditable, TARGET_STATUS } from "@/lib/status";
 import { PostPerformance } from "../analytics/post-performance";
 import { MediaThumb } from "../media/media-thumb";
 import { useOrg } from "../org-provider";
@@ -99,8 +100,13 @@ export function PostDetailView({ id }: { id: string }) {
 		return (
 			<div className="grid gap-6">
 				<Skeleton className="h-9 w-64" />
-				<Skeleton className="h-40" />
-				<Skeleton className="h-56" />
+				<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+					<div className="grid gap-6">
+						<Skeleton className="h-40 rounded-2xl" />
+						<Skeleton className="h-56 rounded-2xl" />
+					</div>
+					<Skeleton className="h-72 rounded-2xl" />
+				</div>
 			</div>
 		);
 	}
@@ -147,7 +153,7 @@ export function PostDetailView({ id }: { id: string }) {
 				}
 				description={
 					post.scheduledAt ? (
-						<span className="inline-flex items-center gap-1.5">
+						<span className="inline-flex items-center gap-1.5 font-mono text-[13px] tabular-nums">
 							<Clock className="size-3.5" aria-hidden="true" />
 							{formatDateTime(post.scheduledAt, org.timezone)}{" "}
 							{zoneLabel(org.timezone, new Date(post.scheduledAt))} ·{" "}
@@ -210,19 +216,23 @@ export function PostDetailView({ id }: { id: string }) {
 			/>
 
 			<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-				<div className="grid gap-6">
+				<div className="grid min-w-0 gap-6">
 					<Card>
-						<CardHeader>
+						<CardHeader className="flex-row items-center justify-between border-border border-b pb-4">
 							<CardTitle>Content</CardTitle>
+							<span className="font-mono text-muted-foreground text-xs tabular-nums">
+								{textLength(post.content)} chars
+								{post.media.length ? ` · ${pluralize(post.media.length, "attachment")}` : ""}
+							</span>
 						</CardHeader>
 						<CardContent className="grid gap-4">
 							{post.content ? (
 								<p className="whitespace-pre-wrap text-[15px] leading-relaxed">{post.content}</p>
 							) : (
-								<p className="text-muted-foreground text-sm">No main text.</p>
+								<p className="text-muted-foreground text-sm italic">No main text.</p>
 							)}
 							{post.media.length ? (
-								<ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+								<ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
 									{post.media.map((m) => (
 										<li key={m.id}>
 											<a
@@ -230,8 +240,9 @@ export function PostDetailView({ id }: { id: string }) {
 												target="_blank"
 												rel="noreferrer"
 												aria-label={`Open ${m.fileName}`}
+												className="block rounded-xl transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
 											>
-												<MediaThumb asset={m} className="ring-1 ring-border" />
+												<MediaThumb asset={m} className="rounded-xl ring-1 ring-border" />
 											</a>
 										</li>
 									))}
@@ -239,11 +250,17 @@ export function PostDetailView({ id }: { id: string }) {
 							) : null}
 						</CardContent>
 					</Card>
-					<Card>
-						<CardHeader>
-							<CardTitle>Channels</CardTitle>
+					<Card className="overflow-hidden">
+						<CardHeader className="flex-row flex-wrap items-center justify-between gap-2 border-border border-b pb-4">
+							<CardTitle>
+								Channels{" "}
+								<span className="font-mono font-normal text-muted-foreground text-sm tabular-nums">
+									{post.targets.length}
+								</span>
+							</CardTitle>
+							<DeliverySummary post={post} />
 						</CardHeader>
-						<ul className="mt-2 divide-y divide-border">
+						<ul className="divide-y divide-border">
 							{post.targets.map((t) => (
 								<TargetCard
 									key={t.id}
@@ -262,9 +279,14 @@ export function PostDetailView({ id }: { id: string }) {
 					</Card>
 					{anyPublished ? <PostPerformance postId={post.id} /> : null}
 				</div>
-				<Card className="lg:sticky lg:top-6">
-					<CardHeader>
+				<Card className="lg:sticky lg:top-20">
+					<CardHeader className="flex-row items-center justify-between border-border border-b pb-4">
 						<CardTitle>Activity</CardTitle>
+						{post.events.length ? (
+							<span className="font-mono text-muted-foreground text-xs tabular-nums">
+								{pluralize(post.events.length, "event")}
+							</span>
+						) : null}
 					</CardHeader>
 					<CardContent>
 						<PostTimeline post={post} timeZone={org.timezone} />
@@ -287,5 +309,27 @@ export function PostDetailView({ id }: { id: string }) {
 				onConfirm={() => actions.remove.mutate()}
 			/>
 		</>
+	);
+}
+
+/** "2 published · 1 failed": per-status counts of the post's targets, most urgent first. */
+function DeliverySummary({ post }: { post: PostDetail }) {
+	const counts = new Map<TargetStatus, number>();
+	for (const t of post.targets) counts.set(t.status, (counts.get(t.status) ?? 0) + 1);
+	const order: TargetStatus[] = ["failed", "unconfirmed", "published"];
+	const entries = [...counts.entries()].sort(
+		([a], [b]) =>
+			(order.indexOf(a) === -1 ? 99 : order.indexOf(a)) -
+			(order.indexOf(b) === -1 ? 99 : order.indexOf(b)),
+	);
+	return (
+		<div className="flex flex-wrap items-center gap-1.5">
+			{entries.map(([status, n]) => (
+				<Badge key={status} tone={TARGET_STATUS[status].tone}>
+					<span className="font-mono tabular-nums">{n}</span>{" "}
+					{TARGET_STATUS[status].label.toLowerCase()}
+				</Badge>
+			))}
+		</div>
 	);
 }

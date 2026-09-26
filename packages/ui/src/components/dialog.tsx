@@ -21,7 +21,7 @@ export function DialogContent({
 			<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-[2px] data-[state=open]:animate-fade-in" />
 			<DialogPrimitive.Content
 				className={cn(
-					"fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border border-border bg-surface-raised p-5 shadow-lg data-[state=open]:animate-scale-in sm:p-6",
+					"fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-3xl border border-border bg-surface-raised p-5 shadow-lg data-[state=open]:animate-scale-in sm:p-6",
 					className,
 				)}
 				{...props}
@@ -58,12 +58,7 @@ export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
 }
 
 export function DialogTitle({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) {
-	return (
-		<DialogPrimitive.Title
-			className={cn("font-semibold text-base tracking-tight", className)}
-			{...props}
-		/>
-	);
+	return <DialogPrimitive.Title className={cn("font-medium text-base", className)} {...props} />;
 }
 
 export function DialogDescription({

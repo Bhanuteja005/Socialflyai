@@ -24,8 +24,6 @@ import type { BrandProfile, BrandProfileInput } from "@/lib/api-types";
 import { errorMessage } from "@/lib/errors";
 import { qk } from "@/lib/query-keys";
 import { useOrg } from "../org-provider";
-import { PageHeader } from "../page-header";
-import { SettingsNav } from "./settings-nav";
 
 const MAX_EXAMPLES = 5;
 
@@ -59,9 +57,7 @@ const toInput = (f: FormState): BrandProfileInput => ({
 export function BrandSettings() {
 	const brand = useBrandProfile();
 	return (
-		<div className="max-w-3xl">
-			<PageHeader title="Settings" />
-			<SettingsNav />
+		<div className="min-w-0">
 			{brand.isPending ? (
 				<div className="grid gap-6">
 					<Skeleton className="h-72" />

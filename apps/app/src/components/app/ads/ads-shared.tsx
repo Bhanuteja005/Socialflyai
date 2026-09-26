@@ -43,7 +43,7 @@ function AdsNav() {
 	const { can } = useOrg();
 	return (
 		<nav aria-label="Ads sections" className="mb-6">
-			<ul className="scrollbar-thin inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-muted p-0.5">
+			<ul className="scrollbar-thin inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-border bg-surface-raised p-1">
 				{TABS.filter((t) => !t.minimum || can(t.minimum)).map((t) => {
 					const active = pathname === t.href;
 					return (
@@ -52,9 +52,9 @@ function AdsNav() {
 								href={t.href}
 								aria-current={active ? "page" : undefined}
 								className={cn(
-									"inline-flex h-7 items-center rounded-md px-2.5 font-medium text-xs transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+									"inline-flex h-7 items-center rounded-full px-3 font-medium text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ring",
 									active
-										? "bg-surface-raised text-foreground shadow-xs"
+										? "bg-ink text-ink-foreground"
 										: "text-muted-foreground hover:text-foreground",
 								)}
 							>

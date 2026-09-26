@@ -62,8 +62,14 @@ export function OnboardingForm() {
 	}
 
 	return (
-		<div className="flex min-h-dvh flex-col bg-surface px-4 py-6">
-			<div className="mx-auto flex w-full max-w-5xl items-center justify-between">
+		<div className="relative flex min-h-dvh flex-col overflow-hidden bg-canvas px-4 py-6">
+			<div
+				aria-hidden="true"
+				className="pointer-events-none absolute inset-x-0 top-0 h-[420px] [mask-image:radial-gradient(ellipse_70%_100%_at_50%_0%,black_10%,transparent_75%)]"
+			>
+				<div className="bg-glow absolute inset-0" />
+			</div>
+			<div className="relative mx-auto flex w-full max-w-5xl items-center justify-between">
 				<Logo />
 				{creatingAnother ? (
 					<Button variant="ghost" size="sm" asChild>
@@ -78,12 +84,35 @@ export function OnboardingForm() {
 					</Button>
 				)}
 			</div>
-			<div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
+			<div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
+				{creatingAnother ? null : (
+					<ol
+						className="mb-8 flex items-center justify-center gap-2 text-xs"
+						aria-label="Setup steps"
+					>
+						{["Workspace", "Channels", "Team"].map((step, i) => (
+							<li key={step} className="flex items-center gap-2">
+								<span
+									className={
+										i === 0
+											? "flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 font-medium text-ink-foreground"
+											: "flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-2.5 py-1 text-muted-foreground"
+									}
+									aria-current={i === 0 ? "step" : undefined}
+								>
+									<span className="tabular-nums">{i + 1}</span>
+									{step}
+								</span>
+								{i < 2 ? <span className="h-px w-5 bg-border-strong" aria-hidden="true" /> : null}
+							</li>
+						))}
+					</ol>
+				)}
 				<div className="mb-6 grid justify-items-center gap-3 text-center">
-					<span className="flex size-12 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
+					<span className="flex size-12 items-center justify-center rounded-2xl border border-border bg-surface-raised text-primary-text shadow-sm">
 						<Building2 className="size-6" aria-hidden="true" />
 					</span>
-					<h1 className="font-semibold text-2xl tracking-tight">
+					<h1 className="font-semibold text-[26px] tracking-[-0.02em]">
 						{creatingAnother
 							? "Create an organization"
 							: `Welcome${user?.name ? `, ${user.name.split(" ")[0]}` : ""}!`}
@@ -92,8 +121,8 @@ export function OnboardingForm() {
 						An organization holds your channels, posts and team. You can invite teammates later.
 					</p>
 				</div>
-				<Card>
-					<CardContent>
+				<Card className="shadow-panel">
+					<CardContent className="p-6">
 						<form onSubmit={onSubmit} className="grid gap-4" noValidate>
 							{errors.form ? <Alert tone="danger" icon={AlertCircle} title={errors.form} /> : null}
 							<Field label="Organization name" htmlFor="org-name" error={errors.fields.name}>

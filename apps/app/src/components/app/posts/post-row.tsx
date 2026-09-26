@@ -3,9 +3,41 @@ import { cn } from "@socialfly/ui/utils";
 import { ImageIcon } from "lucide-react";
 import Link from "next/link";
 import type { Post } from "@/lib/api-types";
-import { formatDateTime, formatRelative } from "@/lib/format";
+import { formatDateTime, formatRelative, formatTime } from "@/lib/format";
 import { TARGET_STATUS } from "@/lib/status";
 import { ChannelAvatar, PostStatusBadge } from "../status-badge";
+
+function PostThumb({ post }: { post: Post }) {
+	const first = post.media[0];
+	if (!first) return null;
+	return (
+		<span className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+			{first.kind === "video" ? (
+				<video
+					src={`${first.url}#t=0.1`}
+					preload="metadata"
+					muted
+					playsInline
+					className="size-full object-cover"
+				/>
+			) : (
+				// biome-ignore lint/performance/noImgElement: user media from a runtime-configured storage host
+				<img
+					src={first.url}
+					alt=""
+					loading="lazy"
+					decoding="async"
+					className="size-full object-cover"
+				/>
+			)}
+			{post.media.length > 1 ? (
+				<span className="absolute right-0.5 bottom-0.5 rounded bg-black/65 px-1 font-medium text-[9px] text-white">
+					+{post.media.length - 1}
+				</span>
+			) : null}
+		</span>
+	);
+}
 
 /** The channels of a post, each with a status dot. */
 export function TargetStack({ targets, max = 5 }: { targets: Post["targets"]; max?: number }) {
@@ -42,7 +74,16 @@ export function postExcerpt(post: Post) {
 	return text || (post.media.length ? "Media post" : "Untitled post");
 }
 
-export function PostRow({ post, timeZone }: { post: Post; timeZone: string }) {
+export function PostRow({
+	post,
+	timeZone,
+	timeOnly = false,
+}: {
+	post: Post;
+	timeZone: string;
+	/** Inside a day-grouped list the date is in the group header; show just the time. */
+	timeOnly?: boolean;
+}) {
 	const failedCount = post.targets.filter(
 		(t) => t.status === "failed" || t.status === "unconfirmed",
 	).length;
@@ -50,12 +91,25 @@ export function PostRow({ post, timeZone }: { post: Post; timeZone: string }) {
 		<li>
 			<Link
 				href={`/posts/${post.id}`}
-				className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none sm:flex-row sm:items-center sm:gap-4"
+				className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-surface focus-visible:bg-surface focus-visible:outline-none sm:flex-row sm:items-center sm:gap-4"
 			>
-				<div className="grid min-w-0 flex-1 gap-1">
+				{timeOnly && post.scheduledAt ? (
+					<time
+						dateTime={post.scheduledAt}
+						className="w-16 shrink-0 font-medium text-[13px] tabular-nums sm:text-right"
+					>
+						{formatTime(post.scheduledAt, timeZone)}
+					</time>
+				) : null}
+				<PostThumb post={post} />
+				<div className="grid min-w-0 flex-1 grid-cols-1 gap-1">
 					<p className="line-clamp-2 text-sm leading-snug sm:line-clamp-1">{postExcerpt(post)}</p>
 					<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-xs">
-						{post.scheduledAt ? (
+						{timeOnly ? (
+							<span className="truncate">
+								{post.targets.map((t) => t.channel.name).join(" · ")}
+							</span>
+						) : post.scheduledAt ? (
 							<time dateTime={post.scheduledAt} title={formatRelative(post.scheduledAt)}>
 								{formatDateTime(post.scheduledAt, timeZone)}
 							</time>

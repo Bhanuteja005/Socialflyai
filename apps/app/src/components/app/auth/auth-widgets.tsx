@@ -11,9 +11,11 @@ export const NEXT_STORAGE_KEY = "sf-auth-next";
 
 export function AuthHeading({ title, description }: { title: string; description?: ReactNode }) {
 	return (
-		<div className="mb-6 grid gap-1.5 text-center">
-			<h1 className="font-semibold text-2xl tracking-tight">{title}</h1>
-			{description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
+		<div className="mb-6 grid gap-2">
+			<h1 className="text-balance font-normal font-pixel text-[24px] leading-8">{title}</h1>
+			{description ? (
+				<p className="text-pretty text-muted-foreground text-sm">{description}</p>
+			) : null}
 		</div>
 	);
 }
@@ -74,7 +76,7 @@ export function GoogleButton({
 
 export function Divider({ children }: { children: ReactNode }) {
 	return (
-		<div className="my-5 flex items-center gap-3 text-subtle-foreground text-xs uppercase tracking-wider">
+		<div className="my-5 flex items-center gap-3 text-subtle-foreground text-xs">
 			<span className="h-px flex-1 bg-border" />
 			{children}
 			<span className="h-px flex-1 bg-border" />
@@ -132,7 +134,7 @@ export function PasswordChecklist({ password, id }: { password: string; id?: str
 						<span
 							className={cn(
 								"flex size-3.5 items-center justify-center rounded-full border",
-								ok ? "border-success bg-success text-white" : "border-border-strong",
+								ok ? "border-success bg-success text-ink-foreground" : "border-border-strong",
 							)}
 							aria-hidden="true"
 						>

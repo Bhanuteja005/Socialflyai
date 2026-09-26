@@ -1,3 +1,61 @@
 @import "tailwindcss";
 /* Shared tokens, theme and base styles (also scans packages/ui for utility classes). */
 @import "@socialfly/ui/theme.css";
+
+/*
+ * Marketing-only brand accent: the logo green. The site is black and white; green marks the
+ * primary CTA, hero highlights, checks, selected states and key numbers — nothing else.
+ * `brand` is the fill (black text on it in both themes); `brand-text` is green used as text,
+ * darkened on light backgrounds so it keeps 4.5:1.
+ */
+:root {
+	--brand: #0be27d;
+	--brand-hover: #09cf72;
+	--brand-foreground: #0a0a0a;
+	--brand-text: #07804a;
+	--brand-soft: rgb(11 226 125 / 0.12);
+}
+
+.dark {
+	--brand-text: #0be27d;
+	--brand-soft: rgb(11 226 125 / 0.14);
+}
+
+@theme inline {
+	--color-brand: var(--brand);
+	--color-brand-hover: var(--brand-hover);
+	--color-brand-foreground: var(--brand-foreground);
+	--color-brand-text: var(--brand-text);
+	--color-brand-soft: var(--brand-soft);
+}
+
+/*
+ * Top-nav dropdown motion (docs/design.md §8): the shared viewport scales in from the bar and the
+ * panel content cross-fades as it morphs between menus. Reduced motion is handled in theme.css.
+ */
+@keyframes nav-viewport-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px) scale(0.98);
+	}
+}
+@keyframes nav-viewport-out {
+	to {
+		opacity: 0;
+		transform: translateY(-4px) scale(0.98);
+	}
+}
+@keyframes nav-content-in {
+	from {
+		opacity: 0;
+	}
+}
+.nav-viewport[data-state="open"] {
+	animation: nav-viewport-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-viewport[data-state="closed"] {
+	animation: nav-viewport-out 120ms ease-in forwards;
+}
+.nav-panel-content[data-motion] {
+	animation: nav-content-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}

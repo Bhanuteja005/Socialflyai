@@ -17,7 +17,7 @@ export function SelectTrigger({
 	return (
 		<SelectPrimitive.Trigger
 			className={cn(
-				"flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-surface-raised px-3 text-left text-sm shadow-xs transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20 disabled:opacity-60 aria-invalid:border-danger data-[placeholder]:text-subtle-foreground [&>span]:truncate",
+				"flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-input bg-surface-raised px-3 text-left text-sm transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20 disabled:opacity-60 aria-invalid:border-danger data-[placeholder]:text-subtle-foreground [&>span]:truncate",
 				className,
 			)}
 			{...props}
@@ -42,7 +42,7 @@ export function SelectContent({
 				position={position}
 				sideOffset={4}
 				className={cn(
-					"relative z-50 max-h-[min(var(--radix-select-content-available-height),320px)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-border bg-surface-raised text-foreground shadow-lg data-[state=open]:animate-scale-in",
+					"relative z-50 max-h-[min(var(--radix-select-content-available-height),320px)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-surface-raised p-1 text-foreground shadow-lg data-[state=open]:animate-scale-in",
 					className,
 				)}
 				{...props}
@@ -63,7 +63,7 @@ export function SelectItem({
 	return (
 		<SelectPrimitive.Item
 			className={cn(
-				"relative flex cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none data-[disabled]:pointer-events-none data-[highlighted]:bg-muted data-[disabled]:opacity-50",
+				"relative flex cursor-pointer select-none items-center gap-2 rounded-lg py-1.5 pr-8 pl-2 text-sm outline-none data-[disabled]:pointer-events-none data-[highlighted]:bg-muted data-[disabled]:opacity-50",
 				className,
 			)}
 			{...props}
@@ -81,7 +81,7 @@ export function NativeSelect({ className, children, ...props }: ComponentProps<"
 	return (
 		<div className={cn("relative", className)}>
 			<select
-				className="h-9 w-full cursor-pointer appearance-none rounded-md border border-input bg-surface-raised pr-8 pl-3 text-foreground text-sm shadow-xs transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20 disabled:opacity-60 aria-invalid:border-danger"
+				className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-input bg-surface-raised pr-8 pl-3 text-foreground text-sm transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20 disabled:opacity-60 aria-invalid:border-danger"
 				{...props}
 			>
 				{children}

@@ -6,7 +6,7 @@ export function Skeleton({ className, ...props }: ComponentProps<"div">) {
 	return (
 		<div
 			aria-hidden="true"
-			className={cn("animate-shimmer rounded-md bg-muted", className)}
+			className={cn("animate-shimmer rounded-lg bg-muted", className)}
 			{...props}
 		/>
 	);
@@ -44,21 +44,33 @@ export function EmptyState({
 	return (
 		<div
 			className={cn(
-				"flex flex-col items-center justify-center rounded-lg border border-border border-dashed text-center",
-				compact ? "gap-2 px-4 py-8" : "gap-3 px-6 py-14",
+				"relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-border border-dashed bg-surface-raised text-center",
+				compact ? "gap-2.5 px-4 py-8" : "gap-3.5 px-6 py-16",
 				className,
 			)}
 		>
 			{Icon ? (
-				<div className="flex size-10 items-center justify-center rounded-lg border border-border bg-surface-raised shadow-xs">
-					<Icon className="size-5 text-muted-foreground" aria-hidden="true" />
+				<div
+					className={cn(
+						"relative flex items-center justify-center rounded-full border border-border bg-surface-raised",
+						compact ? "size-10" : "size-12",
+					)}
+				>
+					<Icon
+						className={cn("text-muted-foreground", compact ? "size-[18px]" : "size-5")}
+						aria-hidden="true"
+					/>
 				</div>
 			) : null}
-			<div className="grid max-w-sm gap-1">
-				<p className="font-medium text-foreground text-sm">{title}</p>
+			<div className="relative grid max-w-sm gap-1">
+				<p className={cn("font-medium text-foreground", compact ? "text-sm" : "text-[15px]")}>
+					{title}
+				</p>
 				{description ? <div className="text-muted-foreground text-sm">{description}</div> : null}
 			</div>
-			{action ? <div className="mt-1">{action}</div> : null}
+			{action ? (
+				<div className="relative mt-1 flex flex-wrap justify-center gap-2">{action}</div>
+			) : null}
 		</div>
 	);
 }
@@ -90,7 +102,7 @@ export function Alert({
 	return (
 		<div
 			role={tone === "danger" ? "alert" : "status"}
-			className={cn("flex gap-3 rounded-lg border px-4 py-3 text-sm", alertTone[tone], className)}
+			className={cn("flex gap-3 rounded-2xl border px-4 py-3 text-sm", alertTone[tone], className)}
 		>
 			{Icon ? <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : null}
 			<div className="grid min-w-0 flex-1 gap-0.5">

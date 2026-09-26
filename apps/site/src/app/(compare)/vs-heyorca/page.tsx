@@ -22,7 +22,7 @@ const data: CompetitorPageData = {
 			"HeyOrca is a great calendar, but it doesn't help you write the posts. SocialflyAI combines an intuitive approval workflow with a native AI engine that does the creative heavy lifting for your team.",
 		socialProof: (
 			<>
-				<span className="font-bold text-white">4.9/5</span> rated by 2k+ creators
+				<span className="font-mono text-foreground tabular-nums">4.9/5</span> rated by 2k+ creators
 			</>
 		),
 	},

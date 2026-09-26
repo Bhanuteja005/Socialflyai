@@ -1,7 +1,7 @@
 import { cn } from "@socialfly/ui/utils";
 import { Scale } from "lucide-react";
 import type { ReactNode } from "react";
-import { Container, Eyebrow, Glow } from "./primitives";
+import { Container, Eyebrow, PixelField } from "./primitives";
 
 export type LegalSection = {
 	id: number;
@@ -21,7 +21,7 @@ export function LegalList({
 	className?: string;
 }) {
 	return (
-		<ul className={cn("space-y-1.5 text-sm text-white/60", className)}>
+		<ul className={cn("space-y-1.5 text-sm text-muted-foreground", className)}>
 			{items.map((item, index) => (
 				<li
 					// biome-ignore lint/suspicious/noArrayIndexKey: static legal copy in a fixed order
@@ -32,7 +32,7 @@ export function LegalList({
 						aria-hidden="true"
 						className={cn(
 							"mt-1.5 size-1.5 shrink-0 rounded-full",
-							tone === "danger" ? "bg-red-400/70" : "bg-primary",
+							tone === "danger" ? "bg-danger" : "bg-subtle-foreground",
 						)}
 					/>
 					<span>{item}</span>
@@ -48,7 +48,7 @@ export function LegalLink({ href, children }: { href: string; children: ReactNod
 	return (
 		<a
 			href={href}
-			className="text-primary hover:underline"
+			className="text-foreground underline underline-offset-2 hover:no-underline"
 			{...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
 		>
 			{children}
@@ -72,17 +72,19 @@ export function LegalPage({
 }) {
 	return (
 		<div className="relative overflow-hidden">
-			<Glow className="top-32 opacity-20" />
+			<PixelField />
 			<Container size="md" className="relative pt-32 pb-24 lg:pt-40 lg:pb-32">
 				<header className="mb-14 text-center">
-					<Eyebrow icon={Scale} className="mb-6 text-white/80">
+					<Eyebrow icon={Scale} className="mb-6">
 						Legal
 					</Eyebrow>
-					<h1 className="mb-4 font-medium text-4xl text-white tracking-[-0.03em] sm:text-5xl md:text-6xl">
+					<h1 className="mb-4 font-normal font-pixel text-[36px] text-foreground leading-[1.1] sm:text-[48px]">
 						{title}
 					</h1>
-					<p className="font-medium text-primary text-sm">{dateLine}</p>
-					<p className="mx-auto mt-4 max-w-2xl text-sm text-white/50 leading-relaxed">{intro}</p>
+					<p className="font-mono text-muted-foreground text-xs">{dateLine}</p>
+					<p className="mx-auto mt-4 max-w-2xl text-sm text-muted-foreground leading-relaxed">
+						{intro}
+					</p>
 				</header>
 
 				<nav aria-label="Sections" className="mb-14">
@@ -91,7 +93,7 @@ export function LegalPage({
 							<li key={section.id}>
 								<a
 									href={`#section-${section.id}`}
-									className="block rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-white/50 text-xs transition-colors hover:border-white/30 hover:text-white/80 focus-visible:outline-2 focus-visible:outline-primary"
+									className="block rounded-full border border-border bg-surface-raised px-3 py-1 text-muted-foreground text-xs transition-colors hover:border-border-strong hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
 								>
 									{section.id}. {section.title}
 								</a>
@@ -107,33 +109,34 @@ export function LegalPage({
 							id={`section-${section.id}`}
 							aria-labelledby={`section-${section.id}-title`}
 							className={cn(
-								"scroll-mt-28 overflow-hidden rounded-2xl border border-white/10 p-6 transition-colors hover:border-white/15 md:p-7",
-								section.highlight
-									? "bg-[linear-gradient(135deg,rgba(11,226,125,0.06)_0%,rgba(0,0,0,0.8)_60%)]"
-									: "bg-white/[0.03]",
+								"scroll-mt-28 overflow-hidden rounded-2xl border border-border p-6 md:p-7",
+								section.highlight ? "border-border-strong bg-surface-raised" : "bg-surface-raised",
 							)}
 						>
 							<div className="mb-5 flex items-center gap-3">
 								<span
 									aria-hidden="true"
-									className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-black text-xs"
+									className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-foreground text-xs"
 								>
 									{section.id}
 								</span>
-								<h2 id={`section-${section.id}-title`} className="font-semibold text-lg text-white">
+								<h2
+									id={`section-${section.id}-title`}
+									className="font-medium text-lg text-foreground"
+								>
 									{section.title}
 								</h2>
 							</div>
-							<div className="text-sm text-white/60 leading-relaxed">{section.content}</div>
+							<div className="text-sm text-muted-foreground leading-relaxed">{section.content}</div>
 						</section>
 					))}
 				</div>
 
-				<div className="mt-14 rounded-2xl border border-white/10 bg-primary/[0.04] p-8 text-center">
-					<p className="mb-4 text-sm text-white/50">{contactPrompt}</p>
+				<div className="mt-14 rounded-3xl border border-border bg-surface-raised p-8 text-center">
+					<p className="mb-4 text-sm text-muted-foreground">{contactPrompt}</p>
 					<a
 						href="mailto:support@socialflyai.com"
-						className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 font-semibold text-black text-sm transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-95"
+						className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-medium text-ink-foreground text-sm transition-colors hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 					>
 						Contact Us
 					</a>

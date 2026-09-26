@@ -2,7 +2,9 @@
 
 import { Button } from "@socialfly/ui/components/button";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
+import { StatCard, type StatTone } from "@socialfly/ui/components/page";
 import { cn } from "@socialfly/ui/utils";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { EngineId } from "@/lib/api-types";
 import { errorMessage } from "@/lib/errors";
@@ -22,39 +24,60 @@ export function StatTile({
 	label,
 	value,
 	hint,
+	icon,
+	tone,
 	className,
 }: {
 	label: string;
 	value: string;
 	hint?: ReactNode;
+	icon?: LucideIcon;
+	tone?: StatTone;
 	className?: string;
 }) {
 	return (
-		<div
-			className={cn(
-				"grid content-start gap-1 rounded-lg border border-border bg-surface-raised p-4 shadow-xs",
-				className,
-			)}
-		>
-			<p className="text-muted-foreground text-xs">{label}</p>
-			<p className="font-semibold text-2xl tabular-nums tracking-tight">{value}</p>
-			{hint ? <div className="text-subtle-foreground text-xs">{hint}</div> : null}
-		</div>
+		<StatCard
+			label={label}
+			value={value}
+			icon={icon}
+			tone={tone}
+			className={className}
+			hint={hint ? <span className="line-clamp-2">{hint}</span> : undefined}
+		/>
 	);
 }
 
 export function StatTilesSkeleton({ count = 4 }: { count?: number }) {
 	return (
-		<div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true">
+		<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" aria-hidden="true">
 			{Array.from({ length: count }, (_, i) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
-				<div key={i} className="grid gap-2 rounded-lg border border-border p-4">
+				<div key={i} className="grid gap-3 rounded-2xl border border-border bg-surface-raised p-4">
 					<Skeleton className="h-3 w-20" />
-					<Skeleton className="h-7 w-16" />
+					<Skeleton className="h-8 w-16" />
 					<Skeleton className="h-3 w-28" />
 				</div>
 			))}
 		</div>
+	);
+}
+
+/**
+ * A setup gap (a missing API key, an engine that isn't connected) as one muted line with a
+ * small status dot — never a coloured alert box. Env var names go in `<code>`.
+ */
+export function SetupNote({ children, className }: { children: ReactNode; className?: string }) {
+	return (
+		<p
+			role="status"
+			className={cn(
+				"flex items-start gap-2 text-muted-foreground text-xs leading-5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[11px] [&_code]:text-foreground",
+				className,
+			)}
+		>
+			<span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
+			<span className="min-w-0">{children}</span>
+		</p>
 	);
 }
 

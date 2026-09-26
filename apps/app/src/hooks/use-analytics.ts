@@ -53,6 +53,23 @@ export function usePostAnalytics(postId: string, enabled: boolean) {
 	});
 }
 
+/** One channel's account numbers (followers, reach, ...) per day over a range. */
+export function useChannelAnalytics(channelId: string | null, range: { from: string; to: string }) {
+	const { orgId } = useOrg();
+	return useQuery({
+		queryKey: qk.analyticsChannel(orgId, channelId ?? "", range.from, range.to),
+		queryFn: () =>
+			call(
+				api.analytics.channels[":channelId"].$get({
+					param: { channelId: channelId ?? "" },
+					query: { from: range.from, to: range.to },
+				}),
+			),
+		enabled: channelId !== null,
+		staleTime: STALE,
+	});
+}
+
 export function useBestTimes(channelIds: string) {
 	const { orgId } = useOrg();
 	return useQuery({

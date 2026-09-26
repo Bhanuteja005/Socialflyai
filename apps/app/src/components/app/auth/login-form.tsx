@@ -52,7 +52,7 @@ export function LoginForm() {
 
 	return (
 		<>
-			<AuthHeading title="Welcome back" description="Sign in to plan and publish your content." />
+			<AuthHeading title="Welcome back" />
 			<GoogleButton next={next} />
 			<Divider>or</Divider>
 			<form onSubmit={onSubmit} className="grid gap-4" noValidate>

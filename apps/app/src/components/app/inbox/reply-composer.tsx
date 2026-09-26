@@ -6,7 +6,7 @@ import { Input, Textarea } from "@socialfly/ui/components/input";
 import { NativeSelect } from "@socialfly/ui/components/select";
 import { toast } from "@socialfly/ui/components/toast";
 import { cn } from "@socialfly/ui/utils";
-import { AlertTriangle, Save, Send, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Pencil, Save, Send, Sparkles, X } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useAiCapabilities } from "@/hooks/use-ai";
 import { useCreateReply, useDraftReply, useReplyMutations } from "@/hooks/use-inbox";
@@ -147,33 +147,12 @@ export function ReplyComposer({
 
 	return (
 		<section aria-labelledby={`${id}-title`} className="grid gap-2">
-			<div className="flex items-center justify-between gap-2">
-				<h3
-					id={`${id}-title`}
-					className="font-medium text-[11px] text-subtle-foreground uppercase tracking-wider"
-				>
-					{editingId ? "Edit reply" : `Reply to ${authorName(item.author)}`}
-				</h3>
-				{aiAvailable ? (
-					<Button
-						variant="ghost"
-						size="xs"
-						aria-expanded={aiOpen}
-						aria-controls={`${id}-ai`}
-						onClick={() => setAiOpen((o) => !o)}
-					>
-						<Sparkles />
-						Draft with AI
-					</Button>
-				) : null}
-			</div>
+			<h3 id={`${id}-title`} className="sr-only">
+				{editingId ? "Edit reply" : `Reply to ${authorName(item.author)}`}
+			</h3>
 
 			{aiOpen ? (
-				<form
-					id={`${id}-ai`}
-					onSubmit={onDraft}
-					className="grid gap-2 rounded-lg border border-primary/25 bg-primary-soft/30 p-3"
-				>
+				<form id={`${id}-ai`} onSubmit={onDraft} className="grid gap-2.5 rounded-xl bg-surface p-3">
 					<div className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
 						<div className="grid gap-1">
 							<label htmlFor={`${id}-tone`} className="font-medium text-xs">
@@ -208,7 +187,7 @@ export function ReplyComposer({
 							/>
 						</div>
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex flex-wrap items-center gap-2">
 						<Button type="submit" size="xs" loading={draft.isPending}>
 							{draft.isPending ? null : <Sparkles />}
 							{draft.isPending ? "Drafting…" : text.trim() ? "Draft again" : "Draft reply"}
@@ -222,77 +201,104 @@ export function ReplyComposer({
 			) : null}
 
 			<form onSubmit={onSubmit} className="grid gap-2">
-				<label htmlFor={`${id}-text`} className="sr-only">
-					Reply text
-				</label>
-				<Textarea
-					ref={textareaRef}
-					id={`${id}-text`}
-					value={text}
-					className="min-h-28"
-					placeholder={`Write a reply on ${providerName(item.provider)}…`}
-					aria-invalid={over || undefined}
-					aria-describedby={`${id}-count`}
-					aria-keyshortcuts="Control+Enter Meta+Enter"
-					onChange={(e) => setText(e.target.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-							e.preventDefault();
-							void save(true);
-						}
-					}}
-				/>
-				<div className="flex flex-wrap items-center gap-2">
-					<p
-						id={`${id}-count`}
-						className={cn(
-							"text-xs tabular-nums",
-							over
-								? "font-medium text-danger"
-								: length > limit * 0.9
-									? "text-warning"
-									: "text-muted-foreground",
-						)}
-						aria-live={length > limit * 0.9 ? "polite" : "off"}
-					>
-						{length.toLocaleString()} / {limit.toLocaleString()}
-						{over
-							? ` — ${(length - limit).toLocaleString()} over ${providerName(item.provider)}'s limit`
-							: ""}
-					</p>
-					<div className="ml-auto flex flex-wrap gap-2">
-						{editingId ? (
+				<div
+					className={cn(
+						"rounded-xl border bg-surface-raised transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/15",
+						over ? "border-danger" : "border-input",
+					)}
+				>
+					{editingId ? (
+						<p className="flex items-center gap-1.5 border-border border-b px-3 py-1.5 font-medium text-muted-foreground text-xs">
+							<Pencil className="size-3" aria-hidden="true" />
+							Editing a saved reply
+						</p>
+					) : null}
+					<label htmlFor={`${id}-text`} className="sr-only">
+						Reply text
+					</label>
+					<Textarea
+						ref={textareaRef}
+						id={`${id}-text`}
+						value={text}
+						className="max-h-60 min-h-20 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+						placeholder={`Reply to ${authorName(item.author)} on ${providerName(item.provider)}…`}
+						aria-invalid={over || undefined}
+						aria-describedby={`${id}-count`}
+						aria-keyshortcuts="Control+Enter Meta+Enter"
+						onChange={(e) => setText(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+								e.preventDefault();
+								void save(true);
+							}
+						}}
+					/>
+					<div className="flex flex-wrap items-center gap-2 px-2 pb-2">
+						{aiAvailable ? (
 							<Button
 								variant="ghost"
-								size="sm"
-								onClick={() => {
-									setText("");
-									onEditDone();
-								}}
+								size="xs"
+								className="text-muted-foreground"
+								aria-expanded={aiOpen}
+								aria-controls={`${id}-ai`}
+								onClick={() => setAiOpen((o) => !o)}
 							>
-								<X />
-								Cancel
+								<Sparkles />
+								Draft with AI
 							</Button>
 						) : null}
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={empty || over || busy}
-							loading={pending === "draft"}
-							onClick={() => void save(false)}
+						<p
+							id={`${id}-count`}
+							className={cn(
+								"font-mono text-[11px] tabular-nums",
+								over
+									? "font-medium text-danger"
+									: length > limit * 0.9
+										? "text-warning"
+										: "text-subtle-foreground",
+							)}
+							aria-live={length > limit * 0.9 ? "polite" : "off"}
 						>
-							<Save />
-							Save draft
-						</Button>
-						<Button
-							type="submit"
-							size="sm"
-							disabled={empty || over || busy}
-							loading={pending === "submit"}
-						>
-							{pending === "submit" ? null : <Send />}
-							{primary}
-						</Button>
+							{length.toLocaleString()} / {limit.toLocaleString()}
+							{over
+								? ` — ${(length - limit).toLocaleString()} over ${providerName(item.provider)}'s limit`
+								: ""}
+						</p>
+						<div className="ml-auto flex flex-wrap items-center gap-1.5">
+							{editingId ? (
+								<Button
+									variant="ghost"
+									size="xs"
+									onClick={() => {
+										setText("");
+										onEditDone();
+									}}
+								>
+									<X />
+									Cancel
+								</Button>
+							) : null}
+							<Button
+								variant="outline"
+								size="xs"
+								disabled={empty || over || busy}
+								loading={pending === "draft"}
+								onClick={() => void save(false)}
+							>
+								<Save />
+								Save draft
+							</Button>
+							<Button
+								type="submit"
+								size="xs"
+								disabled={empty || over || busy}
+								loading={pending === "submit"}
+								title="Ctrl + Enter"
+							>
+								{pending === "submit" ? null : <Send />}
+								{primary}
+							</Button>
+						</div>
 					</div>
 				</div>
 				{notPossible ? (

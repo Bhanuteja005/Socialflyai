@@ -45,7 +45,7 @@ import { formatDuration, formatUsd, pluralize } from "@/lib/format";
 import type { ProviderId } from "@/lib/providers";
 import { AiError, AiNotConfigured, AiUsage } from "../ai/ai-shared";
 import { MediaPickerDialog } from "../composer/media-picker-dialog";
-import { composeHref, GenerationProgress } from "./generation-status";
+import { composeHref, GenerationProgress, StepNumber } from "./generation-status";
 import { type ThemeId, ThemeSwatches } from "./theme-swatches";
 
 // Limits mirror the API's video schemas; the server re-validates everything.
@@ -280,7 +280,7 @@ export function VideoStudio({
 							skipped && "line-through opacity-60",
 						)}
 					>
-						<span className="tabular-nums">{i + 1}.</span>
+						<span className="font-mono tabular-nums">{i + 1}</span>
 						{step.label}
 					</li>
 				);
@@ -295,11 +295,11 @@ export function VideoStudio({
 				<Card className="max-w-2xl">
 					<form onSubmit={onScript} noValidate>
 						<CardHeader>
-							<CardTitle>1. Script</CardTitle>
-							<CardDescription>
-								AI writes the scenes — on-screen text, narration and a background idea for each —
-								plus a caption and hashtags. You can edit everything next.
-							</CardDescription>
+							<CardTitle className="flex items-center">
+								<StepNumber n={1} />
+								Script
+							</CardTitle>
+							<CardDescription>AI writes the scenes, caption and hashtags.</CardDescription>
 						</CardHeader>
 						<CardContent className="grid gap-4">
 							<Field
@@ -387,8 +387,11 @@ export function VideoStudio({
 				<Card className="max-w-2xl">
 					<CardHeader className="flex-row items-start justify-between gap-3">
 						<div className="grid gap-1">
-							<CardTitle>3. Your video</CardTitle>
-							<CardDescription>
+							<CardTitle className="flex items-center">
+								<StepNumber n={3} />
+								Your video
+							</CardTitle>
+							<CardDescription className="font-mono tabular-nums">
 								{scenes.length} {pluralize(scenes.length, "scene")} ·{" "}
 								{formatDuration(totalSeconds * 1000)} · 9:16
 							</CardDescription>
@@ -482,8 +485,7 @@ export function VideoStudio({
 			{steps}
 			{caps.text ? null : (
 				<AiNotConfigured>
-					AI writing needs <code>ANTHROPIC_API_KEY</code> on the server, so write the scenes
-					yourself. Rendering them into a video works without it.
+					Add <code>ANTHROPIC_API_KEY</code> for AI scripts — you can still write scenes by hand.
 				</AiNotConfigured>
 			)}
 			<form
@@ -494,10 +496,16 @@ export function VideoStudio({
 				<Card>
 					<CardHeader className="flex-row items-start justify-between gap-3">
 						<div className="grid gap-1">
-							<CardTitle>2. Scenes</CardTitle>
+							<CardTitle className="flex items-center">
+								<StepNumber n={2} />
+								Scenes
+							</CardTitle>
 							<CardDescription>
-								Each scene is one full-screen shot with its text on top. {MIN_SCENES}–{MAX_SCENES}{" "}
-								scenes, up to {MAX_TOTAL_SECONDS} seconds in total.
+								One full-screen shot per scene ·{" "}
+								<span className="font-mono tabular-nums">
+									{MIN_SCENES}–{MAX_SCENES}
+								</span>{" "}
+								scenes, up to <span className="font-mono tabular-nums">{MAX_TOTAL_SECONDS}s</span>
 							</CardDescription>
 						</div>
 						<Button variant="ghost" size="sm" onClick={startOver}>
@@ -561,7 +569,7 @@ export function VideoStudio({
 											htmlFor={ids.caption}
 											error={errors.caption}
 											hint={
-												<span className="tabular-nums">
+												<span className="font-mono tabular-nums">
 													{scene.caption.length}/{CAPTION_MAX}
 												</span>
 											}
@@ -690,7 +698,10 @@ export function VideoStudio({
 								</span>
 							)}
 							<p
-								className={cn("text-sm tabular-nums", tooLong && "font-medium text-danger")}
+								className={cn(
+									"font-mono text-sm tabular-nums",
+									tooLong && "font-medium text-danger",
+								)}
 								aria-live="polite"
 							>
 								Total: {formatDuration(totalSeconds * 1000)}
@@ -813,7 +824,7 @@ export function VideoStudio({
 						{aiImageScenes > 0 || speechChars > 0 ? (
 							<p className="text-muted-foreground text-xs">
 								Estimated AI cost:{" "}
-								<span className="font-medium text-foreground tabular-nums">
+								<span className="font-medium font-mono text-foreground tabular-nums">
 									{formatUsd(lowCost)}
 									{highCost > lowCost ? `–${formatUsd(highCost)}` : ""}
 								</span>{" "}

@@ -59,9 +59,7 @@ export default function AnalyticsFeaturePage() {
 						title="Performance Trajectory"
 						icon={ChartLine}
 						aside={
-							<span className="font-bold text-[10px] text-primary uppercase tracking-widest">
-								Instagram +18.5% WoW
-							</span>
+							<span className="font-mono text-[11px] text-brand-text">Instagram +18.5% WoW</span>
 						}
 					>
 						<BarChartMockup
@@ -120,20 +118,20 @@ export default function AnalyticsFeaturePage() {
 									{FUNNEL.map((step) => (
 										<li key={step.label}>
 											<div className="mb-1.5 flex justify-between text-sm">
-												<span className="text-white/70">{step.label}</span>
-												<span className="font-bold text-white">{step.value}</span>
+												<span className="text-muted-foreground">{step.label}</span>
+												<span className="font-medium text-foreground">{step.value}</span>
 											</div>
-											<div className="h-2 rounded-full bg-white/5">
+											<div className="h-2 rounded-full bg-surface-raised">
 												<div className={`h-2 rounded-full bg-primary/70 ${step.width}`} />
 											</div>
 										</li>
 									))}
 								</ul>
-								<div className="mt-6 flex items-center justify-between border-white/5 border-t pt-4">
-									<span className="font-bold text-white/50 text-xs uppercase tracking-widest">
+								<div className="mt-6 flex items-center justify-between border-border border-t pt-4">
+									<span className="font-medium text-muted-foreground text-xs font-mono">
 										Total ROI Impact
 									</span>
-									<span className="font-bold text-2xl text-primary">$84,200</span>
+									<span className="font-mono text-2xl text-foreground tabular-nums">$84,200</span>
 								</div>
 							</MockupFrame>
 						),

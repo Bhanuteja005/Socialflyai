@@ -14,7 +14,7 @@ export const badgeVariants = cva(
 				danger: "bg-danger-soft text-danger",
 				info: "bg-info-soft text-info",
 				violet: "bg-violet-soft text-violet",
-				outline: "border border-border text-muted-foreground",
+				outline: "border border-border bg-surface-raised text-muted-foreground",
 			},
 		},
 		defaultVariants: { tone: "neutral" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import type { AnalyticsDay } from "@/lib/api-types";
 import { formatCompact, formatDay, formatNumber } from "@/lib/format";
@@ -45,15 +45,16 @@ function peak(days: AnalyticsDay[], key: "impressions" | "engagements") {
 	return best;
 }
 
-function PanelTitle({ series }: { series: keyof typeof SERIES }) {
+function PanelTitle({ series, total }: { series: keyof typeof SERIES; total: number }) {
 	return (
-		<p className="flex items-center gap-2 font-medium text-muted-foreground text-xs">
+		<p className="mb-1 flex items-center gap-2 text-xs">
 			<span
-				className="h-0.5 w-3 rounded-full"
+				className="size-2 rounded-full"
 				style={{ background: SERIES[series].color }}
 				aria-hidden="true"
 			/>
-			{SERIES[series].label}
+			<span className="font-medium text-muted-foreground">{SERIES[series].label}</span>
+			<span className="font-mono text-foreground tabular-nums">{formatCompact(total)}</span>
 		</p>
 	);
 }
@@ -64,6 +65,8 @@ function PanelTitle({ series }: { series: keyof typeof SERIES }) {
  * never a dual-axis chart.
  */
 export function DailyChart({ days }: { days: AnalyticsDay[] }) {
+	// useId output has colons, which break url(#…) references.
+	const gradientId = `daily-${useId().replace(/:/g, "")}`;
 	const summary = useMemo(() => {
 		if (!days.length) return "No data for this period.";
 		const first = formatDay(days[0]?.date ?? "", true);
@@ -81,6 +84,15 @@ export function DailyChart({ days }: { days: AnalyticsDay[] }) {
 			.join(" ");
 	}, [days]);
 
+	const totals = useMemo(
+		() => ({
+			impressions: days.reduce((s, d) => s + (d.impressions ?? 0), 0),
+			engagements: days.reduce((s, d) => s + (d.engagements ?? 0), 0),
+			posts: days.reduce((s, d) => s + (d.posts ?? 0), 0),
+		}),
+		[days],
+	);
+
 	// Sparse ticks: about six labels whatever the range length.
 	const interval = Math.max(0, Math.ceil(days.length / 6) - 1);
 
@@ -93,7 +105,13 @@ export function DailyChart({ days }: { days: AnalyticsDay[] }) {
 			margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
 			accessibilityLayer={false}
 		>
-			<CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+			<defs>
+				<linearGradient id={`${gradientId}-${key}`} x1="0" y1="0" x2="0" y2="1">
+					<stop offset="0%" stopColor={SERIES[key].color} stopOpacity={0.22} />
+					<stop offset="100%" stopColor={SERIES[key].color} stopOpacity={0} />
+				</linearGradient>
+			</defs>
+			<CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 3" />
 			<XAxis dataKey="date" hide />
 			<YAxis
 				width={Y_WIDTH}
@@ -115,8 +133,7 @@ export function DailyChart({ days }: { days: AnalyticsDay[] }) {
 				dataKey={key}
 				stroke={SERIES[key].color}
 				strokeWidth={2}
-				fill={SERIES[key].color}
-				fillOpacity={0.1}
+				fill={`url(#${gradientId}-${key})`}
 				dot={false}
 				activeDot={{ r: 4, stroke: "var(--surface-raised)", strokeWidth: 2 }}
 				isAnimationActive={false}
@@ -144,17 +161,17 @@ export function DailyChart({ days }: { days: AnalyticsDay[] }) {
 				/>
 			}
 		>
-			<div className="grid gap-3">
+			<div className="grid gap-5">
 				<div>
-					<PanelTitle series="impressions" />
+					<PanelTitle series="impressions" total={totals.impressions} />
 					{area("impressions")}
 				</div>
 				<div>
-					<PanelTitle series="engagements" />
+					<PanelTitle series="engagements" total={totals.engagements} />
 					{area("engagements")}
 				</div>
 				<div>
-					<PanelTitle series="posts" />
+					<PanelTitle series="posts" total={totals.posts} />
 					<BarChart
 						responsive
 						style={{ width: "100%", height: 88 }}
@@ -164,7 +181,7 @@ export function DailyChart({ days }: { days: AnalyticsDay[] }) {
 						accessibilityLayer={false}
 						barCategoryGap={2}
 					>
-						<CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+						<CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 3" />
 						<XAxis
 							dataKey="date"
 							tick={axisTick}

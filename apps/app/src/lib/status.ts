@@ -5,7 +5,7 @@ type StatusMeta = { label: string; tone: BadgeTone /** Calendar / dot colour */;
 
 export const POST_STATUS: Record<PostStatus, StatusMeta> = {
 	draft: { label: "Draft", tone: "neutral", dot: "bg-subtle-foreground" },
-	pending_approval: { label: "Pending approval", tone: "violet", dot: "bg-violet" },
+	pending_approval: { label: "Pending approval", tone: "warning", dot: "bg-warning" },
 	scheduled: { label: "Scheduled", tone: "info", dot: "bg-info" },
 	publishing: { label: "Publishing", tone: "warning", dot: "bg-warning" },
 	published: { label: "Published", tone: "success", dot: "bg-success" },

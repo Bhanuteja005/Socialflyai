@@ -22,9 +22,7 @@ import type { Organization } from "@/lib/api-types";
 import { errorMessage } from "@/lib/errors";
 import { qk } from "@/lib/query-keys";
 import { clearStoredOrg, useOrg } from "../org-provider";
-import { PageHeader } from "../page-header";
 import { TimezoneSelect } from "../timezone-select";
-import { SettingsNav } from "./settings-nav";
 
 export function OrganizationSettings() {
 	const { org, can, organizations } = useOrg();
@@ -83,9 +81,7 @@ export function OrganizationSettings() {
 	}
 
 	return (
-		<div className="max-w-3xl">
-			<PageHeader title="Settings" />
-			<SettingsNav />
+		<div className="min-w-0">
 			<div className="grid gap-6">
 				<Card>
 					<form onSubmit={onSubmit} noValidate>

@@ -22,7 +22,7 @@ export function NewsletterForm() {
 		>
 			<div className="relative w-full">
 				<Mail
-					className="absolute top-1/2 left-4 size-4 -translate-y-1/2 text-white/40"
+					className="absolute top-1/2 left-4 size-4 -translate-y-1/2 text-subtle-foreground"
 					aria-hidden="true"
 				/>
 				<label htmlFor={id} className="sr-only">
@@ -35,12 +35,12 @@ export function NewsletterForm() {
 					required
 					autoComplete="email"
 					placeholder="name@email.com"
-					className="w-full rounded-2xl border border-white/10 bg-black/40 py-4 pr-6 pl-12 text-sm text-white transition focus:border-primary/40 focus:outline-none"
+					className="w-full rounded-full border border-input bg-surface-raised py-3 pr-5 pl-11 text-sm text-foreground transition focus:border-border-strong focus:outline-none"
 				/>
 			</div>
 			<button
 				type="submit"
-				className={`w-full rounded-2xl bg-primary px-8 py-4 font-black text-black text-sm uppercase tracking-widest shadow-[0_0_30px_rgba(11,226,125,0.2)] transition hover:scale-105 active:scale-95 sm:w-auto ${focusRing}`}
+				className={`w-full rounded-full bg-ink px-6 py-3 font-medium text-ink-foreground text-sm transition hover:bg-ink-hover sm:w-auto ${focusRing}`}
 			>
 				Subscribe
 			</button>

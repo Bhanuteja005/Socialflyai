@@ -3,7 +3,7 @@
 import { Button } from "@socialfly/ui/components/button";
 import { Input } from "@socialfly/ui/components/input";
 import { cn } from "@socialfly/ui/utils";
-import { Check, ChevronDown, Radio } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Radio } from "lucide-react";
 import { DropdownMenu as Menu } from "radix-ui";
 import { useState } from "react";
 import type { Channel } from "@/lib/api-types";
@@ -11,8 +11,13 @@ import { formatDay } from "@/lib/format";
 import { ProviderIcon } from "../provider-icon";
 import { PRESETS, type Preset, type RangeSelection } from "./analytics-utils";
 
+// Same pill metrics as the segmented TabsList so a toolbar of tabs + range reads as one row;
+// the selected range is a quiet fill so it doesn't compete with the ink tab pill.
 const segment =
-	"inline-flex h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-md px-2.5 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-surface-raised aria-pressed:text-foreground aria-pressed:shadow-xs";
+	"inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full px-3 font-medium text-[13px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-muted aria-pressed:text-foreground";
+
+const chip =
+	"inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface-raised px-3.5 text-[13px] text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0";
 
 export function RangePicker({
 	range,
@@ -31,7 +36,7 @@ export function RangePicker({
 
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<fieldset className="inline-flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+			<fieldset className="inline-flex items-center gap-0.5 rounded-full border border-border bg-surface-raised p-1">
 				<legend className="sr-only">Date range</legend>
 				{PRESETS.map((days) => (
 					<button
@@ -44,7 +49,9 @@ export function RangePicker({
 							onPreset(days);
 						}}
 					>
-						{days} days
+						{days}
+						<span className="sm:hidden">d</span>
+						<span className="max-sm:hidden">&nbsp;days</span>
 					</button>
 				))}
 				<button
@@ -71,7 +78,7 @@ export function RangePicker({
 					<Input
 						type="date"
 						aria-label="From"
-						className="h-8 w-38"
+						className="h-9 w-38 font-mono"
 						value={from}
 						max={to || undefined}
 						onChange={(e) => setFrom(e.target.value)}
@@ -80,7 +87,7 @@ export function RangePicker({
 					<Input
 						type="date"
 						aria-label="To"
-						className="h-8 w-38"
+						className="h-9 w-38 font-mono"
 						value={to}
 						min={from || undefined}
 						onChange={(e) => setTo(e.target.value)}
@@ -89,14 +96,18 @@ export function RangePicker({
 						type="submit"
 						size="sm"
 						variant="outline"
+						className="h-9"
 						disabled={!valid || (from === range.from && to === range.to)}
 					>
 						Apply
 					</Button>
 				</form>
 			) : (
-				<span className="text-muted-foreground text-xs">
-					{formatDay(range.from)} – {formatDay(range.to, true)}
+				<span className={chip}>
+					<CalendarDays aria-hidden="true" />
+					<span className="font-mono text-foreground text-xs tabular-nums">
+						{formatDay(range.from)} – {formatDay(range.to, true)}
+					</span>
 				</span>
 			)}
 		</div>
@@ -104,7 +115,7 @@ export function RangePicker({
 }
 
 const itemClass =
-	"relative flex cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-none data-[highlighted]:bg-muted";
+	"relative flex cursor-pointer select-none items-center gap-2 rounded-lg py-1.5 pr-2 pl-8 text-sm outline-none data-[highlighted]:bg-muted";
 
 export function ChannelFilter({
 	channels,
@@ -134,7 +145,7 @@ export function ChannelFilter({
 	return (
 		<Menu.Root>
 			<Menu.Trigger asChild>
-				<Button variant="outline" size="sm" className="max-w-60">
+				<Button variant="outline" size="sm" className="h-9 max-w-60">
 					<Radio />
 					<span className="truncate">{label}</span>
 					<ChevronDown className="text-muted-foreground" />
@@ -144,7 +155,7 @@ export function ChannelFilter({
 				<Menu.Content
 					align="end"
 					sideOffset={6}
-					className="scrollbar-thin z-50 max-h-80 min-w-56 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 text-foreground shadow-lg data-[state=open]:animate-scale-in"
+					className="scrollbar-thin z-50 max-h-80 min-w-56 overflow-y-auto rounded-xl border border-border bg-surface-raised p-1 text-foreground shadow-lg data-[state=open]:animate-scale-in"
 				>
 					<Menu.Label className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
 						Show channels

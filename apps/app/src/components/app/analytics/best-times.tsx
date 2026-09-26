@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import type { BestTimes } from "@/lib/api-types";
 import { errorMessage } from "@/lib/errors";
 import { formatNumber, zoneLabel } from "@/lib/format";
-import { slotLabel, WEEKDAYS_LONG, WEEKDAYS_SHORT } from "./analytics-utils";
+import { hourLabel, slotLabel, WEEKDAYS_LONG, WEEKDAYS_SHORT } from "./analytics-utils";
 import { ChartFigure, DataTable } from "./chart-parts";
 
 const STEPS = 5;
@@ -91,23 +91,32 @@ export function BestTimesPanel({
 	return (
 		<div className="grid gap-4">
 			{top.length ? (
-				<div className="grid gap-2">
-					<p className="font-medium text-sm">Try posting on</p>
-					<ol className="flex flex-wrap gap-2">
-						{top.map((r, i) => (
-							<li
-								key={`${r.weekday}:${r.hour}`}
-								className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm"
-							>
-								<span className="font-medium text-subtle-foreground text-xs tabular-nums">
-									{i + 1}
+				<ol className="grid gap-2 sm:grid-cols-3" aria-label="Suggested times to post">
+					{top.map((r, i) => (
+						<li
+							key={`${r.weekday}:${r.hour}`}
+							className="flex items-center gap-3 rounded-xl bg-surface px-3.5 py-2.5"
+						>
+							<Clock
+								className={
+									i === 0
+										? "size-4 shrink-0 text-foreground"
+										: "size-4 shrink-0 text-subtle-foreground"
+								}
+								aria-hidden="true"
+							/>
+							<span className="grid min-w-0">
+								<span className="truncate font-medium text-sm">
+									{WEEKDAYS_LONG[r.weekday]} ·{" "}
+									<span className="font-mono tabular-nums">{hourLabel(r.hour)}</span>
 								</span>
-								<Clock className="size-3.5 text-muted-foreground" aria-hidden="true" />
-								{slotLabel(r.weekday, r.hour)}
-							</li>
-						))}
-					</ol>
-				</div>
+								<span className="text-muted-foreground text-xs">
+									{i === 0 ? "Best slot" : `#${i + 1} suggestion`}
+								</span>
+							</span>
+						</li>
+					))}
+				</ol>
 			) : null}
 
 			<ChartFigure
@@ -142,13 +151,13 @@ export function BestTimesPanel({
 					)
 				}
 			>
-				<div className="scrollbar-thin overflow-x-auto pb-1">
-					<div className="grid min-w-[560px] grid-cols-[2.5rem_repeat(24,minmax(0,1fr))] gap-[2px]">
+				<div className="scrollbar-thin relative overflow-x-auto pb-1 [contain:inline-size]">
+					<div className="grid min-w-[560px] grid-cols-[2.5rem_repeat(24,minmax(0,1fr))] gap-[3px]">
 						<span />
 						{HOURS.map((h) => (
 							<span
 								key={h}
-								className="pb-1 text-center text-[10px] text-subtle-foreground tabular-nums"
+								className="pb-1 text-center font-mono text-[10px] text-subtle-foreground tabular-nums"
 							>
 								{h % 3 === 0 ? String(h).padStart(2, "0") : ""}
 							</span>
@@ -160,30 +169,28 @@ export function BestTimesPanel({
 				</div>
 			</ChartFigure>
 
-			<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs">
+			<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-border border-t pt-3 text-xs">
 				<p className="min-h-4 text-foreground" aria-live="polite">
 					{hover ?? (
-						<span className="text-muted-foreground">Point at a cell to see its numbers.</span>
+						<span className="text-muted-foreground">
+							{fromData
+								? `Based on your posts over the last 12 weeks · ${zone}`
+								: `General best times for these platforms until your own results come in · ${zone}`}
+						</span>
 					)}
 				</p>
 				<div className="flex items-center gap-1.5 text-muted-foreground" aria-hidden="true">
-					Lower
+					Less
 					{Array.from({ length: STEPS }, (_, i) => i + 1).map((s) => (
 						<span
 							key={s}
-							className="size-3 rounded-[3px]"
+							className="size-3 rounded-full"
 							style={{ background: `var(--chart-seq-${s})` }}
 						/>
 					))}
-					Higher engagement
+					More engagement
 				</div>
 			</div>
-
-			<p className="text-muted-foreground text-xs">
-				{fromData
-					? `Based on your published posts over the last 12 weeks. Times are in ${zone}.`
-					: `You don't have enough published posts yet, so these are general best times for these platforms. Times are in ${zone}; they'll adapt once your own results come in.`}
-			</p>
 		</div>
 	);
 }
@@ -222,7 +229,7 @@ function Row({
 						onMouseEnter={() => onHover(text)}
 						onFocus={() => onHover(text)}
 						onClick={() => onHover(text)}
-						className="aspect-square min-h-3 cursor-default rounded-[3px] hover:outline-2 hover:outline-foreground/40"
+						className="h-5 cursor-default rounded-[4px] hover:outline-2 hover:outline-foreground/40 sm:h-7"
 						style={{ background: `var(--chart-seq-${level})` }}
 					/>
 				);

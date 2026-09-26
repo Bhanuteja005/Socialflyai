@@ -5,7 +5,7 @@ import { Skeleton } from "@socialfly/ui/components/feedback";
 import { Tabs, TabsList, TabsTrigger } from "@socialfly/ui/components/tabs";
 import { toast } from "@socialfly/ui/components/toast";
 import { cn } from "@socialfly/ui/utils";
-import { ChevronLeft, ChevronRight, PenSquare, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Globe2, PenSquare, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePosts } from "@/hooks/queries";
@@ -73,10 +73,10 @@ export function CalendarView() {
 		<>
 			<PageHeader
 				title="Calendar"
-				description={`All times in ${tz.replace(/_/g, " ")} (${zoneLabel(tz)}).`}
+				description="Plan and review everything going out, across every channel."
 				actions={
 					editor ? (
-						<Button asChild>
+						<Button asChild variant="brand">
 							<Link href="/compose">
 								<PenSquare />
 								Create post
@@ -85,88 +85,96 @@ export function CalendarView() {
 					) : null
 				}
 			/>
-			<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-				<div className="flex items-center gap-2">
-					<div className="flex items-center rounded-md border border-border bg-surface-raised shadow-xs">
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={`Previous ${view}`}
-							onClick={() => setAnchor((a) => shift(view, a, -1))}
-						>
-							<ChevronLeft />
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="rounded-none border-border border-x"
-							onClick={() => {
-								setAnchor(today);
-								setSelected(today);
-							}}
-						>
-							Today
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={`Next ${view}`}
-							onClick={() => setAnchor((a) => shift(view, a, 1))}
-						>
-							<ChevronRight />
-						</Button>
-					</div>
-					<h2 className="font-semibold text-lg tracking-tight" aria-live="polite">
-						{title(view, anchor, days)}
-					</h2>
-				</div>
-				<Tabs value={view} onValueChange={(v) => changeView(v as View)}>
-					<TabsList aria-label="Calendar view">
-						<TabsTrigger value="month">Month</TabsTrigger>
-						<TabsTrigger value="week">Week</TabsTrigger>
-					</TabsList>
-				</Tabs>
-			</div>
-
-			<div className="relative overflow-hidden rounded-lg border border-border bg-border">
-				<div className="grid grid-cols-7 gap-px">
-					{days.slice(0, 7).map((d) => (
-						<div
-							key={`h-${dateKey(d)}`}
-							className="bg-surface px-2 py-1.5 font-medium text-[11px] text-muted-foreground uppercase tracking-wider"
-						>
-							<span className="hidden sm:inline">{weekdayLabel(d)}</span>
-							<span className="sm:hidden">{weekdayLabel(d, "narrow")}</span>
-						</div>
-					))}
-					{days.map((d) => {
-						const key = dateKey(d);
-						const list = byDay.get(key) ?? [];
-						const outside = view === "month" && d.month !== anchor.month;
-						const isToday = key === dateKey(today);
-						const isSelected = key === dateKey(selected);
-						const past = key < dateKey(today);
-						return (
-							<DayCell
-								key={key}
-								day={d}
-								posts={list}
-								view={view}
-								outside={outside}
-								isToday={isToday}
-								isSelected={isSelected}
-								canCreate={editor && !past}
-								loading={posts.isPending}
-								timeZone={tz}
-								onSelect={() => setSelected(d)}
-								onMore={() => {
-									setSelected(d);
-									changeView("week");
-									setAnchor(d);
+			<div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-card">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-border border-b px-4 py-3">
+					<div className="flex items-center gap-3">
+						<div className="flex items-center rounded-lg border border-border bg-surface-raised shadow-xs">
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={`Previous ${view}`}
+								onClick={() => setAnchor((a) => shift(view, a, -1))}
+							>
+								<ChevronLeft />
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="rounded-none border-border border-x"
+								onClick={() => {
+									setAnchor(today);
+									setSelected(today);
 								}}
-							/>
-						);
-					})}
+							>
+								Today
+							</Button>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={`Next ${view}`}
+								onClick={() => setAnchor((a) => shift(view, a, 1))}
+							>
+								<ChevronRight />
+							</Button>
+						</div>
+						<h2 className="font-semibold text-base tracking-tight" aria-live="polite">
+							{title(view, anchor, days)}
+						</h2>
+					</div>
+					<div className="flex items-center gap-3">
+						<span className="hidden items-center gap-1.5 text-muted-foreground text-xs md:flex">
+							<Globe2 className="size-3.5" aria-hidden="true" />
+							{tz.replace(/_/g, " ")} ({zoneLabel(tz)})
+						</span>
+						<Tabs value={view} onValueChange={(v) => changeView(v as View)}>
+							<TabsList aria-label="Calendar view">
+								<TabsTrigger value="month">Month</TabsTrigger>
+								<TabsTrigger value="week">Week</TabsTrigger>
+							</TabsList>
+						</Tabs>
+					</div>
+				</div>
+
+				<div className="relative bg-border">
+					<div className="grid grid-cols-7 gap-px">
+						{days.slice(0, 7).map((d) => (
+							<div
+								key={`h-${dateKey(d)}`}
+								className="bg-surface px-2.5 py-2 font-medium text-muted-foreground text-xs"
+							>
+								<span className="hidden sm:inline">{weekdayLabel(d)}</span>
+								<span className="sm:hidden">{weekdayLabel(d, "narrow")}</span>
+							</div>
+						))}
+						{days.map((d) => {
+							const key = dateKey(d);
+							const list = byDay.get(key) ?? [];
+							const outside = view === "month" && d.month !== anchor.month;
+							const isToday = key === dateKey(today);
+							const isSelected = key === dateKey(selected);
+							const past = key < dateKey(today);
+							return (
+								<DayCell
+									key={key}
+									day={d}
+									posts={list}
+									view={view}
+									outside={outside}
+									isToday={isToday}
+									isSelected={isSelected}
+									canCreate={editor && !past}
+									loading={posts.isPending}
+									timeZone={tz}
+									onSelect={() => setSelected(d)}
+									onMore={() => {
+										setSelected(d);
+										changeView("week");
+										setAnchor(d);
+									}}
+								/>
+							);
+						})}
+					</div>
 				</div>
 			</div>
 
@@ -233,10 +241,12 @@ function DayCell({
 	return (
 		<div
 			className={cn(
-				"group relative flex flex-col gap-1 bg-surface-raised p-1.5",
-				week ? "min-h-16 sm:min-h-[26rem]" : "min-h-16 sm:min-h-28",
+				"group relative flex flex-col gap-1 bg-surface-raised p-1.5 transition-colors",
+				week ? "min-h-16 sm:min-h-[26rem]" : "min-h-16 sm:min-h-32",
 				outside && "bg-surface",
-				isSelected && "max-sm:bg-primary-soft",
+				// Layered over an opaque base: the grid behind the cells is the border colour.
+				isToday && "bg-[linear-gradient(var(--primary-soft),var(--primary-soft))]",
+				isSelected && "max-sm:bg-[linear-gradient(var(--primary-soft),var(--primary-soft))]",
 			)}
 		>
 			<div className="flex items-center justify-between">

@@ -9,12 +9,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@socialfly/ui/components/card";
-import { Alert, EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
+import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { Field, fieldAria } from "@socialfly/ui/components/field";
 import { Input } from "@socialfly/ui/components/input";
 import { toast } from "@socialfly/ui/components/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useAdsSettings } from "@/hooks/use-ads";
 import { api, call } from "@/lib/api-client";
@@ -22,6 +22,7 @@ import { errorMessage } from "@/lib/errors";
 import { formatNumber } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
 import { useOrg } from "../org-provider";
+import { AdsSafetyCard } from "./ads-landing";
 import { AdsLayout } from "./ads-shared";
 
 /** Ceilings are in each ad account's own currency units; say so rather than pretend they're USD. */
@@ -67,7 +68,7 @@ function CeilingCard() {
 		onError: (e) => toast.error(errorMessage(e)),
 	});
 
-	if (settings.isPending) return <Skeleton className="h-64" />;
+	if (settings.isPending) return <Skeleton className="h-64 max-w-2xl rounded-xl" />;
 	if (settings.isError) {
 		return (
 			<EmptyState
@@ -102,17 +103,18 @@ function CeilingCard() {
 	}
 
 	return (
-		<div className="grid max-w-2xl gap-6">
+		<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 			<Card>
 				<form onSubmit={onSubmit} noValidate>
-					<CardHeader>
-						<CardTitle>Daily budget ceiling</CardTitle>
-						<CardDescription>
-							No campaign can be created or activated with a daily budget above this amount. It
-							catches typos like 5000 instead of 50 before they reach the platform.
-						</CardDescription>
+					<CardHeader className="flex-row items-start gap-3 border-border border-b pb-4">
+						<div className="grid gap-1">
+							<CardTitle>Daily budget ceiling</CardTitle>
+							<CardDescription>
+								No campaign can run a daily budget above this amount.
+							</CardDescription>
+						</div>
 					</CardHeader>
-					<CardContent className="grid gap-4">
+					<CardContent className="grid gap-5 pt-5">
 						<Field
 							label="Organization ceiling"
 							htmlFor="ads-ceiling"
@@ -126,7 +128,7 @@ function CeilingCard() {
 							<Input
 								id="ads-ceiling"
 								inputMode="decimal"
-								className="max-w-48"
+								className="max-w-48 font-mono tabular-nums"
 								value={value}
 								placeholder={serverCeiling ? String(serverCeiling) : "No limit"}
 								onChange={(e) => setValue(e.target.value)}
@@ -134,38 +136,38 @@ function CeilingCard() {
 								{...fieldAria("ads-ceiling", error, true)}
 							/>
 						</Field>
-						<ul className="grid gap-1.5 text-sm">
-							<li className="flex items-center gap-2">
-								<ShieldCheck className="size-4 text-success" aria-hidden="true" />
-								<span>
-									In effect now:{" "}
-									<span className="font-medium tabular-nums">
-										{maxDailyBudget ? units(maxDailyBudget) : "no ceiling"}
+						<dl className="grid gap-px overflow-hidden rounded-xl border border-border bg-border text-sm sm:grid-cols-2">
+							<div className="grid gap-1 bg-surface p-3.5">
+								<dt className="flex items-center gap-1.5 text-muted-foreground text-xs">
+									<ShieldCheck className="size-3.5" aria-hidden="true" />
+									In effect now
+								</dt>
+								<dd className="font-medium font-mono tabular-nums">
+									{maxDailyBudget ? units(maxDailyBudget) : "No ceiling"}
+								</dd>
+							</div>
+							<div className="grid gap-1 bg-surface p-3.5">
+								<dt className="flex items-center gap-1.5 text-muted-foreground text-xs">
+									<Lock className="size-3.5" aria-hidden="true" />
+									Server limit
+								</dt>
+								<dd className="font-mono tabular-nums">
+									{serverCeiling ? units(serverCeiling) : "None"}
+									<span className="block text-muted-foreground text-xs">
+										Set by whoever runs SocialFly
 									</span>
-								</span>
-							</li>
-							<li className="flex items-center gap-2 text-muted-foreground">
-								<Lock className="size-4" aria-hidden="true" />
-								<span>
-									Server limit (set by whoever runs SocialFly):{" "}
-									<span className="tabular-nums">
-										{serverCeiling ? units(serverCeiling) : "none"}
-									</span>
-								</span>
-							</li>
-						</ul>
+								</dd>
+							</div>
+						</dl>
 					</CardContent>
-					<CardFooter className="justify-end">
+					<CardFooter className="justify-end border-border border-t">
 						<Button type="submit" loading={save.isPending}>
-							Save
+							Save changes
 						</Button>
 					</CardFooter>
 				</form>
 			</Card>
-			<Alert tone="info" icon={AlertTriangle} title="How money is protected">
-				Campaigns are always created paused. Only an admin can activate one, and only after typing
-				its exact budget.
-			</Alert>
+			<AdsSafetyCard />
 		</div>
 	);
 }
