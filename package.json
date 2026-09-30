@@ -28,7 +28,7 @@
 		"@commitlint/cli": "^21.2.3",
 		"@commitlint/config-conventional": "^21.2.0",
 		"lefthook": "^2.1.14",
-		"turbo": "^2.11.2",
+		"turbo": "^2.11.4",
 		"typescript": "5.9.3"
 	},
 	"trustedDependencies": [
