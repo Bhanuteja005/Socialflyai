@@ -125,7 +125,7 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<div className="relative bg-[radial-gradient(ellipse_140%_70%_at_50%_60%,#001a0d_0%,#000_80%)]">
+			<div className="relative bg-[radial-gradient(ellipse_140%_70%_at_50%_60%,rgb(11_226_125/0.08)_0%,transparent_80%)] dark:bg-[radial-gradient(ellipse_140%_70%_at_50%_60%,#001a0d_0%,#000_80%)]">
 				<section className="relative z-10 px-4 py-24 sm:px-6 lg:px-10">
 					<div className="mx-auto max-w-5xl text-center">
 						<HomeEyebrow>Testimonials</HomeEyebrow>
@@ -138,6 +138,7 @@ export default function HomePage() {
 					title="Got Questions?"
 					description="Everything you need to know before you get started."
 					defaultOpenFirst={false}
+					titleClassName="text-balance font-medium text-3xl text-foreground tracking-[-0.04em] sm:text-4xl lg:text-5xl dark:text-white"
 				/>
 			</div>
 		</>

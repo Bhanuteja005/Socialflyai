@@ -58,7 +58,7 @@ export function AnalyticsSnapshot() {
 								<div key={key} className="grid gap-0.5">
 									<dt className="text-muted-foreground text-xs">{label}</dt>
 									<dd
-										className="font-semibold text-xl tracking-tight"
+										className="font-mono text-xl tabular-nums tracking-tight"
 										title={formatNumber(query.data.totals[key])}
 									>
 										{formatCompact(query.data.totals[key])}

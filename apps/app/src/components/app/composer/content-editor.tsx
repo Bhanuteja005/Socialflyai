@@ -5,6 +5,7 @@ import { Textarea } from "@socialfly/ui/components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@socialfly/ui/components/tabs";
 import { cn } from "@socialfly/ui/utils";
 import { Undo2 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Channel, ProviderInfo } from "@/lib/api-types";
 import { textLength } from "@/lib/format";
 import { ProviderIcon } from "../provider-icon";
@@ -26,12 +27,8 @@ function Counter({
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] tabular-nums",
-				over
-					? "border-danger/40 bg-danger-soft text-danger"
-					: near
-						? "border-warning/40 text-warning"
-						: "border-border text-muted-foreground",
+				"inline-flex items-center gap-1 font-mono text-[11.5px] tabular-nums",
+				over ? "text-danger" : near ? "text-warning" : "text-muted-foreground",
 			)}
 			title={`${label}: ${count} of ${max} characters`}
 		>
@@ -44,18 +41,25 @@ function Counter({
 	);
 }
 
+// Borderless: the surrounding card is the editor's frame.
+const editorClass =
+	"min-h-52 resize-y rounded-none border-0 bg-transparent px-0 py-1 text-[15px] leading-relaxed shadow-none focus-visible:ring-0";
+
 export function ContentEditor({
 	composer,
 	providers,
 	activeTab,
 	onTabChange,
 	disabled,
+	toolbar,
 }: {
 	composer: Composer;
 	providers: ProviderInfo[];
 	activeTab: string;
 	onTabChange: (tab: string) => void;
 	disabled?: boolean;
+	/** Tools shown under the text (AI assist...), left of the character counters. */
+	toolbar?: ReactNode;
 }) {
 	const { state, selected, update, setOverride } = composer;
 	const limitOf = (provider: string) =>
@@ -63,6 +67,7 @@ export function ContentEditor({
 		Number.POSITIVE_INFINITY;
 	const mainLength = textLength(state.content);
 	const usingMain = selected.filter((c) => state.overrides[c.id] === undefined);
+	const activeChannel = selected.find((c) => c.id === activeTab);
 
 	// One counter per platform (channels of the same provider share limits).
 	const counters = (channels: Channel[], length: (c: Channel) => number) => {
@@ -88,7 +93,7 @@ export function ContentEditor({
 	return (
 		<Tabs value={activeTab} onValueChange={onTabChange} className="grid gap-3">
 			{selected.length > 0 ? (
-				<TabsList aria-label="Edit content for">
+				<TabsList aria-label="Edit content for" className="justify-self-start">
 					<TabsTrigger value="main">All channels</TabsTrigger>
 					{selected.map((c) => (
 						<TabsTrigger key={c.id} value={c.id}>
@@ -96,7 +101,7 @@ export function ContentEditor({
 							<span className="max-w-28 truncate">{c.name}</span>
 							{state.overrides[c.id] !== undefined ? (
 								<>
-									<span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+									<span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
 									<span className="sr-only">(customized)</span>
 								</>
 							) : null}
@@ -115,14 +120,8 @@ export function ContentEditor({
 					onChange={(e) => update({ content: e.target.value })}
 					placeholder="What would you like to share?"
 					disabled={disabled}
-					className="min-h-48 resize-y text-[15px] leading-relaxed"
+					className={editorClass}
 				/>
-				<div className="flex flex-wrap items-center gap-1.5">
-					{counters(usingMain, () => mainLength)}
-					<span className="ml-auto text-muted-foreground text-xs tabular-nums">
-						{mainLength} characters
-					</span>
-				</div>
 			</TabsContent>
 
 			{selected.map((c) => {
@@ -132,10 +131,8 @@ export function ContentEditor({
 				return (
 					<TabsContent key={c.id} value={c.id} className="grid gap-2">
 						<div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-							<p className="text-muted-foreground">
-								{customized
-									? `Custom text for ${c.name}.`
-									: `${c.name} uses the text from “All channels”.`}
+							<p className="text-muted-foreground text-xs">
+								{customized ? `Custom text for ${c.name}` : "Uses the main text"}
 							</p>
 							{customized ? (
 								<Button
@@ -167,15 +164,28 @@ export function ContentEditor({
 							readOnly={!customized}
 							disabled={disabled}
 							onChange={(e) => setOverride(c.id, e.target.value)}
-							className={cn(
-								"min-h-48 resize-y text-[15px] leading-relaxed",
-								!customized && "text-muted-foreground",
-							)}
+							className={cn(editorClass, !customized && "text-muted-foreground")}
 						/>
-						<div className="flex items-center gap-1.5">{counters([c], () => textLength(text))}</div>
 					</TabsContent>
 				);
 			})}
+
+			{/* Outside the tab panels so the toolbar (and the AI assist's state) survives tab switches. */}
+			<div className="flex flex-wrap items-center gap-1 border-border border-t pt-3">
+				{toolbar}
+				<div className="ml-auto flex flex-wrap items-center gap-3">
+					{activeChannel
+						? counters([activeChannel], () =>
+								textLength(state.overrides[activeChannel.id] ?? state.content),
+							)
+						: counters(usingMain, () => mainLength)}
+					{activeChannel ? null : (
+						<span className="font-mono text-[11.5px] text-subtle-foreground tabular-nums">
+							{mainLength} chars
+						</span>
+					)}
+				</div>
+			</div>
 		</Tabs>
 	);
 }

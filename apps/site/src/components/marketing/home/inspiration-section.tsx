@@ -28,7 +28,7 @@ const COLUMNS: { offset: string; cards: Card[] }[] = [
 
 function InspirationCard({ card }: { card: Card }) {
 	return (
-		<div className="group relative overflow-hidden rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+		<div className="group relative overflow-hidden rounded-3xl shadow-[0_8px_24px_-8px_rgba(4,21,12,0.25)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
 			<Image
 				src={card.src}
 				alt={card.alt}
@@ -38,15 +38,19 @@ function InspirationCard({ card }: { card: Card }) {
 				className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-105"
 			/>
 			<div className="absolute inset-0 bg-black/10 transition-colors group-hover:bg-black/0" />
-			<div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/40 p-2.5 backdrop-blur-sm sm:inset-x-4 sm:bottom-4 sm:p-3">
+			<div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/60 bg-white/85 p-2.5 backdrop-blur-sm dark:border-white/10 dark:bg-black/40 sm:inset-x-4 sm:bottom-4 sm:p-3">
 				<div className="flex items-center gap-3">
 					<div
 						aria-hidden="true"
 						className="size-8 shrink-0 rounded-full bg-[linear-gradient(135deg,#0BE27D,#0099ff)] sm:size-10"
 					/>
 					<div className="min-w-0">
-						<p className="truncate font-medium text-sm text-white">walterwhite</p>
-						<p className="truncate text-white/50 text-xs">@walterwhite</p>
+						<p className="truncate font-medium text-foreground text-sm dark:text-white">
+							walterwhite
+						</p>
+						<p className="truncate text-muted-foreground text-xs dark:text-white/50">
+							@walterwhite
+						</p>
 					</div>
 				</div>
 			</div>
@@ -56,13 +60,13 @@ function InspirationCard({ card }: { card: Card }) {
 
 export function InspirationSection() {
 	return (
-		<section className="relative overflow-hidden bg-black px-4 pt-24 pb-40 sm:px-6 lg:px-10">
+		<section className="relative overflow-hidden px-4 pt-24 pb-40 sm:px-6 lg:px-10 dark:bg-black">
 			<GridLines />
 			<div className="relative mx-auto max-w-6xl">
 				<div className="text-center">
 					<HomeEyebrow>Inspiration</HomeEyebrow>
 					<h2 className={homeHeading}>Find Inspiration</h2>
-					<p className="mx-auto mt-4 max-w-xl text-base text-white/60">
+					<p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground dark:text-white/60">
 						Fuel Your Creativity or Discover Fresh Content Ideas.
 					</p>
 				</div>
@@ -80,7 +84,7 @@ export function InspirationSection() {
 
 			<div
 				aria-hidden="true"
-				className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-64 bg-gradient-to-b from-transparent to-black"
+				className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-64 bg-gradient-to-b from-transparent to-canvas dark:to-black"
 			/>
 		</section>
 	);

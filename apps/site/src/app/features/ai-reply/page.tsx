@@ -62,7 +62,7 @@ export default function AIReplyFeaturePage() {
 					title="Instagram Comment • 2s ago"
 					icon={MessageSquare}
 					aside={
-						<span className="hidden font-bold text-[10px] text-primary uppercase tracking-widest sm:inline">
+						<span className="hidden font-mono text-[11px] text-brand-text sm:inline">
 							AI Active · 1.2s React Time · 100+ Languages
 						</span>
 					}
@@ -97,20 +97,20 @@ export default function AIReplyFeaturePage() {
 					<div className="grid items-center gap-10 lg:grid-cols-2">
 						<ul className="grid gap-4 sm:grid-cols-2">
 							{CORE_FEATURES.map(({ icon: Icon, title, description }) => (
-								<li key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6">
-									<span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+								<li key={title} className="rounded-2xl border border-border bg-surface-raised p-6">
+									<span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground">
 										<Icon className="size-6" aria-hidden="true" />
 									</span>
-									<h3 className="font-bold text-lg text-white">{title}</h3>
-									<p className="mt-2 text-sm text-white/60">{description}</p>
+									<h3 className="font-medium text-lg text-foreground">{title}</h3>
+									<p className="mt-2 text-sm text-muted-foreground">{description}</p>
 								</li>
 							))}
 						</ul>
 						<MockupFrame title="Automation Engine" icon={Bot}>
-							<p className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+							<p className="rounded-xl border border-border bg-surface-raised p-4 text-sm text-muted-foreground">
 								Analysis: Positive sentiment detected. Query about pricing.
 							</p>
-							<p className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-primary text-sm">
+							<p className="mt-4 rounded-xl border border-border-strong bg-surface p-4 text-brand-text text-sm">
 								"Reply generated with 1.2s latent response time."
 							</p>
 						</MockupFrame>

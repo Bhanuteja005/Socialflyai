@@ -34,11 +34,11 @@ export default function AIAssistantFeaturePage() {
 			>
 				<MockupFrame title="AI Writer" icon={PenTool}>
 					<div className="space-y-4">
-						<div className="h-4 w-3/4 rounded bg-white/5" />
-						<div className="h-4 w-full rounded bg-white/5" />
-						<div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4">
-							<Sparkles className="absolute -right-2 -bottom-2 size-12 text-primary opacity-10" />
-							<p className="text-sm text-white/80">
+						<div className="h-4 w-3/4 rounded bg-surface-raised" />
+						<div className="h-4 w-full rounded bg-surface-raised" />
+						<div className="relative overflow-hidden rounded-xl border border-border-strong bg-surface p-4">
+							<Sparkles className="absolute -right-2 -bottom-2 size-12 text-foreground opacity-10" />
+							<p className="text-sm text-foreground">
 								"The secret to consistent growth isn't working harder—it's working smarter with the
 								right tools. Here's how we helped 25k+ creators..."
 							</p>
@@ -67,10 +67,10 @@ export default function AIAssistantFeaturePage() {
 						],
 						visual: (
 							<MockupFrame title="Viral Hook Idea" icon={Sparkles}>
-								<p className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-white">
+								<p className="rounded-xl border border-border-strong bg-surface p-4 text-sm text-foreground">
 									"99% of creators are missing this one simple trick to double their reach..."
 								</p>
-								<p className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/50">
+								<p className="mt-4 rounded-xl border border-border bg-surface-raised p-4 text-sm text-muted-foreground">
 									Generating variation 2...
 								</p>
 							</MockupFrame>

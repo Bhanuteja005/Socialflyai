@@ -35,31 +35,33 @@ export function ResearchView() {
 		<>
 			<PageHeader
 				title="Research"
-				description="Understand your brand, how AI assistants talk about it, and what people search for."
+				description="Your brand, how AI assistants describe it, and what people search for."
 			/>
 			<Tabs
 				value={tab}
 				// Each tab's own options (e.g. the visibility period) don't carry over.
 				onValueChange={(v) => update({ tab: v === "brand" ? null : v, days: null })}
 			>
-				<TabsList className="mb-5 max-w-full overflow-x-auto" aria-label="Research sections">
-					<TabsTrigger value="brand">
-						<Building2 />
-						Brand
-					</TabsTrigger>
-					<TabsTrigger value="visibility">
-						<Eye />
-						AI visibility
-					</TabsTrigger>
-					<TabsTrigger value="keywords">
-						<KeyRound />
-						Keywords
-					</TabsTrigger>
-					<TabsTrigger value="competitors">
-						<Swords />
-						Competitors
-					</TabsTrigger>
-				</TabsList>
+				<div className="mb-6 border-border border-b pb-4">
+					<TabsList className="max-w-full overflow-x-auto" aria-label="Research sections">
+						<TabsTrigger value="brand">
+							<Building2 />
+							Brand
+						</TabsTrigger>
+						<TabsTrigger value="visibility">
+							<Eye />
+							AI visibility
+						</TabsTrigger>
+						<TabsTrigger value="keywords">
+							<KeyRound />
+							Keywords
+						</TabsTrigger>
+						<TabsTrigger value="competitors">
+							<Swords />
+							Competitors
+						</TabsTrigger>
+					</TabsList>
+				</div>
 				<TabsContent value="brand">
 					<BrandTab onOpenTab={(t) => update({ tab: t, days: null })} />
 				</TabsContent>

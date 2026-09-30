@@ -24,17 +24,22 @@ export function StepsSection({
 							{index < steps.length - 1 ? (
 								<div
 									aria-hidden="true"
-									className="absolute top-10 left-[calc(50%+3rem)] hidden w-[calc(100%-6rem)] border-white/10 border-t-2 border-dashed md:block"
+									className="absolute top-7 left-[calc(50%+2.5rem)] hidden w-[calc(100%-5rem)] border-border-strong border-t border-dashed md:block"
 								/>
 							) : null}
-							<div className="mx-auto mb-8 flex size-20 items-center justify-center rounded-3xl border border-white/10 bg-primary/10 text-primary shadow-[0_0_30px_rgba(11,226,125,0.05)] transition-transform group-hover:scale-105">
-								<Icon className="size-10" aria-hidden="true" />
+							<div className="mx-auto mb-6 flex size-14 items-center justify-center rounded-2xl border border-border bg-surface-raised text-foreground">
+								<Icon className="size-6" aria-hidden="true" />
 							</div>
-							<h3 className="font-bold text-white text-xl">
+							<p aria-hidden="true" className="mb-1 font-mono text-subtle-foreground text-xs">
+								{String(index + 1).padStart(2, "0")}
+							</p>
+							<h3 className="font-medium text-foreground text-lg">
 								<span className="sr-only">Step {index + 1}: </span>
 								{stepTitle}
 							</h3>
-							<p className="mt-4 text-white/60 leading-relaxed">{stepDescription}</p>
+							<p className="mx-auto mt-3 max-w-xs text-muted-foreground text-sm leading-relaxed">
+								{stepDescription}
+							</p>
 						</li>
 					))}
 				</ol>

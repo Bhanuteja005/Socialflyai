@@ -22,7 +22,7 @@ const data: CompetitorPageData = {
 			"Agorapulse is built for responding to the past. SocialflyAI is built for creating the future. Transition from manual community management to AI-driven content generation and growth.",
 		socialProof: (
 			<>
-				<span className="font-bold text-white">4.9/5</span> from 1.2k+ teams
+				<span className="font-mono text-foreground tabular-nums">4.9/5</span> from 1.2k+ teams
 			</>
 		),
 	},

@@ -23,7 +23,7 @@ const data: CompetitorPageData = {
 			"Buffer charges you for every social profile you add. SocialflyAI gives you the freedom of unlimited channels and the power of native AI content generation in one unified workflow.",
 		socialProof: (
 			<>
-				<span className="font-bold text-white">4.8/5</span> from 500+ users
+				<span className="font-mono text-foreground tabular-nums">4.8/5</span> from 500+ users
 			</>
 		),
 	},

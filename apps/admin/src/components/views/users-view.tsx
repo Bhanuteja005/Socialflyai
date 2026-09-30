@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@socialfly/ui/components/avatar";
 import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
 import { ConfirmDialog } from "@socialfly/ui/components/dialog";
@@ -23,6 +24,7 @@ import {
 	tdClass,
 	thClass,
 } from "../common";
+import { Toolbar } from "./parts";
 
 type Pending = { user: AdminUser; action: "disable" | "enable" };
 
@@ -39,11 +41,14 @@ export function UsersView() {
 
 	return (
 		<>
-			<PageHeader
-				title="Users"
-				description="Every account, newest first. Disabling signs someone out everywhere at once."
-			/>
-			<div className="mb-4">
+			<PageHeader title="Users" description="Every account, newest first." />
+			<Toolbar
+				aside={
+					query.data
+						? `${formatNumber(items.length)} ${query.hasNextPage ? "loaded" : items.length === 1 ? "user" : "users"}`
+						: null
+				}
+			>
 				<SearchBox
 					id="user-search"
 					label="Search users"
@@ -51,7 +56,7 @@ export function UsersView() {
 					value={search}
 					onChange={setSearch}
 				/>
-			</div>
+			</Toolbar>
 			{query.isError && !query.data ? (
 				<QueryError error={query.error} onRetry={() => void query.refetch()} />
 			) : query.isPending ? (
@@ -66,7 +71,7 @@ export function UsersView() {
 				/>
 			) : (
 				<TableCard>
-					<table className={tableClass}>
+					<table className={`${tableClass} relative`}>
 						<caption className="sr-only">Users</caption>
 						<thead>
 							<tr>
@@ -95,15 +100,22 @@ export function UsersView() {
 								const self = user.id === me.id;
 								const disabled = user.status === "disabled";
 								return (
-									<tr key={user.id} className="hover:bg-muted/40">
+									<tr key={user.id} className="transition-colors hover:bg-surface">
 										<td className={tdClass}>
-											<div className="flex flex-wrap items-center gap-1.5 font-medium">
-												{user.name || user.email}
-												{self ? <Badge tone="outline">You</Badge> : null}
+											<div className="flex items-center gap-3">
+												<Avatar name={user.name || user.email} size="sm" />
+												<div className="grid min-w-0 gap-0.5">
+													<div className="flex flex-wrap items-center gap-1.5 font-medium">
+														<span className="truncate">{user.name || user.email}</span>
+														{self ? <Badge tone="outline">You</Badge> : null}
+													</div>
+													{user.name ? (
+														<div className="truncate text-muted-foreground text-xs">
+															{user.email}
+														</div>
+													) : null}
+												</div>
 											</div>
-											{user.name ? (
-												<div className="text-muted-foreground text-xs">{user.email}</div>
-											) : null}
 										</td>
 										<td className={tdClass}>
 											<div className="flex flex-wrap gap-1.5">
@@ -116,10 +128,12 @@ export function UsersView() {
 												{user.emailVerifiedAt ? null : <Badge tone="warning">Unverified</Badge>}
 											</div>
 										</td>
-										<td className={`${tdClass} text-right tabular-nums`}>
+										<td className={`${tdClass} text-right font-mono tabular-nums`}>
 											{formatNumber(user.orgCount)}
 										</td>
-										<td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+										<td
+											className={`${tdClass} whitespace-nowrap font-mono text-muted-foreground text-xs`}
+										>
 											{user.lastLoginAt ? (
 												<span title={formatDateTime(user.lastLoginAt)}>
 													{formatRelative(user.lastLoginAt)}
@@ -128,7 +142,9 @@ export function UsersView() {
 												<None label="Never" />
 											)}
 										</td>
-										<td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+										<td
+											className={`${tdClass} whitespace-nowrap font-mono text-muted-foreground text-xs`}
+										>
 											{formatDate(user.createdAt)}
 										</td>
 										<td className={`${tdClass} text-right`}>

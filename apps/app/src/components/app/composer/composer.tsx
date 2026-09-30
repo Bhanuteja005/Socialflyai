@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@socialfly/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/components/card";
-import { ArrowLeft, FileText, Send } from "lucide-react";
+import { Card } from "@socialfly/ui/components/card";
+import { ArrowLeft, CalendarClock, FileText, Send } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Channel, PostDetail, ProviderInfo } from "@/lib/api-types";
@@ -14,11 +14,12 @@ import { AiAssist } from "./ai-assist";
 import { ChannelPicker } from "./channel-picker";
 import { ContentEditor } from "./content-editor";
 import { MediaAttach } from "./media-attach";
+import { PostPreview } from "./post-preview";
 import { ProviderSettings } from "./provider-settings";
 import { SchedulePanel } from "./schedule-panel";
 import { type ComposerPrefill, initialState, useComposer } from "./use-composer";
 import { useLiveValidation, useSubmitPost } from "./use-post-actions";
-import { type ChannelProblems, ValidationPanel } from "./validation-panel";
+import { type ChannelProblems, ReadinessStatus, ValidationPanel } from "./validation-panel";
 
 type ComposerProps = {
 	channels: Channel[];
@@ -35,6 +36,7 @@ export function Composer({ channels, providers, post, presetDate, prefill, brief
 	const [initial] = useState(() => initialState(org.timezone, post, presetDate, prefill));
 	const composer = useComposer(initial, channels, org.timezone);
 	const [tab, setTab] = useState("main");
+	const [previewChannel, setPreviewChannel] = useState<string | null>(null);
 	const validation = useLiveValidation(composer, true);
 	const submit = useSubmitPost(composer, post);
 	const { state, selected } = composer;
@@ -80,8 +82,11 @@ export function Composer({ channels, providers, post, presetDate, prefill, brief
 	const busy = submit.isPending;
 	const errorIds = new Set([...problems.entries()].filter(([, l]) => l.length).map(([id]) => id));
 
+	const previewId = state.channelIds.includes(tab) ? tab : previewChannel;
+	const activeCount = channels.filter((c) => c.status === "active").length;
+
 	return (
-		<div className="pb-24 lg:pb-0">
+		<div className="pb-32 lg:pb-0">
 			<PageHeader
 				eyebrow={
 					<Link
@@ -94,36 +99,44 @@ export function Composer({ channels, providers, post, presetDate, prefill, brief
 				}
 				title={post ? "Edit post" : "Create post"}
 			/>
-			<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-				<div className="grid gap-6">
-					<Card>
-						<CardHeader>
-							<CardTitle>Channels</CardTitle>
-						</CardHeader>
-						<CardContent>
+			<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+				<div className="grid min-w-0 gap-6">
+					<Card className="overflow-hidden">
+						<div className="grid gap-3 border-border border-b px-5 py-4">
+							<div className="flex items-center justify-between gap-3">
+								<h2 className="font-medium text-[15px]">Publish to</h2>
+								{channels.length > 0 ? (
+									<span className="font-mono text-muted-foreground text-xs tabular-nums">
+										{selected.length}/{activeCount}
+									</span>
+								) : null}
+							</div>
 							<ChannelPicker
 								channels={channels}
 								selectedIds={state.channelIds}
 								onToggle={composer.toggleChannel}
 								errorIds={errorIds}
 							/>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardHeader className="flex-row items-center justify-between gap-2">
-							<CardTitle>Content</CardTitle>
-							<AiAssist composer={composer} activeTab={tab} disabled={busy} initialBrief={brief} />
-						</CardHeader>
-						<CardContent className="grid gap-4">
+						</div>
+						<div className="grid gap-4 px-5 py-4">
 							<ContentEditor
 								composer={composer}
 								providers={providers}
 								activeTab={tab}
 								onTabChange={setTab}
 								disabled={busy}
+								toolbar={
+									<AiAssist
+										composer={composer}
+										activeTab={tab}
+										disabled={busy}
+										initialBrief={brief}
+									/>
+								}
 							/>
 							<MediaAttach media={state.media} onChange={composer.updateMedia} disabled={busy} />
-						</CardContent>
+						</div>
+						<ValidationPanel channels={selected} problems={problems} onSelect={setTab} />
 					</Card>
 					{selected.length > 0 ? (
 						<ProviderSettings
@@ -135,12 +148,12 @@ export function Composer({ channels, providers, post, presetDate, prefill, brief
 					) : null}
 				</div>
 
-				<aside className="grid gap-4 lg:sticky lg:top-6">
+				<aside className="grid min-w-0 gap-6">
 					<Card>
-						<CardHeader>
-							<CardTitle>Publishing</CardTitle>
-						</CardHeader>
-						<CardContent className="grid gap-4">
+						<div className="border-border border-b px-5 py-3.5">
+							<h2 className="font-medium text-[15px]">When to publish</h2>
+						</div>
+						<div className="px-5 py-4">
 							<SchedulePanel
 								mode={state.mode}
 								onModeChange={(mode) => composer.update({ mode })}
@@ -150,44 +163,48 @@ export function Composer({ channels, providers, post, presetDate, prefill, brief
 								timeZone={org.timezone}
 								disabled={busy}
 							/>
-							<div className="hidden gap-2 lg:grid">
-								<SubmitButtons
-									mode={state.mode}
-									busy={busy}
-									pendingAction={submit.variables}
-									canPublish={!nothingSelected && !hasProblems && !inPast}
-									canSaveDraft={!nothingSelected}
-									onSubmit={(a) => submit.mutate(a)}
-								/>
-							</div>
-						</CardContent>
+						</div>
 					</Card>
-					<Card>
-						<CardContent>
-							<ValidationPanel
-								channels={selected}
-								problems={problems}
-								checking={validation.settling}
-								onSelect={setTab}
-							/>
-							{validation.isError ? (
-								<p className="mt-2 text-danger text-xs">{errorMessage(validation.error)}</p>
-							) : null}
-						</CardContent>
-					</Card>
+					<PostPreview
+						channels={selected}
+						content={state.content}
+						overrides={state.overrides}
+						settings={state.settings}
+						media={state.media}
+						scheduledAt={composer.scheduledAt}
+						timeZone={org.timezone}
+						active={previewId}
+						onActiveChange={(id) => {
+							setPreviewChannel(id);
+							// Keep the editor and the preview on the same channel once one is picked.
+							if (tab !== "main") setTab(id);
+						}}
+					/>
 				</aside>
 			</div>
 
-			{/* Mobile action bar */}
-			<div className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 border-border border-t bg-background/95 p-3 backdrop-blur lg:hidden">
-				<SubmitButtons
-					mode={state.mode}
-					busy={busy}
-					pendingAction={submit.variables}
-					canPublish={!nothingSelected && !hasProblems && !inPast}
-					canSaveDraft={!nothingSelected}
-					onSubmit={(a) => submit.mutate(a)}
-				/>
+			{/* Action bar: fixed on small screens, floating at the bottom of the page on large ones. */}
+			<div className="fixed inset-x-0 bottom-0 z-20 border-border border-t bg-surface-raised/95 px-4 py-3 backdrop-blur lg:sticky lg:bottom-4 lg:mt-6 lg:rounded-full lg:border lg:py-2.5 lg:pr-3 lg:pl-5 lg:shadow-lg">
+				<div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
+					<div className="min-w-0 flex-1">
+						<ReadinessStatus
+							channels={selected}
+							problems={problems}
+							checking={validation.settling}
+							error={validation.isError ? errorMessage(validation.error) : null}
+						/>
+					</div>
+					<div className="grid grid-cols-2 gap-2 sm:flex">
+						<SubmitButtons
+							mode={state.mode}
+							busy={busy}
+							pendingAction={submit.variables}
+							canPublish={!nothingSelected && !hasProblems && !inPast}
+							canSaveDraft={!nothingSelected}
+							onSubmit={(a) => submit.mutate(a)}
+						/>
+					</div>
+				</div>
 			</div>
 		</div>
 	);
@@ -212,23 +229,21 @@ function SubmitButtons({
 	return (
 		<>
 			<Button
-				className="order-2 lg:order-1"
-				disabled={busy || !canPublish}
-				loading={busy && pendingAction === primary}
-				onClick={() => onSubmit(primary)}
-			>
-				<Send />
-				{mode === "now" ? "Publish now" : "Schedule"}
-			</Button>
-			<Button
 				variant="outline"
-				className="order-1 lg:order-2"
 				disabled={busy || !canSaveDraft}
 				loading={busy && pendingAction === "draft"}
 				onClick={() => onSubmit("draft")}
 			>
 				<FileText />
 				Save draft
+			</Button>
+			<Button
+				disabled={busy || !canPublish}
+				loading={busy && pendingAction === primary}
+				onClick={() => onSubmit(primary)}
+			>
+				{mode === "now" ? <Send /> : <CalendarClock />}
+				{mode === "now" ? "Publish now" : "Schedule post"}
 			</Button>
 		</>
 	);

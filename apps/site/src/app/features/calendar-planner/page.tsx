@@ -89,7 +89,7 @@ export default function CalendarPlannerFeaturePage() {
 								title="Client Review"
 								icon={Users}
 								aside={
-									<span className="flex items-center gap-1.5 font-bold text-primary text-xs">
+									<span className="flex items-center gap-1.5 font-medium text-brand-text text-xs">
 										<CircleCheck className="size-4" />
 										Approve Post
 									</span>
@@ -125,7 +125,7 @@ export default function CalendarPlannerFeaturePage() {
 											className={
 												index % 4 === 0
 													? "aspect-square rounded-lg bg-primary/30"
-													: "aspect-square rounded-lg bg-white/10"
+													: "aspect-square rounded-lg bg-muted"
 											}
 										/>
 									))}

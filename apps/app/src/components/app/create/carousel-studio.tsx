@@ -30,7 +30,7 @@ import { api, call } from "@/lib/api-client";
 import type { AiCapabilities, CarouselInput } from "@/lib/api-types";
 import { PROVIDERS, type ProviderId } from "@/lib/providers";
 import { AiError, AiNotConfigured } from "../ai/ai-shared";
-import { composeHref, GenerationProgress } from "./generation-status";
+import { composeHref, GenerationProgress, StepNumber } from "./generation-status";
 import { type ThemeId, ThemeSwatches } from "./theme-swatches";
 
 const MIN_SLIDES = 2;
@@ -136,10 +136,11 @@ export function CarouselStudio({
 			<Card className="max-w-2xl">
 				<form onSubmit={onOutline} noValidate>
 					<CardHeader>
-						<CardTitle>1. What's it about?</CardTitle>
-						<CardDescription>
-							AI drafts the slides, a caption and hashtags. You can edit everything next.
-						</CardDescription>
+						<CardTitle className="flex items-center">
+							<StepNumber n={1} />
+							What's it about?
+						</CardTitle>
+						<CardDescription>AI drafts the slides, caption and hashtags.</CardDescription>
 					</CardHeader>
 					<CardContent className="grid gap-4">
 						<Field
@@ -214,8 +215,7 @@ export function CarouselStudio({
 		<div className="grid gap-6">
 			{caps.text ? null : (
 				<AiNotConfigured>
-					AI writing needs <code>ANTHROPIC_API_KEY</code> on the server, so write the slides
-					yourself. Rendering them into images works without it.
+					Add <code>ANTHROPIC_API_KEY</code> for AI drafts — you can still write slides by hand.
 				</AiNotConfigured>
 			)}
 			<form
@@ -226,9 +226,16 @@ export function CarouselStudio({
 				<Card>
 					<CardHeader className="flex-row items-start justify-between gap-3">
 						<div className="grid gap-1">
-							<CardTitle>2. Slides</CardTitle>
+							<CardTitle className="flex items-center">
+								<StepNumber n={2} />
+								Slides
+							</CardTitle>
 							<CardDescription>
-								Slide 1 is the cover. Keep one idea per slide; {MIN_SLIDES}–{MAX_SLIDES} slides.
+								Slide 1 is the cover ·{" "}
+								<span className="font-mono tabular-nums">
+									{MIN_SLIDES}–{MAX_SLIDES}
+								</span>{" "}
+								slides
 							</CardDescription>
 						</div>
 						<Button variant="ghost" size="sm" onClick={startOver} disabled={render.busy}>
@@ -330,7 +337,10 @@ export function CarouselStudio({
 
 				<Card className="lg:sticky lg:top-6">
 					<CardHeader>
-						<CardTitle>3. Design</CardTitle>
+						<CardTitle className="flex items-center">
+							<StepNumber n={3} />
+							Design
+						</CardTitle>
 					</CardHeader>
 					<CardContent className="grid gap-4">
 						<ThemeSwatches value={theme} onChange={setTheme} disabled={render.busy} />

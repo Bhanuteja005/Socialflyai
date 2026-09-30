@@ -23,7 +23,7 @@ const data: CompetitorPageData = {
 			"Sendible handles client reports, but SocialflyAI handles the content. Use our AI creative partner to scale your agency's output without adding to your headcount or your bill.",
 		socialProof: (
 			<>
-				<span className="font-bold text-white">4.9/5</span> rated by 2k+ creators
+				<span className="font-mono text-foreground tabular-nums">4.9/5</span> rated by 2k+ creators
 			</>
 		),
 	},

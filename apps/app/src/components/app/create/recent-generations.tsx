@@ -1,7 +1,7 @@
 "use client";
 
+import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/components/card";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import {
 	Clapperboard,
@@ -25,7 +25,10 @@ import { errorMessage } from "@/lib/errors";
 import { formatRelative } from "@/lib/format";
 import { MediaThumb } from "../media/media-thumb";
 import { useOrg } from "../org-provider";
-import { composeHref, GENERATION_KIND, GenerationBadge } from "./generation-status";
+import { SectionHeader } from "../page-header";
+import { composeHref, GENERATION_KIND, GENERATION_STATUS } from "./generation-status";
+
+const gridClass = "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4";
 
 const KIND_ICON: Record<GenerationKind, typeof ImageIcon> = {
 	post: FileText,
@@ -68,92 +71,108 @@ export function RecentGenerations() {
 	const items = recent.data?.items ?? [];
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Recent</CardTitle>
-			</CardHeader>
-			<CardContent>
-				{recent.isPending ? (
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{Array.from({ length: 4 }, (_, i) => `sk-${i}`).map((k) => (
-							<Skeleton key={k} className="aspect-square" />
-						))}
-					</div>
-				) : recent.isError ? (
-					<EmptyState
-						compact
-						title="Couldn't load recent generations"
-						description={errorMessage(recent.error)}
-						action={
-							<Button variant="outline" size="sm" onClick={() => recent.refetch()}>
-								Retry
-							</Button>
-						}
-					/>
-				) : items.length === 0 ? (
-					<EmptyState
-						compact
-						icon={Wand2}
-						title="Nothing generated yet"
-						description="Images, carousels, videos and AI drafts you create show up here."
-					/>
-				) : (
-					<ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{items.map((g) => {
-							const Icon = KIND_ICON[g.kind];
-							const cover = g.media[0];
-							const usable =
-								can("editor") &&
-								g.status === "succeeded" &&
-								g.media.length > 0 &&
-								(g.kind === "image" || g.kind === "carousel" || g.kind === "video");
-							return (
-								<li key={g.id} className="grid content-start gap-2">
-									<div className="relative">
-										{cover ? (
-											<MediaThumb asset={cover} className="ring-1 ring-border" />
-										) : (
-											<div className="flex aspect-square items-center justify-center rounded-md bg-muted">
-												<Icon className="size-6 text-subtle-foreground" aria-hidden="true" />
-											</div>
-										)}
+		<section aria-labelledby="recent-generations">
+			<SectionHeader title={<span id="recent-generations">Recent generations</span>} />
+			{recent.isPending ? (
+				<div className={gridClass}>
+					{Array.from({ length: 4 }, (_, i) => `sk-${i}`).map((k) => (
+						<div key={k} className="overflow-hidden rounded-2xl border border-border">
+							<Skeleton className="aspect-square rounded-none" />
+							<div className="grid gap-1.5 p-3">
+								<Skeleton className="h-3 w-1/2" />
+								<Skeleton className="h-2.5 w-3/4" />
+							</div>
+						</div>
+					))}
+				</div>
+			) : recent.isError ? (
+				<EmptyState
+					compact
+					title="Couldn't load recent generations"
+					description={errorMessage(recent.error)}
+					action={
+						<Button variant="outline" size="sm" onClick={() => recent.refetch()}>
+							Retry
+						</Button>
+					}
+				/>
+			) : items.length === 0 ? (
+				<EmptyState
+					compact
+					icon={Wand2}
+					title="Nothing generated yet"
+					description="Images, carousels, videos and AI drafts you create show up here."
+				/>
+			) : (
+				<ul className={gridClass}>
+					{items.map((g) => {
+						const Icon = KIND_ICON[g.kind];
+						const cover = g.media[0];
+						const usable =
+							can("editor") &&
+							g.status === "succeeded" &&
+							g.media.length > 0 &&
+							(g.kind === "image" || g.kind === "carousel" || g.kind === "video");
+						const status = GENERATION_STATUS[g.status];
+						return (
+							<li
+								key={g.id}
+								className="group overflow-hidden rounded-2xl border border-border bg-surface-raised transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md"
+							>
+								<div className="relative">
+									{cover ? (
+										<MediaThumb asset={cover} className="rounded-none" />
+									) : (
+										<div className="flex aspect-square items-center justify-center bg-surface">
+											<span className="flex size-11 items-center justify-center rounded-full border border-border bg-surface-raised">
+												<Icon className="size-5 text-muted-foreground" aria-hidden="true" />
+											</span>
+										</div>
+									)}
+									<span className="absolute top-2 right-2 flex items-center gap-1">
 										{g.kind === "carousel" && g.media.length > 1 ? (
-											<span className="absolute top-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 font-medium text-[10px] text-white">
+											<span className="rounded-full bg-black/60 px-2 py-0.5 font-mono text-[10px] text-white tabular-nums backdrop-blur-sm">
 												{g.media.length} slides
 											</span>
 										) : null}
-									</div>
-									<div className="grid min-w-0 gap-1 px-0.5">
-										<div className="flex items-center justify-between gap-2">
-											<span className="truncate font-medium text-xs">
-												{GENERATION_KIND[g.kind]}
-											</span>
-											<GenerationBadge status={g.status} />
-										</div>
-										<p
-											className="line-clamp-2 text-[11px] text-muted-foreground"
-											title={summary(g)}
-										>
-											{summary(g)}
-										</p>
-										<p className="text-[11px] text-subtle-foreground">
-											{formatRelative(g.createdAt)}
-										</p>
-										{usable ? (
-											<Button variant="outline" size="xs" asChild className="justify-self-start">
+										<Badge tone={status.tone} dot className="bg-surface-raised/95 backdrop-blur-sm">
+											{status.label}
+										</Badge>
+									</span>
+									{usable ? (
+										// Hover/focus overlay on pointer devices; always visible on touch screens.
+										<div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/60 to-transparent p-3 pt-10 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+											<Button size="sm" variant="outline" asChild className="border-transparent">
 												<Link href={composeHref(g.id)}>
 													<PenSquare />
 													Use in a post
 												</Link>
 											</Button>
-										) : null}
+										</div>
+									) : null}
+								</div>
+								<div className="grid min-w-0 gap-1 border-border border-t px-3 py-2.5">
+									<div className="flex items-center justify-between gap-2">
+										<span className="flex min-w-0 items-center gap-1.5 font-medium text-[13px]">
+											<Icon
+												className="size-3.5 shrink-0 text-muted-foreground"
+												aria-hidden="true"
+											/>
+											<span className="truncate">{GENERATION_KIND[g.kind]}</span>
+										</span>
+										<span className="shrink-0 font-mono text-[11.5px] text-subtle-foreground tabular-nums">
+											{formatRelative(g.createdAt)}
+										</span>
 									</div>
-								</li>
-							);
-						})}
-					</ul>
-				)}
-			</CardContent>
-		</Card>
+									<p className="truncate text-muted-foreground text-xs" title={summary(g)}>
+										{summary(g)}
+									</p>
+								</div>
+							</li>
+						);
+					})}
+				</ul>
+			)}
+		</section>
 	);
 }

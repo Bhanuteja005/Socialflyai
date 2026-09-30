@@ -6,9 +6,9 @@ import { type FormEvent, useId } from "react";
 import { focusRing } from "@/components/marketing/primitives";
 import { SUPPORT_EMAIL } from "@/components/marketing/site-config";
 
-const labelClass = "mb-2 block font-black text-[10px] text-white/50 uppercase tracking-widest";
+const labelClass = "mb-2 block font-mono text-muted-foreground text-xs";
 const fieldClass =
-	"w-full rounded-2xl border border-white/10 bg-white/5 px-6 font-medium text-white transition placeholder:text-white/30 focus:border-primary/40 focus:outline-none focus:ring-4 focus:ring-primary/10";
+	"w-full rounded-xl border border-input bg-surface-raised px-4 text-foreground transition-colors placeholder:text-subtle-foreground focus:border-ring focus:outline-none";
 
 /**
  * Contact form. There is no backend endpoint for marketing enquiries, so submitting opens the
@@ -44,7 +44,7 @@ export function ContactForm() {
 					autoComplete="name"
 					required
 					placeholder="e.g. Sarah Miller"
-					className={`${fieldClass} h-14`}
+					className={`${fieldClass} h-12`}
 				/>
 			</div>
 			<div>
@@ -58,7 +58,7 @@ export function ContactForm() {
 					autoComplete="email"
 					required
 					placeholder="sarah@example.com"
-					className={`${fieldClass} h-14`}
+					className={`${fieldClass} h-12`}
 				/>
 			</div>
 			<div>
@@ -71,12 +71,12 @@ export function ContactForm() {
 					rows={4}
 					required
 					placeholder="How can we help?"
-					className={`${fieldClass} resize-none py-5`}
+					className={`${fieldClass} resize-none py-3`}
 				/>
 			</div>
 			<button
 				type="submit"
-				className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-black shadow-xl transition hover:scale-[1.02] hover:bg-primary-hover active:scale-95 ${focusRing}`}
+				className={`flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink font-medium text-ink-foreground transition-colors hover:bg-ink-hover ${focusRing}`}
 			>
 				Send Message
 				<Send className="size-4" aria-hidden="true" />

@@ -35,7 +35,7 @@ export function SchedulePanel({
 			<div
 				role="radiogroup"
 				aria-label="When to publish"
-				className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+				className="grid grid-cols-2 gap-0.5 rounded-full border border-border bg-surface-raised p-1"
 			>
 				{options.map((o) => (
 					// biome-ignore lint/a11y/useSemanticElements: segmented control styled as buttons
@@ -47,9 +47,9 @@ export function SchedulePanel({
 						disabled={disabled}
 						onClick={() => onModeChange(o.value)}
 						className={cn(
-							"flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md font-medium text-xs transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+							"flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-full font-medium text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ring",
 							mode === o.value
-								? "bg-surface-raised text-foreground shadow-xs"
+								? "bg-ink text-ink-foreground"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 					>
@@ -72,7 +72,10 @@ export function SchedulePanel({
 					/>
 					<p
 						id="scheduled-at-hint"
-						className={cn("text-xs", inPast ? "text-danger" : "text-muted-foreground")}
+						className={cn(
+							"font-mono text-xs tabular-nums",
+							inPast ? "text-danger" : "text-muted-foreground",
+						)}
 					>
 						{inPast
 							? "That time is in the past."
@@ -82,9 +85,7 @@ export function SchedulePanel({
 					</p>
 				</div>
 			) : (
-				<p className="text-muted-foreground text-xs">
-					Goes out as soon as you click Publish. Each channel publishes independently.
-				</p>
+				<p className="text-muted-foreground text-xs">Goes out as soon as you click Publish.</p>
 			)}
 		</div>
 	);

@@ -129,13 +129,11 @@ export default function PhotoVideoDownloaderPage() {
 				<div className="grid gap-6 sm:grid-cols-3">
 					{PLATFORM_GROUPS.map((group) => (
 						<div key={group.title}>
-							<h4 className="mb-3 font-bold text-primary text-sm uppercase tracking-widest">
-								{group.title}
-							</h4>
+							<h4 className="mb-3 font-medium text-brand-text text-sm font-mono">{group.title}</h4>
 							<ul className="space-y-2">
 								{group.items.map((item) => (
-									<li key={item} className="flex items-center gap-2 text-white/70">
-										<CircleCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
+									<li key={item} className="flex items-center gap-2 text-muted-foreground">
+										<CircleCheck className="size-4 shrink-0 text-brand-text" aria-hidden="true" />
 										{item}
 									</li>
 								))}

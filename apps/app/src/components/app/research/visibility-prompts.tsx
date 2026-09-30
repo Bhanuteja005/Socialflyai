@@ -64,17 +64,20 @@ export function PromptsCard({ prompts }: { prompts: ReturnType<typeof useVisibil
 	}
 
 	return (
-		<Card>
-			<CardHeader>
+		<Card className="overflow-hidden">
+			<CardHeader className="border-border border-b pb-4">
 				<CardTitle>Questions we ask</CardTitle>
 				<CardDescription>
-					Phrase them the way a buyer would ask an assistant, without naming your brand — e.g.
-					“What's the best tool to schedule LinkedIn posts?” Up to {MAX_PROMPTS} active at a time.
+					Ask the way a buyer would, without naming your brand. Up to{" "}
+					<span className="font-mono">{MAX_PROMPTS}</span> active.
 				</CardDescription>
 			</CardHeader>
 
 			{editor ? (
-				<form onSubmit={onAdd} className="flex flex-wrap gap-2 px-5 pt-4">
+				<form
+					onSubmit={onAdd}
+					className="flex flex-wrap gap-2 border-border border-b bg-surface px-5 py-4"
+				>
 					<label htmlFor="new-prompt" className="sr-only">
 						New question
 					</label>
@@ -89,7 +92,7 @@ export function PromptsCard({ prompts }: { prompts: ReturnType<typeof useVisibil
 								: "Add a question buyers ask…"
 						}
 						onChange={(e) => setDraft(e.target.value)}
-						className="min-w-60 flex-1"
+						className="min-w-0 flex-1 basis-40"
 						aria-describedby={create.error ? "new-prompt-error" : undefined}
 					/>
 					<Button
@@ -108,13 +111,13 @@ export function PromptsCard({ prompts }: { prompts: ReturnType<typeof useVisibil
 				</form>
 			) : null}
 
-			<div className="mt-4">
+			<div>
 				{prompts.isPending ? (
-					<div className="px-5 pb-5">
+					<div className="p-5">
 						<ListSkeleton />
 					</div>
 				) : prompts.isError ? (
-					<div className="px-5 pb-5">
+					<div className="p-5">
 						<LoadError
 							title="Couldn't load your questions"
 							error={prompts.error}
@@ -122,7 +125,7 @@ export function PromptsCard({ prompts }: { prompts: ReturnType<typeof useVisibil
 						/>
 					</div>
 				) : items.length === 0 ? (
-					<div className="px-5 pb-5">
+					<div className="p-5">
 						<EmptyState
 							compact
 							icon={MessageSquareText}
@@ -132,11 +135,11 @@ export function PromptsCard({ prompts }: { prompts: ReturnType<typeof useVisibil
 					</div>
 				) : (
 					<>
-						<p className="px-5 pb-2 text-muted-foreground text-xs tabular-nums">
+						<p className="flex h-10 items-center border-border border-b px-5 font-mono text-muted-foreground text-xs tabular-nums">
 							{activeCount} of {MAX_PROMPTS} active
 							{items.length > activeCount ? ` · ${items.length - activeCount} paused` : ""}
 						</p>
-						<ul className="divide-y divide-border border-border border-t">
+						<ul className="divide-y divide-border">
 							{items.map((p) => (
 								<PromptRow
 									key={p.id}
@@ -269,7 +272,7 @@ function PromptRow({
 				)}
 
 				<span className="w-24 text-right">
-					<span className="block font-semibold text-sm tabular-nums">
+					<span className="block font-mono text-sm tabular-nums">
 						{formatPercent(prompt.mentionRate)}
 					</span>
 					<span className="block text-muted-foreground text-xs">mention rate</span>
@@ -358,11 +361,14 @@ function CheckItem({ check: c, onView }: { check: VisibilityCheck; onView: () =>
 	const { org } = useOrg();
 	const sentiment = c.sentiment ? SENTIMENT[c.sentiment] : undefined;
 	return (
-		<li className="grid gap-2 rounded-lg border border-border bg-surface-raised p-3">
+		<li className="grid gap-2 rounded-xl border border-border bg-surface-raised p-4">
 			<div className="flex flex-wrap items-center gap-2 text-xs">
-				<span className="font-semibold text-sm">{engineName(c.engine)}</span>
-				<span className="text-muted-foreground">{c.model}</span>
-				<span className="text-subtle-foreground" title={formatDateTime(c.checkedAt, org.timezone)}>
+				<span className="font-medium text-sm">{engineName(c.engine)}</span>
+				<span className="font-mono text-[11px] text-muted-foreground">{c.model}</span>
+				<span
+					className="font-mono text-subtle-foreground"
+					title={formatDateTime(c.checkedAt, org.timezone)}
+				>
 					· {formatRelative(c.checkedAt)}
 				</span>
 				<span className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -411,10 +417,8 @@ function CheckItem({ check: c, onView }: { check: VisibilityCheck; onView: () =>
 										className={cn(
 											"inline-flex max-w-64 items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:underline",
 											ci.own
-												? "border-success/40 bg-success-soft text-success"
-												: ci.competitorId
-													? "border-warning/40 bg-warning-soft text-warning"
-													: "border-border text-muted-foreground",
+												? "border-border-strong bg-surface text-foreground"
+												: "border-border text-muted-foreground",
 										)}
 									>
 										<span className="truncate">{ci.domain}</span>
@@ -463,7 +467,7 @@ function FullAnswerDialog({ id, onClose }: { id: string | null; onClose: () => v
 						onRetry={() => void check.refetch()}
 					/>
 				) : (
-					<div className="scrollbar-thin max-h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-surface p-4 text-sm leading-relaxed">
+					<div className="scrollbar-thin max-h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed">
 						{check.data.answer || "The engine returned an empty answer."}
 					</div>
 				)}

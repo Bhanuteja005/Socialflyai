@@ -51,7 +51,7 @@ function SettingInput({
 			);
 		case "boolean":
 			return (
-				<div className="flex items-center justify-between gap-3 self-end rounded-md border border-border px-3 py-2">
+				<div className="flex h-9 items-center justify-between gap-3 self-end rounded-full border border-border bg-surface px-4">
 					<Label htmlFor={id} className="font-normal">
 						{field.label}
 					</Label>
@@ -126,27 +126,38 @@ export function ProviderSettings({
 	if (withSettings.length === 0) return null;
 
 	return (
-		<div className="grid gap-4">
-			{withSettings.map((channel) => (
-				<fieldset key={channel.id} className="grid gap-3 rounded-lg border border-border p-4">
-					<legend className="flex items-center gap-2 px-1 font-medium text-sm">
-						<ChannelAvatar channel={channel} size="sm" />
-						{channel.name}
-					</legend>
-					<div className="grid gap-3 sm:grid-cols-2">
-						{providerMeta(channel.provider).settings.map((field) => (
-							<SettingInput
-								key={field.key}
-								field={field}
-								id={`setting-${channel.id}-${field.key}`}
-								value={settings[channel.id]?.[field.key]}
-								onChange={(v) => onChange(channel.id, field.key, v)}
-								disabled={disabled}
-							/>
-						))}
-					</div>
-				</fieldset>
-			))}
-		</div>
+		<section
+			aria-label="Channel settings"
+			className="overflow-hidden rounded-2xl border border-border bg-surface-raised"
+		>
+			<div className="border-border border-b px-5 py-3.5">
+				<h2 className="font-medium text-[15px]">Channel settings</h2>
+			</div>
+			<div className="divide-y divide-border">
+				{withSettings.map((channel) => (
+					<fieldset key={channel.id} className="grid gap-3 px-5 py-4">
+						<legend className="float-left mb-3 flex w-full items-center gap-2.5 font-medium text-sm">
+							<ChannelAvatar channel={channel} size="xs" />
+							{channel.name}
+							<span className="font-normal text-muted-foreground text-xs">
+								{providerMeta(channel.provider).name}
+							</span>
+						</legend>
+						<div className="clear-both grid gap-3 sm:grid-cols-2">
+							{providerMeta(channel.provider).settings.map((field) => (
+								<SettingInput
+									key={field.key}
+									field={field}
+									id={`setting-${channel.id}-${field.key}`}
+									value={settings[channel.id]?.[field.key]}
+									onChange={(v) => onChange(channel.id, field.key, v)}
+									disabled={disabled}
+								/>
+							))}
+						</div>
+					</fieldset>
+				))}
+			</div>
+		</section>
 	);
 }

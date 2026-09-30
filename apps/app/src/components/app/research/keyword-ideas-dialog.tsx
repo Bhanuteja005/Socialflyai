@@ -102,7 +102,7 @@ export function KeywordIdeasDialog({
 						description="Try broader or different seed keywords."
 					/>
 				) : items.length ? (
-					<div className="scrollbar-thin max-h-[50vh] overflow-auto rounded-md border border-border">
+					<div className="scrollbar-thin max-h-[50vh] overflow-auto rounded-xl border border-border">
 						<table className="w-full text-sm">
 							<caption className="sr-only">Keyword ideas</caption>
 							<thead className="sticky top-0 bg-surface">
@@ -135,15 +135,15 @@ export function KeywordIdeasDialog({
 												{idea.keyword}
 											</th>
 											<td
-												className="px-3 py-2 text-right tabular-nums"
+												className="px-3 py-2 text-right font-mono tabular-nums"
 												title={formatNumber(idea.searchVolume)}
 											>
 												{formatCompact(idea.searchVolume)}
 											</td>
-											<td className="px-3 py-2 text-right tabular-nums">
+											<td className="px-3 py-2 text-right font-mono tabular-nums">
 												{idea.difficulty === null ? UNKNOWN : Math.round(idea.difficulty)}
 											</td>
-											<td className="px-3 py-2 text-right tabular-nums">
+											<td className="px-3 py-2 text-right font-mono tabular-nums">
 												{idea.cpcUsd === null ? UNKNOWN : formatUsd(Number(idea.cpcUsd))}
 											</td>
 											<td className="px-3 py-1.5 text-right">

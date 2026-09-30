@@ -41,13 +41,16 @@ export function FeatureSplit({
 		>
 			<div className="w-full max-w-xl lg:flex-1">
 				<h3 className={headingSub}>{title}</h3>
-				<p className="mt-6 text-base text-white/60 leading-relaxed sm:text-lg">{description}</p>
+				<p className="mt-4 text-base text-muted-foreground leading-relaxed">{description}</p>
 
 				{bullets && bullets.length > 0 ? (
 					<ul className="mt-8 space-y-4">
 						{bullets.map((bullet) => (
-							<li key={bullet} className="flex items-start gap-3 text-white/80">
-								<CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+							<li key={bullet} className="flex items-start gap-3 text-foreground">
+								<CircleCheck
+									className="mt-0.5 size-4 shrink-0 text-brand-text"
+									aria-hidden="true"
+								/>
 								<span>{bullet}</span>
 							</li>
 						))}
@@ -59,9 +62,9 @@ export function FeatureSplit({
 						{chips.map(({ icon: Icon, label }) => (
 							<li
 								key={label}
-								className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-2 font-semibold text-sm text-white"
+								className="flex items-center gap-2 rounded-full border border-border bg-surface-raised px-5 py-2 font-medium text-sm text-foreground"
 							>
-								{Icon ? <Icon className="size-4 text-primary" aria-hidden="true" /> : null}
+								{Icon ? <Icon className="size-4 text-foreground" aria-hidden="true" /> : null}
 								{label}
 							</li>
 						))}
@@ -73,12 +76,12 @@ export function FeatureSplit({
 						{cards.map(({ icon: Icon, title: cardTitle, description: cardDescription }) => (
 							<li
 								key={cardTitle}
-								className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4"
+								className="flex items-start gap-4 rounded-2xl border border-border bg-surface-raised p-4"
 							>
-								<Icon className="mt-1 size-6 shrink-0 text-primary" aria-hidden="true" />
+								<Icon className="mt-1 size-6 shrink-0 text-foreground" aria-hidden="true" />
 								<div>
-									<p className="mb-1 font-bold text-white">{cardTitle}</p>
-									<p className="text-sm text-white/60">{cardDescription}</p>
+									<p className="mb-1 font-medium text-foreground">{cardTitle}</p>
+									<p className="text-sm text-muted-foreground">{cardDescription}</p>
 								</div>
 							</li>
 						))}
@@ -98,17 +101,12 @@ export function FeatureSplit({
 
 export function StatGrid({ stats, className }: { stats: FeatureStat[]; className?: string }) {
 	return (
-		<div className={cn("grid grid-cols-2 gap-4", className)}>
+		<div className={cn("grid grid-cols-2 gap-3 sm:gap-4", className)}>
 			{stats.map(({ icon: Icon, label, value }) => (
-				<div
-					key={label}
-					className="group rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:border-primary/40 sm:p-6"
-				>
-					{Icon ? <Icon className="mb-4 size-6 text-primary" aria-hidden="true" /> : null}
-					<p className="font-bold text-2xl text-white transition-colors group-hover:text-primary">
-						{value}
-					</p>
-					<p className="mt-1 font-bold text-white/50 text-xs uppercase tracking-widest">{label}</p>
+				<div key={label} className="rounded-2xl border border-border bg-surface-raised p-5 sm:p-6">
+					{Icon ? <Icon className="mb-4 size-5 text-muted-foreground" aria-hidden="true" /> : null}
+					<p className="font-mono text-2xl text-brand-text tabular-nums">{value}</p>
+					<p className="mt-1 text-muted-foreground text-sm">{label}</p>
 				</div>
 			))}
 		</div>

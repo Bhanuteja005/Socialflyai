@@ -7,6 +7,7 @@ import { Clapperboard, Eye, GalleryHorizontal, ImageIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useAiCapabilities } from "@/hooks/use-ai";
+import type { AiCapabilities } from "@/lib/api-types";
 import { errorMessage } from "@/lib/errors";
 import { AiUsage } from "../ai/ai-shared";
 import { useOrg } from "../org-provider";
@@ -17,6 +18,37 @@ import { RecentGenerations } from "./recent-generations";
 import { VideoStudio } from "./video-studio";
 
 type CreateTab = "image" | "carousel" | "video";
+
+const TOOLS: {
+	value: CreateTab;
+	label: string;
+	description: string;
+	icon: typeof ImageIcon;
+	/** Without the model the studio still works by hand (or not at all, for images). */
+	available: (caps: AiCapabilities) => boolean;
+}[] = [
+	{
+		value: "image",
+		label: "Image",
+		description: "Turn a prompt into a picture in any aspect ratio.",
+		icon: ImageIcon,
+		available: (c) => c.images,
+	},
+	{
+		value: "carousel",
+		label: "Carousel",
+		description: "Outline slides and render a branded, swipeable set.",
+		icon: GalleryHorizontal,
+		available: (c) => c.text,
+	},
+	{
+		value: "video",
+		label: "Video",
+		description: "Script scenes and render a short vertical video.",
+		icon: Clapperboard,
+		available: (c) => c.text,
+	},
+];
 const TABS: readonly string[] = ["image", "carousel", "video"];
 
 /**
@@ -43,8 +75,8 @@ export function CreateView() {
 		<div className="grid gap-6">
 			<PageHeader
 				className="mb-0"
-				title="Create"
-				description="Generate images, carousels and short videos, then drop them into a post."
+				title="AI Studio"
+				description="Images, carousels and short videos for your posts."
 				actions={<AiUsage className="min-w-52" />}
 			/>
 
@@ -56,7 +88,11 @@ export function CreateView() {
 				/>
 			) : caps.isPending ? (
 				<div className="grid gap-4">
-					<Skeleton className="h-8 w-48" />
+					<div className="grid gap-3 sm:grid-cols-3">
+						<Skeleton className="h-20" />
+						<Skeleton className="h-20" />
+						<Skeleton className="h-20" />
+					</div>
 					<Skeleton className="h-96" />
 				</div>
 			) : caps.isError ? (
@@ -70,20 +106,41 @@ export function CreateView() {
 					}
 				/>
 			) : (
-				<Tabs value={tab} onValueChange={(v) => setTab(v as CreateTab)} className="grid gap-4">
-					<TabsList aria-label="What to create" className="justify-self-start">
-						<TabsTrigger value="image">
-							<ImageIcon />
-							Image
-						</TabsTrigger>
-						<TabsTrigger value="carousel">
-							<GalleryHorizontal />
-							Carousel
-						</TabsTrigger>
-						<TabsTrigger value="video">
-							<Clapperboard />
-							Video
-						</TabsTrigger>
+				<Tabs value={tab} onValueChange={(v) => setTab(v as CreateTab)} className="grid gap-6">
+					<TabsList
+						aria-label="What to create"
+						className="grid h-auto grid-cols-1 items-stretch gap-3 overflow-visible border-0 bg-transparent p-0 sm:grid-cols-3"
+					>
+						{TOOLS.map((tool) => {
+							const available = tool.available(caps.data);
+							return (
+								<TabsTrigger
+									key={tool.value}
+									value={tool.value}
+									className="group h-auto items-start justify-start gap-3 whitespace-normal rounded-2xl border border-border bg-surface-raised p-4 text-left transition-[border-color,box-shadow] hover:border-border-strong data-[state=active]:border-foreground data-[state=active]:bg-surface-raised data-[state=active]:text-foreground data-[state=active]:ring-1 data-[state=active]:ring-foreground [&_svg]:size-4"
+								>
+									<span
+										className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground group-data-[state=active]:bg-ink group-data-[state=active]:text-ink-foreground"
+										aria-hidden="true"
+									>
+										<tool.icon />
+									</span>
+									<span className="grid min-w-0 flex-1 gap-0.5">
+										<span className="flex items-center gap-2 font-medium text-foreground text-sm">
+											{tool.label}
+											{available ? null : (
+												<span className="rounded-full bg-muted px-2 py-px font-medium text-[11px] text-muted-foreground">
+													{tool.value === "image" ? "Needs setup" : "Manual"}
+												</span>
+											)}
+										</span>
+										<span className="font-normal text-muted-foreground text-xs leading-snug">
+											{tool.description}
+										</span>
+									</span>
+								</TabsTrigger>
+							);
+						})}
 					</TabsList>
 					{/* Kept mounted so switching tabs doesn't lose a generation in progress. */}
 					<TabsContent value="image" forceMount className="data-[state=inactive]:hidden">

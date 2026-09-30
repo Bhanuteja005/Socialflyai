@@ -101,7 +101,7 @@ export function MediaPickerDialog({
 											<MediaThumb asset={asset} />
 											<span className="sr-only">{asset.fileName}</span>
 											{selected && multiple ? (
-												<span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary font-semibold text-[11px] text-primary-foreground">
+												<span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary font-mono text-[11px] text-primary-foreground tabular-nums">
 													{order + 1}
 												</span>
 											) : attached ? (

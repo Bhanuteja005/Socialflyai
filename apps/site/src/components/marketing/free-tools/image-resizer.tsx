@@ -167,15 +167,15 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 								aria-pressed={active}
 								onClick={() => setPresetIndex(index)}
 								className={cn(
-									"flex flex-col items-center gap-2 rounded-3xl border p-4 text-center transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+									"flex flex-col items-center gap-2 rounded-3xl border p-4 text-center transition-colors focus-visible:outline-2 focus-visible:outline-ring",
 									active
-										? "border-primary bg-primary/10 text-white"
-										: "border-white/10 bg-black/40 text-white/50 hover:border-white/30",
+										? "border-brand bg-brand-soft text-foreground"
+										: "border-border bg-surface-raised/90 text-muted-foreground hover:border-border-strong",
 								)}
 							>
-								<Icon className={cn("size-6", active && "text-primary")} aria-hidden="true" />
-								<span className="font-bold text-sm">{item.name}</span>
-								<span className="text-white/40 text-xs">
+								<Icon className={cn("size-6", active && "text-brand-text")} aria-hidden="true" />
+								<span className="font-medium text-sm">{item.name}</span>
+								<span className="text-subtle-foreground text-xs">
 									{item.width} × {item.height}
 								</span>
 							</button>
@@ -186,7 +186,7 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 
 			<fieldset className="mt-6">
 				<legend className={toolLabel}>Fit</legend>
-				<div className="flex flex-wrap gap-4 text-sm text-white/80">
+				<div className="flex flex-wrap gap-4 text-sm text-foreground">
 					{(
 						[
 							["cover", "Crop to fill"],
@@ -200,7 +200,7 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 								value={value}
 								checked={fit === value}
 								onChange={() => setFit(value)}
-								className="size-4 accent-[#0BE27D]"
+								className="size-4 accent-primary"
 							/>
 							{text}
 						</label>
@@ -220,15 +220,15 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 				className={cn(
 					"flex cursor-pointer flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-12 text-center transition-colors has-[:focus-visible]:border-primary",
 					dragging
-						? "border-primary bg-primary/10"
-						: "border-white/15 bg-black/30 hover:border-white/30",
+						? "border-brand bg-brand-soft"
+						: "border-border-strong bg-surface-raised/90 hover:border-border-strong",
 				)}
 			>
-				<Upload className="size-10 text-primary" aria-hidden="true" />
-				<span className="font-semibold text-white">
-					Click to <span className="text-primary">upload</span> or drag and drop
+				<Upload className="size-10 text-brand-text" aria-hidden="true" />
+				<span className="font-medium text-foreground">
+					Click to <span className="text-brand-text">upload</span> or drag and drop
 				</span>
-				<span className="text-sm text-white/40">
+				<span className="text-sm text-subtle-foreground">
 					PNG, JPG or WebP (max. 10MB) · processed on your device
 				</span>
 				<input
@@ -244,7 +244,7 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 			</label>
 
 			<div aria-live="polite">
-				{error ? <p className="mt-4 text-red-400 text-sm">{error}</p> : null}
+				{error ? <p className="mt-4 text-danger text-sm">{error}</p> : null}
 				{sourceUrl && resultUrl ? (
 					<div className="mt-8 grid gap-6 md:grid-cols-2">
 						<figure>
@@ -253,7 +253,7 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 							<img
 								src={sourceUrl}
 								alt="Original upload"
-								className="max-h-80 w-full rounded-2xl border border-white/10 bg-black/40 object-contain"
+								className="max-h-80 w-full rounded-2xl border border-border bg-surface object-contain"
 							/>
 						</figure>
 						<figure>
@@ -264,7 +264,7 @@ export function ImageResizer({ platform }: { platform: ResizerPlatform }) {
 							<img
 								src={resultUrl}
 								alt={`Resized to ${preset.width} by ${preset.height} pixels`}
-								className="max-h-80 w-full rounded-2xl border border-primary/30 bg-black/40 object-contain"
+								className="max-h-80 w-full rounded-2xl border border-border-strong bg-surface object-contain"
 							/>
 						</figure>
 						<a

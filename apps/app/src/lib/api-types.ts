@@ -82,6 +82,11 @@ export type AnalyticsMetrics = AnalyticsPostItem["metrics"];
 export type AnalyticsSort = NonNullable<AnalyticsPostsQuery["sort"]>;
 export type PostAnalytics = InferResponseType<(typeof api.analytics.posts)[":postId"]["$get"], 200>;
 export type PostAnalyticsTarget = PostAnalytics["targets"][number];
+export type ChannelAnalytics = InferResponseType<
+	(typeof api.analytics.channels)[":channelId"]["$get"],
+	200
+>;
+export type ChannelAnalyticsDay = ChannelAnalytics["days"][number];
 export type BestTimes = InferResponseType<(typeof api.analytics)["best-times"]["$get"], 200>;
 export type BestTimeCell = BestTimes["cells"][number];
 

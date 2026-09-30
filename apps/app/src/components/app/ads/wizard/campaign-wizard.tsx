@@ -42,6 +42,7 @@ import { StepAudience } from "./step-audience";
 import { StepBudget } from "./step-budget";
 import { StepCreative } from "./step-creative";
 import { StepSetup } from "./step-setup";
+import { WizardSummaryPanel } from "./summary-panel";
 import {
 	emptyState,
 	fromCampaign,
@@ -56,6 +57,14 @@ import {
 	validateStep,
 	type WizardState,
 } from "./wizard-state";
+
+const STEP_HINTS: Record<StepId, string> = {
+	setup: "Where the ads run, what they're for and what they look like.",
+	creative: "The text, media and link people see.",
+	audience: "Who sees the ad. Start broad; the platforms optimise delivery.",
+	budget: "How much to spend and when. Amounts are in the ad account's currency.",
+	review: "Check everything once more. Submitting never spends money.",
+};
 
 // Nothing exists on the platform yet in these states (the API allows the same).
 const EDITABLE = ["draft", "pending_approval", "rejected"];
@@ -356,9 +365,9 @@ function Wizard({
 	const admin = can("admin");
 
 	return (
-		<div className="grid items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
-			<nav aria-label="Campaign steps" className="lg:sticky lg:top-6">
-				<ol className="scrollbar-thin flex gap-1 overflow-x-auto lg:grid">
+		<div className="grid grid-cols-[minmax(0,1fr)] gap-6">
+			<nav aria-label="Campaign steps" className="min-w-0">
+				<ol className="scrollbar-thin flex items-center gap-1 overflow-x-auto">
 					{STEPS.map((s, i) => {
 						const current = s.id === step;
 						const done = i < stepIndex && stepValid(s.id);
@@ -366,152 +375,170 @@ function Wizard({
 							problemSteps.includes(s.id) || (attempted.has(s.id) && !stepValid(s.id));
 						const canOpen = i <= stepIndex || reachable(i);
 						return (
-							<li key={s.id} className="shrink-0">
+							<li key={s.id} className="flex shrink-0 items-center gap-1 lg:flex-1">
 								<button
 									type="button"
 									onClick={() => goTo(s.id)}
 									disabled={!canOpen}
 									aria-current={current ? "step" : undefined}
 									className={cn(
-										"flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50",
+										"flex cursor-pointer items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5 text-left text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50",
 										current
-											? "bg-muted font-medium text-foreground"
-											: "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+											? "bg-ink font-medium text-ink-foreground"
+											: "text-muted-foreground hover:bg-muted hover:text-foreground",
 									)}
 								>
 									<span
 										className={cn(
-											"flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] tabular-nums",
+											"flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-xs tabular-nums transition-colors",
 											flagged
-												? "border-danger bg-danger-soft text-danger"
-												: done
-													? "border-primary bg-primary text-primary-foreground"
-													: current
-														? "border-foreground"
-														: "border-border-strong",
+												? "bg-danger-soft text-danger"
+												: current
+													? "text-ink-foreground"
+													: done
+														? "text-foreground"
+														: "text-subtle-foreground",
 										)}
 										aria-hidden="true"
 									>
-										{flagged ? "!" : done ? <Check className="size-3" /> : i + 1}
+										{flagged ? "!" : done ? <Check className="size-3.5" /> : i + 1}
 									</span>
-									{s.label}
+									<span className="whitespace-nowrap">{s.label}</span>
 									{flagged ? <span className="sr-only"> (needs attention)</span> : null}
 								</button>
+								{i < STEPS.length - 1 ? (
+									<span
+										aria-hidden="true"
+										className={cn(
+											"hidden h-px w-4 shrink-0 lg:block lg:w-auto lg:min-w-4 lg:flex-1",
+											done ? "bg-border-strong" : "bg-border",
+										)}
+									/>
+								) : null}
 							</li>
 						);
 					})}
 				</ol>
 			</nav>
 
-			<Card>
-				<CardContent className="grid gap-6 pt-5">
-					<h2
-						ref={headingRef}
-						tabIndex={-1}
-						className="font-semibold text-lg tracking-tight outline-none"
-					>
-						{stepIndex + 1}. {STEPS[stepIndex]?.label}
-					</h2>
-
-					{rejectionReason && step === "setup" ? (
-						<Alert tone="warning" icon={AlertTriangle} title="Sent back by an admin">
-							{rejectionReason}
-						</Alert>
-					) : null}
-
-					{step === "setup" ? (
-						<StepSetup
-							state={state}
-							update={update}
-							accounts={accounts}
-							providers={providers}
-							errors={errors}
-						/>
-					) : step === "creative" ? (
-						<StepCreative state={state} update={update} provider={provider} errors={errors} />
-					) : step === "audience" ? (
-						<StepAudience state={state} update={update} needs={needs} errors={errors} />
-					) : step === "budget" ? (
-						<StepBudget
-							state={state}
-							update={update}
-							account={account}
-							provider={provider}
-							ceiling={ceiling}
-							timeZone={timeZone}
-							errors={errors}
-						/>
-					) : (
-						<div className="grid gap-5">
-							<Alert tone="info" icon={PauseCircle} title="This does not spend money">
-								Creating this campaign does not spend money. It is created PAUSED; an admin must
-								activate it.
+			<div
+				className={cn(
+					"grid grid-cols-[minmax(0,1fr)] items-start gap-6",
+					// The review step already lists everything; the side summary would repeat it.
+					step !== "review" && "lg:grid-cols-[minmax(0,1fr)_300px]",
+				)}
+			>
+				<Card>
+					<div className="grid gap-1 border-border border-b px-5 pt-5 pb-4 sm:px-6">
+						<p className="font-mono text-muted-foreground text-xs tabular-nums">
+							Step {stepIndex + 1} of {STEPS.length}
+						</p>
+						<h2 ref={headingRef} tabIndex={-1} className="font-medium text-lg outline-none">
+							{STEPS[stepIndex]?.label}
+						</h2>
+						<p className="text-muted-foreground text-sm">{STEP_HINTS[step]}</p>
+					</div>
+					<CardContent className="grid gap-6 p-5 sm:p-6">
+						{rejectionReason && step === "setup" ? (
+							<Alert tone="warning" icon={AlertTriangle} title="Sent back by an admin">
+								{rejectionReason}
 							</Alert>
-							{problems.length ? (
-								<Alert tone="danger" icon={AlertTriangle} title="Fix these before continuing">
-									<ul className="mt-1 grid gap-1.5">
-										{problems.map((p) => {
-											const target = stepForProblem(p);
-											return (
-												<li key={p} className="flex flex-wrap items-baseline gap-x-2">
-													<span>{p}</span>
-													{target !== "review" ? (
-														<button
-															type="button"
-															onClick={() => goTo(target)}
-															className="cursor-pointer text-xs underline underline-offset-2"
-														>
-															Go to {STEPS.find((s) => s.id === target)?.label}
-														</button>
-													) : null}
-												</li>
-											);
-										})}
-									</ul>
-								</Alert>
-							) : null}
-							<DraftSummary
-								state={state}
-								currency={account?.currency ?? "USD"}
-								timeZone={timeZone}
-								accountLabel={
-									account ? (
-										<span className="inline-flex items-center gap-1.5">
-											<ProviderIcon provider={account.provider} size="xs" />
-											{account.name} ({adsProviderMeta(account.provider).name}, {account.currency})
-										</span>
-									) : (
-										"—"
-									)
-								}
-								onEdit={goTo}
-								flaggedSteps={problemSteps}
-							/>
-							<SpecialCategoryDeclaration
-								checked={declared}
-								missing={declarationMissing && !declared}
-								onChange={(v) => {
-									setDeclared(v);
-									if (v) setDeclarationMissing(false);
-								}}
-							/>
-							{admin ? (
-								<p className="flex items-start gap-2 text-muted-foreground text-xs">
-									<ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-									As an admin you can approve now. The campaign is then created on{" "}
-									{provider?.displayName ?? "the platform"} — paused — and you activate it from its
-									page when you're ready.
-								</p>
-							) : (
-								<p className="flex items-start gap-2 text-muted-foreground text-xs">
-									<ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-									An admin reviews it next. You'll see its status on the Ads overview.
-								</p>
-							)}
-						</div>
-					)}
+						) : null}
 
-					<div className="flex flex-wrap items-center justify-between gap-2 border-border border-t pt-4">
+						{step === "setup" ? (
+							<StepSetup
+								state={state}
+								update={update}
+								accounts={accounts}
+								providers={providers}
+								errors={errors}
+							/>
+						) : step === "creative" ? (
+							<StepCreative state={state} update={update} provider={provider} errors={errors} />
+						) : step === "audience" ? (
+							<StepAudience state={state} update={update} needs={needs} errors={errors} />
+						) : step === "budget" ? (
+							<StepBudget
+								state={state}
+								update={update}
+								account={account}
+								provider={provider}
+								ceiling={ceiling}
+								timeZone={timeZone}
+								errors={errors}
+							/>
+						) : (
+							<div className="grid gap-5">
+								<Alert tone="info" icon={PauseCircle} title="This does not spend money">
+									Creating this campaign does not spend money. It is created PAUSED; an admin must
+									activate it.
+								</Alert>
+								{problems.length ? (
+									<Alert tone="danger" icon={AlertTriangle} title="Fix these before continuing">
+										<ul className="mt-1 grid gap-1.5">
+											{problems.map((p) => {
+												const target = stepForProblem(p);
+												return (
+													<li key={p} className="flex flex-wrap items-baseline gap-x-2">
+														<span>{p}</span>
+														{target !== "review" ? (
+															<button
+																type="button"
+																onClick={() => goTo(target)}
+																className="cursor-pointer text-xs underline underline-offset-2"
+															>
+																Go to {STEPS.find((s) => s.id === target)?.label}
+															</button>
+														) : null}
+													</li>
+												);
+											})}
+										</ul>
+									</Alert>
+								) : null}
+								<DraftSummary
+									state={state}
+									currency={account?.currency ?? "USD"}
+									timeZone={timeZone}
+									accountLabel={
+										account ? (
+											<span className="inline-flex items-center gap-1.5">
+												<ProviderIcon provider={account.provider} size="xs" />
+												{account.name} ({adsProviderMeta(account.provider).name}, {account.currency}
+												)
+											</span>
+										) : (
+											"—"
+										)
+									}
+									onEdit={goTo}
+									flaggedSteps={problemSteps}
+								/>
+								<SpecialCategoryDeclaration
+									checked={declared}
+									missing={declarationMissing && !declared}
+									onChange={(v) => {
+										setDeclared(v);
+										if (v) setDeclarationMissing(false);
+									}}
+								/>
+								{admin ? (
+									<p className="flex items-start gap-2 text-muted-foreground text-xs">
+										<ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+										As an admin you can approve now. The campaign is then created on{" "}
+										{provider?.displayName ?? "the platform"} — paused — and you activate it from
+										its page when you're ready.
+									</p>
+								) : (
+									<p className="flex items-start gap-2 text-muted-foreground text-xs">
+										<ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+										An admin reviews it next. You'll see its status on the Ads overview.
+									</p>
+								)}
+							</div>
+						)}
+					</CardContent>
+					<div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-border border-t bg-surface-raised/95 px-5 py-3 backdrop-blur sm:px-6">
 						<div className="flex gap-2">
 							{stepIndex > 0 ? (
 								<Button variant="outline" onClick={() => goTo(STEPS[stepIndex - 1]?.id ?? "setup")}>
@@ -554,8 +581,13 @@ function Wizard({
 							</Button>
 						)}
 					</div>
-				</CardContent>
-			</Card>
+				</Card>
+				{step !== "review" ? (
+					<div className="hidden lg:sticky lg:top-6 lg:block">
+						<WizardSummaryPanel state={state} account={account} timeZone={timeZone} />
+					</div>
+				) : null}
+			</div>
 		</div>
 	);
 }

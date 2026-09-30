@@ -40,12 +40,12 @@ export function UploadTray({
 			{visible.map((item) => (
 				<li
 					key={item.key}
-					className="flex items-center gap-3 rounded-md border border-border bg-surface-raised px-3 py-2"
+					className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-3.5 py-2.5"
 				>
 					<div className="grid min-w-0 flex-1 gap-1.5">
 						<div className="flex items-center justify-between gap-2 text-xs">
 							<span className="truncate font-medium">{item.file.name}</span>
-							<span className="shrink-0 text-muted-foreground">
+							<span className="shrink-0 font-mono text-muted-foreground tabular-nums">
 								{item.status === "uploading"
 									? `${Math.round(item.progress * 100)}% of ${formatBytes(item.file.size)}`
 									: null}

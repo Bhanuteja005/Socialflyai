@@ -74,7 +74,7 @@ export default function TestimonialsPage() {
 					{TESTIMONIALS.map((testimonial) => (
 						<li
 							key={testimonial.name}
-							className="break-inside-avoid rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm transition hover:border-primary/40"
+							className="break-inside-avoid rounded-3xl border border-border bg-surface-raised p-8 transition hover:border-border-strong"
 						>
 							<figure>
 								<div className="mb-4 flex items-center justify-between">
@@ -87,13 +87,13 @@ export default function TestimonialsPage() {
 											/>
 										))}
 									</div>
-									<Quote className="size-8 text-white/10" aria-hidden="true" />
+									<Quote className="size-8 text-subtle-foreground" aria-hidden="true" />
 								</div>
-								<blockquote className="mb-6 text-white/80 italic leading-relaxed">
+								<blockquote className="mb-6 text-foreground italic leading-relaxed">
 									&ldquo;{testimonial.text}&rdquo;
 								</blockquote>
 								<figcaption className="flex items-center gap-4">
-									<div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/10 font-bold text-white text-xs">
+									<div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted font-medium text-foreground text-xs">
 										{testimonial.avatar ? (
 											<Image
 												src={testimonial.avatar}
@@ -107,8 +107,8 @@ export default function TestimonialsPage() {
 										)}
 									</div>
 									<div>
-										<p className="font-bold text-sm text-white">{testimonial.name}</p>
-										<p className="font-bold text-[10px] text-white/50 uppercase tracking-widest">
+										<p className="font-medium text-sm text-foreground">{testimonial.name}</p>
+										<p className="font-mono text-[11px] text-muted-foreground">
 											{testimonial.role}
 										</p>
 									</div>

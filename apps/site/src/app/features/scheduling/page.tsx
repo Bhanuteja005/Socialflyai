@@ -52,27 +52,25 @@ export default function SchedulingFeaturePage() {
 				<MockupFrame title="New Post" icon={Plus}>
 					<div className="space-y-5 text-sm">
 						<div>
-							<p className="mb-2 font-bold text-[10px] text-white/40 uppercase tracking-widest">
-								Caption
-							</p>
-							<p className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/80">
+							<p className="mb-2 font-mono text-[11px] text-subtle-foreground">Caption</p>
+							<p className="rounded-xl border border-border bg-surface-raised p-4 text-foreground">
 								Excited to share our latest project update! 🚀 #innovation #socialfly
 							</p>
 						</div>
 						<div className="grid gap-4 sm:grid-cols-3">
-							<div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-white/60">
+							<div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised p-3 text-muted-foreground">
 								<ImageIcon className="size-4" />
 								Media
 							</div>
-							<div className="rounded-xl border border-white/10 bg-white/5 p-3 text-white/60">
+							<div className="rounded-xl border border-border bg-surface-raised p-3 text-muted-foreground">
 								Platforms: 4 selected
 							</div>
-							<div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-primary">
+							<div className="flex items-center gap-2 rounded-xl border border-border-strong bg-surface p-3 text-brand-text">
 								<Zap className="size-4" />
 								Tomorrow, 10:00 AM
 							</div>
 						</div>
-						<div className="flex h-11 items-center justify-center rounded-xl bg-primary font-bold text-black">
+						<div className="flex h-11 items-center justify-center rounded-xl bg-primary font-medium text-primary-foreground">
 							Schedule Post
 						</div>
 					</div>
@@ -124,19 +122,19 @@ export default function SchedulingFeaturePage() {
 				<Container>
 					<div className="grid gap-6 md:grid-cols-2">
 						<GlassCard>
-							<span className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+							<span className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground">
 								<Sparkles className="size-6" aria-hidden="true" />
 							</span>
-							<h3 className="font-bold text-2xl text-white">AI Content Assist</h3>
-							<p className="mt-4 text-white/60">
+							<h3 className="font-medium text-2xl text-foreground">AI Content Assist</h3>
+							<p className="mt-4 text-muted-foreground">
 								Never stare at a blank screen again. Generate hooks, captions, and hashtag clusters
 								tailored to your niche.
 							</p>
 							<ul className="mt-6 space-y-3">
 								{["Instant Hook Generator", "Smart Hashtag Batches", "Tone Selection"].map(
 									(item) => (
-										<li key={item} className="flex items-center gap-3 text-white/80">
-											<CircleCheck className="size-5 text-primary" aria-hidden="true" />
+										<li key={item} className="flex items-center gap-3 text-foreground">
+											<CircleCheck className="size-5 text-brand-text" aria-hidden="true" />
 											{item}
 										</li>
 									),
@@ -144,11 +142,11 @@ export default function SchedulingFeaturePage() {
 							</ul>
 						</GlassCard>
 						<GlassCard>
-							<span className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+							<span className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground">
 								<Clock className="size-6" aria-hidden="true" />
 							</span>
-							<h3 className="font-bold text-2xl text-white">Perfect Post Time</h3>
-							<p className="mt-4 text-white/60">
+							<h3 className="font-medium text-2xl text-foreground">Perfect Post Time</h3>
+							<p className="mt-4 text-muted-foreground">
 								Data-driven insights telling you exactly when your audience is most likely to see
 								and engage with your posts.
 							</p>

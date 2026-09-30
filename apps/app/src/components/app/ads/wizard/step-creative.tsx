@@ -21,7 +21,10 @@ function Counter({ value, max, id }: { value: string; max?: number; id: string }
 	return (
 		<span
 			id={id}
-			className={cn("text-xs tabular-nums", n > max ? "text-danger" : "text-subtle-foreground")}
+			className={cn(
+				"text-xs font-mono tabular-nums",
+				n > max ? "text-danger" : "text-subtle-foreground",
+			)}
 		>
 			{n} / {max}
 			{n > max ? <span className="sr-only"> — too long</span> : null}
@@ -71,7 +74,7 @@ export function StepCreative({
 					</div>
 					<ul aria-labelledby="creative-media-label" className="flex flex-wrap gap-2">
 						{state.media.map((m, i) => (
-							<li key={m.id} className="relative size-24 overflow-hidden rounded-md bg-muted">
+							<li key={m.id} className="relative size-24 overflow-hidden rounded-lg bg-muted">
 								{m.url ? (
 									m.kind === "video" ? (
 										<video
@@ -116,7 +119,7 @@ export function StepCreative({
 								<button
 									type="button"
 									onClick={() => setPickerOpen(true)}
-									className="flex size-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-border-strong border-dashed text-muted-foreground text-xs hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+									className="flex size-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-border-strong border-dashed text-muted-foreground text-xs hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
 								>
 									<ImagePlus className="size-5" aria-hidden="true" />
 									Add from library
@@ -310,7 +313,7 @@ function ListEditor({
 		<fieldset className="grid gap-2" aria-describedby={`${id}-hint`}>
 			<legend className="flex w-full flex-wrap items-baseline justify-between gap-2 font-medium text-sm">
 				{label}
-				<span className="font-normal text-muted-foreground text-xs tabular-nums">
+				<span className="font-normal text-muted-foreground text-xs font-mono tabular-nums">
 					{filled} of {min}–{max}
 				</span>
 			</legend>
@@ -347,7 +350,7 @@ function ListEditor({
 							)}
 							<span
 								className={cn(
-									"w-14 pt-2 text-right text-xs tabular-nums",
+									"w-14 pt-2 text-right text-xs font-mono tabular-nums",
 									over ? "text-danger" : "text-subtle-foreground",
 								)}
 							>

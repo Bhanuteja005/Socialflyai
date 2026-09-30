@@ -35,7 +35,7 @@ function SortHeader({
 		<th
 			scope="col"
 			aria-sort={active ? "descending" : "none"}
-			className={cn("px-3 py-2 font-medium", className)}
+			className={cn("h-10 px-3 font-medium", className)}
 		>
 			<button
 				type="button"
@@ -58,7 +58,7 @@ function SortHeader({
 
 function Thumb({ item }: { item: AnalyticsPostItem }) {
 	return (
-		<span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+		<span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
 			{item.thumbnailUrl ? (
 				// biome-ignore lint/performance/noImgElement: user media from a runtime-configured storage host
 				<img
@@ -75,7 +75,7 @@ function Thumb({ item }: { item: AnalyticsPostItem }) {
 	);
 }
 
-const num = "px-3 py-3 text-right tabular-nums";
+const num = "px-3 py-3 text-right font-mono tabular-nums";
 
 export function PostsTable({
 	from,
@@ -135,12 +135,12 @@ export function PostsTable({
 
 	return (
 		<>
-			<div className="scrollbar-thin overflow-x-auto">
+			<div className="scrollbar-thin relative overflow-x-auto [contain:inline-size]">
 				<table className="w-full min-w-[820px] text-sm">
 					<caption className="sr-only">Published posts and their results</caption>
 					<thead>
-						<tr className="border-border border-y bg-surface text-muted-foreground text-xs">
-							<th scope="col" className="px-3 py-2 pl-5 text-left font-medium">
+						<tr className="border-border border-b bg-surface text-muted-foreground text-xs">
+							<th scope="col" className="h-10 px-3 pl-5 text-left font-medium">
 								Post
 							</th>
 							<SortHeader sort="publishedAt" current={sort} onSort={onSort} className="text-left" />
@@ -156,30 +156,30 @@ export function PostsTable({
 								onSort={onSort}
 								className="text-right"
 							/>
-							<th scope="col" className="px-3 py-2 text-right font-medium">
+							<th scope="col" className="h-10 px-3 text-right font-medium">
 								Rate
 							</th>
-							<th scope="col" className="px-3 py-2 text-right font-medium">
+							<th scope="col" className="h-10 px-3 text-right font-medium">
 								Likes
 							</th>
-							<th scope="col" className="px-3 py-2 text-right font-medium">
+							<th scope="col" className="h-10 px-3 text-right font-medium">
 								Comments
 							</th>
-							<th scope="col" className="px-3 py-2 pr-5 text-right font-medium">
+							<th scope="col" className="h-10 px-3 pr-5 text-right font-medium">
 								Shares
 							</th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-border">
 						{items.map((item) => (
-							<tr key={item.targetId} className="align-top">
+							<tr key={item.targetId} className="align-middle transition-colors hover:bg-surface">
 								<th scope="row" className="px-3 py-3 pl-5 text-left font-normal">
-									<span className="flex gap-3">
+									<span className="flex items-center gap-3">
 										<Thumb item={item} />
 										<span className="grid min-w-0 max-w-sm gap-1">
 											<Link
 												href={`/posts/${item.postId}`}
-												className="line-clamp-2 rounded-sm leading-snug hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+												className="line-clamp-2 rounded-sm font-medium leading-snug hover:underline focus-visible:outline-2 focus-visible:outline-ring"
 											>
 												{item.excerpt || "Media post"}
 											</Link>
@@ -193,7 +193,7 @@ export function PostsTable({
 										</span>
 									</span>
 								</th>
-								<td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
+								<td className="whitespace-nowrap px-3 py-3 font-mono text-muted-foreground text-xs">
 									{item.publishedAt ? (
 										<time dateTime={item.publishedAt}>
 											{formatDate(item.publishedAt, timeZone)}
@@ -203,10 +203,17 @@ export function PostsTable({
 								<td className={num} title={formatNumber(item.metrics.impressions)}>
 									{formatCompact(item.metrics.impressions)}
 								</td>
-								<td className={num} title={formatNumber(item.metrics.engagements)}>
+								<td
+									className={cn(num, "font-medium")}
+									title={formatNumber(item.metrics.engagements)}
+								>
 									{formatCompact(item.metrics.engagements)}
 								</td>
-								<td className={num}>{formatPercent(item.metrics.engagementRate)}</td>
+								<td className={num}>
+									<span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+										{formatPercent(item.metrics.engagementRate)}
+									</span>
+								</td>
 								<td className={num}>{formatCompact(item.metrics.likes)}</td>
 								<td className={num}>{formatCompact(item.metrics.comments)}</td>
 								<td className={cn(num, "pr-5")}>{formatCompact(item.metrics.shares)}</td>
@@ -216,7 +223,7 @@ export function PostsTable({
 				</table>
 			</div>
 			{query.hasNextPage ? (
-				<div className="flex justify-center border-border border-t p-3">
+				<div className="flex justify-center border-border border-t bg-surface p-3">
 					<Button
 						variant="outline"
 						size="sm"

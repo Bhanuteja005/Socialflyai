@@ -71,8 +71,8 @@ export function AiAssist({
 				<DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-border border-l bg-background shadow-lg data-[state=open]:animate-fade-in sm:max-w-md">
 					<div className="flex items-start justify-between gap-3 border-border border-b px-5 py-4">
 						<div className="grid gap-0.5">
-							<DialogPrimitive.Title className="flex items-center gap-2 font-semibold text-base tracking-tight">
-								<Sparkles className="size-4 text-primary-text" aria-hidden="true" />
+							<DialogPrimitive.Title className="flex items-center gap-2 font-medium text-base">
+								<Sparkles className="size-4" aria-hidden="true" />
 								AI assist
 							</DialogPrimitive.Title>
 							<DialogPrimitive.Description className="text-muted-foreground text-xs">
@@ -83,7 +83,7 @@ export function AiAssist({
 								>
 									brand voice
 								</Link>
-								. Nothing changes in your post until you choose to use it.
+								. Nothing changes until you use a result.
 							</DialogPrimitive.Description>
 						</div>
 						<DialogPrimitive.Close asChild>
@@ -377,11 +377,11 @@ function WritePanel({
 						<article
 							// biome-ignore lint/suspicious/noArrayIndexKey: generated options have no id; the list is replaced wholesale
 							key={index}
-							className="grid gap-3 rounded-lg border border-border bg-surface-raised p-3 shadow-xs"
+							className="grid gap-3 rounded-xl border border-border bg-surface-raised p-3"
 						>
 							<header className="flex items-start justify-between gap-3">
 								<div className="grid gap-0.5">
-									<p className="font-medium text-[11px] text-subtle-foreground uppercase tracking-wider">
+									<p className="font-mono text-[11.5px] text-subtle-foreground tabular-nums">
 										Option {index + 1}
 									</p>
 									<h3 className="font-medium text-sm">{variant.angle}</h3>
@@ -400,7 +400,7 @@ function WritePanel({
 									</p>
 									<p className="whitespace-pre-wrap text-sm leading-relaxed">{draft.text}</p>
 									{draft.hashtags.length ? (
-										<p className="text-primary-text text-xs">{draft.hashtags.join(" ")}</p>
+										<p className="text-muted-foreground text-xs">{draft.hashtags.join(" ")}</p>
 									) : null}
 								</div>
 							))}
@@ -476,7 +476,7 @@ function ImprovePanel({ composer, activeTab }: { composer: Composer; activeTab: 
 
 	return (
 		<div className="grid gap-5">
-			<p className="rounded-md bg-muted px-3 py-2 text-muted-foreground text-xs">
+			<p className="rounded-full bg-muted px-3 py-1.5 text-muted-foreground text-xs">
 				Working on:{" "}
 				<span className="font-medium text-foreground">
 					{customized && channel ? `the custom text for ${channel.name}` : "the main post text"}
@@ -534,12 +534,10 @@ function ImprovePanel({ composer, activeTab }: { composer: Composer; activeTab: 
 						<AiError error={rewrite.error} />
 						{rewrite.data ? (
 							<div
-								className="grid gap-3 rounded-lg border border-primary/30 bg-primary-soft/40 p-3"
+								className="grid gap-3 rounded-xl border border-border-strong bg-surface p-3"
 								aria-live="polite"
 							>
-								<p className="font-medium text-[11px] text-primary-text uppercase tracking-wider">
-									Suggestion
-								</p>
+								<p className="font-medium text-muted-foreground text-xs">Suggestion</p>
 								<p className="whitespace-pre-wrap text-sm leading-relaxed">{rewrite.data.text}</p>
 								<div className="flex gap-2">
 									<Button size="sm" onClick={() => replace(rewrite.data.text)}>
@@ -586,7 +584,7 @@ function ImprovePanel({ composer, activeTab }: { composer: Composer; activeTab: 
 													className={cn(
 														"inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default",
 														added
-															? "border-primary/30 bg-primary-soft text-primary-text"
+															? "border-foreground bg-muted text-foreground"
 															: "border-border hover:border-border-strong hover:bg-muted",
 													)}
 												>

@@ -116,7 +116,7 @@ export function AdCopyDialog({
 			<DialogContent className="max-w-2xl">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
-						<Sparkles className="size-4 text-primary-text" aria-hidden="true" />
+						<Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
 						Write ad copy with AI
 					</DialogTitle>
 					<DialogDescription>

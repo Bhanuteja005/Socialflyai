@@ -23,7 +23,7 @@ import { ListSkeleton, LoadError } from "../research/research-shared";
 
 function Yes({ on, label }: { on: boolean; label: string }) {
 	return on ? (
-		<Check className="size-4 text-success" aria-label={`${label}: yes`} />
+		<Check className="size-4 text-foreground" aria-label={`${label}: yes`} />
 	) : (
 		<Minus className="size-4 text-subtle-foreground" aria-label={`${label}: no`} />
 	);
@@ -51,37 +51,33 @@ export function InboxSettingsPanel() {
 	return (
 		<div className="grid max-w-3xl gap-4">
 			<Card>
-				<CardHeader>
-					<CardTitle>Reply approval</CardTitle>
-					<CardDescription>
-						Replies are posted publicly under your brand. With approval on, editors' replies wait
-						for an admin or owner before they're sent. Admins' own replies are always sent directly.
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div className="flex items-center gap-3">
-						<Switch
-							id="reply-approval"
-							checked={
-								save.isPending
-									? (save.variables?.replyApprovalRequired ?? replyApprovalRequired)
-									: replyApprovalRequired
-							}
-							disabled={save.isPending}
-							onCheckedChange={(on) => save.mutate({ replyApprovalRequired: on })}
-						/>
-						<Label htmlFor="reply-approval">Require approval for replies</Label>
+				<CardContent className="flex items-start justify-between gap-6 p-5">
+					<div className="grid gap-1">
+						<Label htmlFor="reply-approval" className="font-medium text-sm">
+							Require approval for replies
+						</Label>
+						<CardDescription>
+							Editors' replies wait for an admin before they're sent.
+						</CardDescription>
 					</div>
+					<Switch
+						id="reply-approval"
+						className="mt-0.5"
+						checked={
+							save.isPending
+								? (save.variables?.replyApprovalRequired ?? replyApprovalRequired)
+								: replyApprovalRequired
+						}
+						disabled={save.isPending}
+						onCheckedChange={(on) => save.mutate({ replyApprovalRequired: on })}
+					/>
 				</CardContent>
 			</Card>
 
 			<Card>
 				<CardHeader>
 					<CardTitle>Channels</CardTitle>
-					<CardDescription>
-						What the inbox can do on each connected account. Missing permissions come from an older
-						connection — reconnecting asks the platform for them.
-					</CardDescription>
+					<CardDescription>Missing permissions? Reconnect the channel.</CardDescription>
 				</CardHeader>
 				{channels.length === 0 ? (
 					<CardContent>
@@ -106,7 +102,7 @@ export function InboxSettingsPanel() {
 						<table className="w-full min-w-[34rem] text-sm">
 							<caption className="sr-only">Inbox capabilities per channel</caption>
 							<thead>
-								<tr className="border-border border-y bg-surface text-left text-muted-foreground text-xs">
+								<tr className="h-10 border-border border-y bg-surface text-left text-muted-foreground text-xs">
 									<th scope="col" className="px-5 py-2 font-medium">
 										Channel
 									</th>
@@ -154,8 +150,8 @@ function ChannelRow({
 	return (
 		<tr>
 			<td className="px-5 py-3">
-				<div className="flex min-w-0 items-center gap-2">
-					<ProviderIcon provider={c.provider} size="sm" />
+				<div className="flex min-w-0 items-center gap-2.5">
+					<ProviderIcon provider={c.provider} size="md" />
 					<div className="grid min-w-0">
 						<span className="truncate font-medium">{c.name}</span>
 						<span className="text-muted-foreground text-xs">{providerName(c.provider)}</span>

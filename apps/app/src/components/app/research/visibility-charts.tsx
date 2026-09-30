@@ -23,7 +23,7 @@ type EngineRow = VisibilitySummary["byEngine"][number];
 
 // The brand is the one bar that matters; competitors recede into a neutral.
 const BRAND = "var(--chart-1)";
-const OTHER = "var(--subtle-foreground)";
+const OTHER = "var(--chart-3)";
 
 const voiceLabel = (v: Voice) => (v.isBrand ? `${v.name} (you)` : v.name);
 
@@ -122,7 +122,7 @@ export function ShareOfVoiceChart({ rows }: { rows: Voice[] }) {
 								dy={4}
 								textAnchor="end"
 								fontSize={12}
-								fontWeight={row?.isBrand ? 600 : 400}
+								fontWeight={row?.isBrand ? 500 : 400}
 								fill={row?.isBrand ? "var(--foreground)" : "var(--muted-foreground)"}
 							>
 								{text.length > 20 ? `${text.slice(0, 19)}…` : text}
@@ -240,36 +240,38 @@ export function MentionTrendChart({ weeks }: { weeks: Week[] }) {
 	);
 }
 
-const num = "px-4 py-2.5 text-right tabular-nums";
+const num = "px-4 py-3 text-right font-mono tabular-nums last:pr-5";
 
 export function EngineTable({ rows, models }: { rows: EngineRow[]; models: Map<string, string> }) {
 	return (
-		<div className="scrollbar-thin overflow-x-auto">
+		<div className="scrollbar-thin relative overflow-x-auto [contain:inline-size]">
 			<table className="w-full min-w-[480px] text-sm">
 				<caption className="sr-only">Results by AI engine</caption>
 				<thead>
-					<tr className="border-border border-b text-muted-foreground text-xs">
-						<th scope="col" className="px-4 py-2 text-left font-medium">
+					<tr className="border-border border-b bg-surface text-muted-foreground text-xs">
+						<th scope="col" className="h-10 px-4 pl-5 text-left font-medium">
 							Engine
 						</th>
-						<th scope="col" className="px-4 py-2 text-right font-medium">
+						<th scope="col" className="h-10 px-4 text-right font-medium">
 							Answers checked
 						</th>
-						<th scope="col" className="px-4 py-2 text-right font-medium">
+						<th scope="col" className="h-10 px-4 text-right font-medium">
 							Mention rate
 						</th>
-						<th scope="col" className="px-4 py-2 text-right font-medium">
+						<th scope="col" className="h-10 px-4 pr-5 text-right font-medium">
 							Average rank
 						</th>
 					</tr>
 				</thead>
 				<tbody className="divide-y divide-border">
 					{rows.map((r) => (
-						<tr key={r.engine}>
-							<th scope="row" className="px-4 py-2.5 text-left font-normal">
+						<tr key={r.engine} className="transition-colors hover:bg-surface">
+							<th scope="row" className="px-4 py-3 pl-5 text-left font-normal">
 								<span className="font-medium">{engineName(r.engine)}</span>
 								{models.get(r.engine) ? (
-									<span className="ml-2 text-muted-foreground text-xs">{models.get(r.engine)}</span>
+									<span className="ml-2 font-mono text-[11px] text-muted-foreground">
+										{models.get(r.engine)}
+									</span>
 								) : null}
 							</th>
 							<td className={num}>{formatNumber(r.checks)}</td>

@@ -81,7 +81,7 @@ export default function FaqPage() {
 						<section key={group.category} aria-labelledby={`faq-group-${index}`}>
 							<h2
 								id={`faq-group-${index}`}
-								className="mb-6 ml-2 font-bold text-white/40 text-xl uppercase tracking-widest"
+								className="mb-6 ml-2 font-medium text-subtle-foreground text-xl font-mono"
 							>
 								{group.category}
 							</h2>
@@ -90,9 +90,11 @@ export default function FaqPage() {
 					))}
 				</div>
 
-				<div className="mt-20 rounded-[40px] border border-white/10 bg-white/5 p-8 text-center backdrop-blur-md sm:p-12">
-					<h2 className="mb-4 font-bold text-2xl text-white">Still have more questions?</h2>
-					<p className="mb-8 text-white/60">Our support team is ready to help your brand grow.</p>
+				<div className="mt-20 rounded-3xl border border-border bg-surface-raised p-8 text-center sm:p-12">
+					<h2 className="mb-4 font-medium text-2xl text-foreground">Still have more questions?</h2>
+					<p className="mb-8 text-muted-foreground">
+						Our support team is ready to help your brand grow.
+					</p>
 					<CtaLink href="/contact">Message our team</CtaLink>
 				</div>
 			</Container>

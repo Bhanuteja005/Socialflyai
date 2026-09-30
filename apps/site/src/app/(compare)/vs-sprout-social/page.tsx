@@ -22,7 +22,7 @@ const data: CompetitorPageData = {
 			"Sprout Social costs $249+ per user. SocialflyAI provides the same high-end AI generation and analytics at a price that actually makes sense for your ROI.",
 		socialProof: (
 			<>
-				<span className="block font-bold text-white">4.9/5 Rating</span>
+				<span className="block font-mono text-foreground tabular-nums">4.9/5 rating</span>
 				by 200+ fast-growing teams
 			</>
 		),

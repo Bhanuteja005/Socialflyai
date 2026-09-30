@@ -22,7 +22,8 @@ const data: CompetitorPageData = {
 			"Planable helps you approve content. SocialflyAI helps you create it. Experience the perfect blend of world-class collaboration and native AI creation in one seamless workspace.",
 		socialProof: (
 			<>
-				<span className="font-bold text-white">4.8/5</span> trusted by 800+ agencies
+				<span className="font-mono text-foreground tabular-nums">4.8/5</span> trusted by 800+
+				agencies
 			</>
 		),
 	},

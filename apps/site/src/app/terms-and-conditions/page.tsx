@@ -13,8 +13,8 @@ export const metadata = pageMetadata({
 	path: "/terms-and-conditions",
 });
 
-const note = "text-xs italic text-white/40";
-const label = (text: string) => <span className="font-semibold text-white/80">{text}:</span>;
+const note = "text-xs italic text-subtle-foreground";
+const label = (text: string) => <span className="font-medium text-foreground">{text}:</span>;
 const support = (
 	<LegalLink href="mailto:support@socialflyai.com">support@socialflyai.com</LegalLink>
 );
@@ -90,7 +90,7 @@ const SECTIONS: LegalSection[] = [
 		content: (
 			<div>
 				<p className="mb-4">
-					You agree <strong className="text-white/80">NOT</strong> to use the Service to:
+					You agree <strong className="text-foreground">NOT</strong> to use the Service to:
 				</p>
 				<LegalList
 					tone="danger"
@@ -106,7 +106,7 @@ const SECTIONS: LegalSection[] = [
 						"Use the platform for illegal or unethical purposes",
 					]}
 				/>
-				<p className="text-white/40 italic">
+				<p className="text-subtle-foreground italic">
 					Violation of this policy may result in immediate account suspension or termination.
 				</p>
 			</div>
@@ -165,14 +165,14 @@ const SECTIONS: LegalSection[] = [
 		content: (
 			<div className="space-y-5">
 				<div>
-					<h3 className="mb-2 font-semibold text-sm text-white/90">Your Data</h3>
+					<h3 className="mb-2 font-medium text-sm text-foreground">Your Data</h3>
 					<p>
 						You retain ownership of all social media content, posts, and data you create or upload
 						to the platform, including analytics and engagement metrics.
 					</p>
 				</div>
 				<div>
-					<h3 className="mb-2 font-semibold text-sm text-white/90">Our Rights</h3>
+					<h3 className="mb-2 font-medium text-sm text-foreground">Our Rights</h3>
 					<p className="mb-3">
 						You grant us a limited license to process your data solely to provide our services,
 						including:
@@ -186,7 +186,7 @@ const SECTIONS: LegalSection[] = [
 						]}
 					/>
 				</div>
-				<p className="text-white/40 italic">
+				<p className="text-subtle-foreground italic">
 					We do not claim ownership of your social media content and will not use it for purposes
 					outside of providing our services.
 				</p>
@@ -209,7 +209,7 @@ const SECTIONS: LegalSection[] = [
 						"Ensuring your social media activities comply with platform policies",
 					]}
 				/>
-				<p className="text-white/40 italic">
+				<p className="text-subtle-foreground italic">
 					We provide tools to help with compliance, but ultimate responsibility rests with you as
 					the data controller for your social media data.
 				</p>
@@ -353,10 +353,10 @@ const SECTIONS: LegalSection[] = [
 			<div className="space-y-2">
 				<p className="mb-1">For questions about these Terms of Service, please contact us:</p>
 				<p>
-					<span className="font-medium text-white/80">Email:</span> {support}
+					<span className="font-medium text-foreground">Email:</span> {support}
 				</p>
 				<p>
-					<span className="font-medium text-white/80">Website:</span>{" "}
+					<span className="font-medium text-foreground">Website:</span>{" "}
 					<LegalLink href="https://socialflyai.com">socialflyai.com</LegalLink>
 				</p>
 				<p className={note}>

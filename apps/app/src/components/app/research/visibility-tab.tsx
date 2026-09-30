@@ -2,9 +2,9 @@
 
 import { Button } from "@socialfly/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@socialfly/ui/components/card";
-import { Alert, EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
+import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { cn } from "@socialfly/ui/utils";
-import { Bot, Eye, Info, Play } from "lucide-react";
+import { Bot, Clock, Eye, PieChart, Play } from "lucide-react";
 import { useMemo } from "react";
 import {
 	useResearchCapabilities,
@@ -15,7 +15,7 @@ import {
 import type { VisibilitySummary } from "@/lib/api-types";
 import { formatDateTime, formatPercent, formatRelative, UNKNOWN } from "@/lib/format";
 import { useOrg } from "../org-provider";
-import { ENGINES, LoadError, StatTile, StatTilesSkeleton } from "./research-shared";
+import { ENGINES, LoadError, SetupNote, StatTile, StatTilesSkeleton } from "./research-shared";
 import { EngineTable, MentionTrendChart, ShareOfVoiceChart } from "./visibility-charts";
 import { PromptsCard } from "./visibility-prompts";
 
@@ -37,19 +37,18 @@ export function VisibilityTab({ days, onDays }: { days: number; onDays: (d: numb
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div className="grid max-w-2xl gap-2">
 					<p className="text-muted-foreground text-sm">
-						We ask AI assistants the questions your buyers ask and measure how often they mention
-						you, where you rank among the brands they name, and whether they cite your website.
+						How often AI assistants mention you, rank you and cite your site when buyers ask.
 					</p>
 					{caps.isSuccess && engines.length ? (
 						<ul className="flex flex-wrap items-center gap-1.5" aria-label="Engines checked">
 							{engines.map((e) => (
 								<li
 									key={e.id}
-									className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-xs"
+									className="inline-flex h-6 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-2.5 text-xs"
 								>
 									<Bot className="size-3 text-muted-foreground" aria-hidden="true" />
 									<span className="font-medium">{ENGINES[e.id]?.name ?? e.id}</span>
-									<span className="text-muted-foreground">{e.model}</span>
+									<span className="font-mono text-[11px] text-muted-foreground">{e.model}</span>
 								</li>
 							))}
 						</ul>
@@ -57,7 +56,7 @@ export function VisibilityTab({ days, onDays }: { days: number; onDays: (d: numb
 				</div>
 				<div className="grid justify-items-end gap-1.5">
 					<div className="flex flex-wrap items-center gap-2">
-						<fieldset className="flex rounded-md border border-border p-0.5">
+						<fieldset className="inline-flex items-center gap-0.5 rounded-full border border-border bg-surface-raised p-1">
 							<legend className="sr-only">Period</legend>
 							{PERIODS.map((p) => (
 								<button
@@ -66,7 +65,7 @@ export function VisibilityTab({ days, onDays }: { days: number; onDays: (d: numb
 									aria-pressed={days === p}
 									onClick={() => onDays(p)}
 									className={cn(
-										"cursor-pointer rounded-sm px-2.5 py-1 font-medium text-xs transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+										"inline-flex h-7 cursor-pointer items-center rounded-full px-3 font-medium text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ring",
 										days === p
 											? "bg-muted text-foreground"
 											: "text-muted-foreground hover:text-foreground",
@@ -79,6 +78,7 @@ export function VisibilityTab({ days, onDays }: { days: number; onDays: (d: numb
 						{can("editor") ? (
 							<Button
 								size="sm"
+								className="h-9"
 								loading={run.isPending}
 								disabled={!engines.length || activePrompts === 0}
 								onClick={() => run.mutate()}
@@ -117,16 +117,14 @@ export function VisibilityTab({ days, onDays }: { days: number; onDays: (d: numb
 
 function NoEngines() {
 	return (
-		<Alert tone="info" icon={Info} title="No AI engines are configured">
-			Each engine is turned on by an API key on the server:{" "}
+		<SetupNote>
+			No AI engines are configured. Add at least one key to the API:{" "}
 			{Object.values(ENGINES).map((e, i, all) => (
 				<span key={e.envVar}>
-					{e.name} with <code>{e.envVar}</code>
-					{i < all.length - 1 ? ", " : "."}
+					<code>{e.envVar}</code> ({e.name}){i < all.length - 1 ? ", " : "."}
 				</span>
-			))}{" "}
-			Ask whoever runs SocialFly to add at least one.
-		</Alert>
+			))}
+		</SetupNote>
 	);
 }
 
@@ -163,45 +161,49 @@ function Overview({
 	}
 	const data = summary.data;
 	if (data.overall.checks === 0) {
+		// Show what will be measured (as empty tiles) so the tab explains itself before any data.
 		return (
-			<EmptyState
-				icon={Eye}
-				title={hasPrompts ? `No checks in the last ${days} days` : "Add a question to start"}
-				description={
-					hasPrompts
-						? "Checks run automatically a few times a week. Run one now to see results in a few minutes."
-						: "Add the questions your buyers ask below — or pick them from your brand research — and we'll start asking AI assistants."
-				}
-			/>
+			<div className="grid gap-4">
+				<PreviewKpis />
+				<EmptyState
+					compact
+					icon={hasPrompts ? Clock : Eye}
+					title={hasPrompts ? `No checks in the last ${days} days` : "Add a question to start"}
+					description={
+						hasPrompts
+							? "Checks run a few times a week. Run one now for results in minutes."
+							: "Add a buyer question below, or pick some from your brand research."
+					}
+				/>
+			</div>
 		);
 	}
 	return (
 		<div className="grid gap-6" aria-busy={summary.isFetching || undefined}>
 			<Kpis data={data} />
-			<div className="grid items-start gap-6 xl:grid-cols-2">
+			<div className="grid gap-6 xl:grid-cols-2">
 				<Card>
-					<CardHeader>
+					<CardHeader className="border-border border-b pb-4">
 						<CardTitle>Share of voice</CardTitle>
-						<p className="text-muted-foreground text-xs">
-							Of all the brand mentions in AI answers, how many were you.
-						</p>
+						<p className="text-muted-foreground text-xs">Your share of brand mentions.</p>
 					</CardHeader>
 					<CardContent>
 						{data.shareOfVoice.length ? (
 							<ShareOfVoiceChart rows={data.shareOfVoice} />
 						) : (
-							<p className="text-muted-foreground text-sm">
-								No brands were mentioned yet. Add competitors to compare against them.
-							</p>
+							<EmptyState
+								compact
+								icon={PieChart}
+								title="No brands mentioned yet"
+								description="Add competitors to compare against them."
+							/>
 						)}
 					</CardContent>
 				</Card>
 				<Card>
-					<CardHeader>
+					<CardHeader className="border-border border-b pb-4">
 						<CardTitle>Mention rate by week</CardTitle>
-						<p className="text-muted-foreground text-xs">
-							The share of answers that named you, week by week.
-						</p>
+						<p className="text-muted-foreground text-xs">Share of answers that named you.</p>
 					</CardHeader>
 					<CardContent>
 						<MentionTrendChart weeks={data.trend} />
@@ -209,15 +211,24 @@ function Overview({
 				</Card>
 			</div>
 			{data.byEngine.length ? (
-				<Card>
-					<CardHeader>
+				<Card className="overflow-hidden">
+					<CardHeader className="border-border border-b pb-4">
 						<CardTitle>By engine</CardTitle>
 					</CardHeader>
-					<div className="mt-3">
-						<EngineTable rows={data.byEngine} models={models} />
-					</div>
+					<EngineTable rows={data.byEngine} models={models} />
 				</Card>
 			) : null}
+		</div>
+	);
+}
+
+function PreviewKpis() {
+	return (
+		<div className="grid grid-cols-2 gap-3 opacity-70 sm:gap-4 lg:grid-cols-4" aria-hidden="true">
+			<StatTile label="Mention rate" value={UNKNOWN} hint="How often answers name you" />
+			<StatTile label="Average rank" value={UNKNOWN} hint="Your place among brands named" />
+			<StatTile label="Positive tone" value={UNKNOWN} hint="How warmly you're described" />
+			<StatTile label="Cites your site" value={UNKNOWN} hint="Answers linking to you" />
 		</div>
 	);
 }
@@ -230,7 +241,7 @@ function Kpis({ data }: { data: VisibilitySummary }) {
 		return total > 0 ? o.sentiment.positive / total : null;
 	}, [o.sentiment]);
 	return (
-		<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+		<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
 			<StatTile
 				label="Mention rate"
 				value={formatPercent(o.mentionRate)}

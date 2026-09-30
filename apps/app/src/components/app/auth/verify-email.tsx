@@ -90,7 +90,7 @@ export function VerifyEmail() {
 	if (state === "done") {
 		return (
 			<StatusPanel icon={CheckCircle2} title="Email verified">
-				<p>Thanks! Your email address is confirmed.</p>
+				<p>Your email address is confirmed.</p>
 				<Button asChild>
 					<Link href="/dashboard">Continue to SocialFly</Link>
 				</Button>
@@ -109,7 +109,7 @@ export function VerifyEmail() {
 
 	return (
 		<StatusPanel icon={MailCheck} title="Verify your email">
-			<p>We sent a verification link to your inbox. Open it to confirm your address.</p>
+			<p>Open the link we sent to your inbox.</p>
 			<ResendForm initialEmail={user?.email ?? params.get("email") ?? ""} />
 		</StatusPanel>
 	);

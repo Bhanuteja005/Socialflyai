@@ -66,8 +66,8 @@ export default function CommentManagementFeaturePage() {
 					<>
 						Say goodbye to tab-switching. Manage every interaction, reply with AI, and analyze
 						sentiment from one powerful dashboard.
-						<span className="mt-4 block text-base text-white/50">
-							Trusted by <span className="font-bold text-white">18,000+ Teams</span>
+						<span className="mt-4 block text-base text-muted-foreground">
+							Trusted by <span className="font-medium text-foreground">18,000+ Teams</span>
 						</span>
 					</>
 				}
@@ -79,11 +79,7 @@ export default function CommentManagementFeaturePage() {
 				<MockupFrame
 					title="Unified Inbox"
 					icon={Inbox}
-					aside={
-						<span className="font-bold text-[10px] text-primary uppercase tracking-widest">
-							14 New · AI Active
-						</span>
-					}
+					aside={<span className="font-mono text-[11px] text-brand-text">14 New · AI Active</span>}
 				>
 					<ChatMockup
 						messages={[
@@ -115,12 +111,15 @@ export default function CommentManagementFeaturePage() {
 						<div>
 							<ul className="grid gap-4 sm:grid-cols-2">
 								{CORE_VALUE.map(({ icon: Icon, title, description }) => (
-									<li key={title} className="rounded-2xl border border-white/10 bg-white/5 p-6">
-										<span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+									<li
+										key={title}
+										className="rounded-2xl border border-border bg-surface-raised p-6"
+									>
+										<span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground">
 											<Icon className="size-6" aria-hidden="true" />
 										</span>
-										<h3 className="font-bold text-lg text-white">{title}</h3>
-										<p className="mt-2 text-sm text-white/60">{description}</p>
+										<h3 className="font-medium text-lg text-foreground">{title}</h3>
+										<p className="mt-2 text-sm text-muted-foreground">{description}</p>
 									</li>
 								))}
 							</ul>

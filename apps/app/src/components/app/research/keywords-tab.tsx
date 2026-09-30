@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge, type BadgeTone } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@socialfly/ui/components/card";
 import { Switch } from "@socialfly/ui/components/controls";
@@ -12,14 +13,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@socialfly/ui/components/dialog";
-import { Alert, EmptyState } from "@socialfly/ui/components/feedback";
+import { EmptyState } from "@socialfly/ui/components/feedback";
 import { Field, fieldAria } from "@socialfly/ui/components/field";
 import { Textarea } from "@socialfly/ui/components/input";
 import { cn } from "@socialfly/ui/utils";
 import {
 	ArrowDown,
 	ArrowUp,
-	Info,
 	KeyRound,
 	Lightbulb,
 	LineChart as LineChartIcon,
@@ -35,7 +35,7 @@ import { formatCompact, formatNumber, formatRelative, formatUsd, UNKNOWN } from 
 import { useOrg } from "../org-provider";
 import { KeywordIdeasDialog } from "./keyword-ideas-dialog";
 import { KeywordRankingDialog } from "./keyword-ranking";
-import { ListSkeleton, LoadError } from "./research-shared";
+import { ListSkeleton, LoadError, SetupNote } from "./research-shared";
 
 /** The API takes at most 50 keywords per request. */
 export const MAX_KEYWORDS_PER_ADD = 50;
@@ -70,21 +70,17 @@ export function KeywordsTab() {
 	return (
 		<div className="grid gap-5">
 			{caps.isSuccess && !seo ? (
-				<Alert tone="info" icon={Info} title="Search data isn't connected">
-					You can keep a keyword list, but search volume, difficulty, cost-per-click, ideas and rank
-					tracking need a DataForSEO account. Ask whoever runs SocialFly to set{" "}
+				<SetupNote>
+					Search data isn't connected. Volume, difficulty, ideas and rank tracking need{" "}
 					<code>DATAFORSEO_LOGIN</code> and <code>DATAFORSEO_PASSWORD</code> on the API.
-				</Alert>
+				</SetupNote>
 			) : null}
 
-			<Card>
-				<CardHeader className="flex-row flex-wrap items-start justify-between gap-3">
+			<Card className="overflow-hidden">
+				<CardHeader className="flex-row flex-wrap items-start justify-between gap-3 border-border border-b pb-4">
 					<div className="grid gap-1">
 						<CardTitle>Keywords</CardTitle>
-						<CardDescription>
-							What people search for, how hard it is to rank, and where your site shows up in
-							Google. Positions of tracked keywords are checked about once a day.
-						</CardDescription>
+						<CardDescription>Where your site ranks in Google, checked daily.</CardDescription>
 					</div>
 					{editor ? (
 						<div className="flex flex-wrap gap-2">
@@ -106,13 +102,13 @@ export function KeywordsTab() {
 					) : null}
 				</CardHeader>
 
-				<div className="mt-4">
+				<div>
 					{keywords.isPending ? (
-						<div className="px-5 pb-5">
+						<div className="p-5">
 							<ListSkeleton rows={5} />
 						</div>
 					) : keywords.isError ? (
-						<div className="px-5 pb-5">
+						<div className="p-5">
 							<LoadError
 								title="Couldn't load keywords"
 								error={keywords.error}
@@ -120,11 +116,11 @@ export function KeywordsTab() {
 							/>
 						</div>
 					) : items.length === 0 ? (
-						<div className="px-5 pb-5">
+						<div className="p-5">
 							<EmptyState
 								icon={KeyRound}
 								title="No keywords yet"
-								description="Add the searches you want to be found for, pick them from your brand research, or get ideas from a few seed words."
+								description="Add the searches you want to be found for, or pick them from your brand research."
 								action={
 									editor ? (
 										<Button size="sm" onClick={() => setAdding(true)}>
@@ -173,6 +169,12 @@ export function KeywordsTab() {
 	);
 }
 
+function difficultyTone(d: number): BadgeTone {
+	if (d < 30) return "success";
+	if (d < 60) return "warning";
+	return "danger";
+}
+
 function difficultyLabel(d: number) {
 	if (d < 30) return "Easy";
 	if (d < 60) return "Medium";
@@ -183,10 +185,11 @@ function difficultyLabel(d: number) {
 function PositionChange({ k }: { k: Keyword }) {
 	if (k.position === null) {
 		return k.previousPosition !== null ? (
-			<span className="text-danger text-xs">dropped out</span>
+			<span className="font-mono text-danger text-xs">dropped out</span>
 		) : null;
 	}
-	if (k.previousPosition === null) return <span className="text-info text-xs">new</span>;
+	if (k.previousPosition === null)
+		return <span className="font-mono text-muted-foreground text-xs">new</span>;
 	const diff = k.previousPosition - k.position;
 	if (diff === 0) {
 		return (
@@ -201,7 +204,7 @@ function PositionChange({ k }: { k: Keyword }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-0.5 text-xs tabular-nums",
+				"inline-flex items-center gap-0.5 font-mono text-xs tabular-nums",
 				up ? "text-success" : "text-danger",
 			)}
 			title={`Was #${k.previousPosition}`}
@@ -213,8 +216,8 @@ function PositionChange({ k }: { k: Keyword }) {
 	);
 }
 
-const th = "px-4 py-2 font-medium";
-const td = "px-4 py-2.5 tabular-nums";
+const th = "h-10 px-4 font-medium";
+const td = "px-4 py-3 font-mono tabular-nums";
 
 function KeywordTable({
 	items,
@@ -232,11 +235,11 @@ function KeywordTable({
 	onDelete: (k: Keyword) => void;
 }) {
 	return (
-		<div className="scrollbar-thin overflow-x-auto border-border border-t">
+		<div className="scrollbar-thin relative overflow-x-auto [contain:inline-size]">
 			<table className="w-full min-w-[820px] text-sm">
 				<caption className="sr-only">Your keywords with search metrics and ranking</caption>
 				<thead>
-					<tr className="border-border border-b text-muted-foreground text-xs">
+					<tr className="border-border border-b bg-surface text-muted-foreground text-xs">
 						<th scope="col" className={cn(th, "text-left")}>
 							Keyword
 						</th>
@@ -269,8 +272,8 @@ function KeywordTable({
 				</thead>
 				<tbody className="divide-y divide-border">
 					{items.map((k) => (
-						<tr key={k.id}>
-							<th scope="row" className="px-4 py-2.5 text-left font-medium">
+						<tr key={k.id} className="transition-colors hover:bg-surface">
+							<th scope="row" className="min-w-44 px-4 py-3 text-left font-medium">
 								{k.keyword}
 								{k.metricsUpdatedAt ? null : seo ? (
 									<span className="block font-normal text-subtle-foreground text-xs">
@@ -285,11 +288,11 @@ function KeywordTable({
 								{k.difficulty === null ? (
 									UNKNOWN
 								) : (
-									<span className="inline-flex items-center gap-1.5">
-										{Math.round(k.difficulty)}
-										<span className="text-muted-foreground text-xs">
+									<span className="inline-flex items-center gap-2">
+										<span>{Math.round(k.difficulty)}</span>
+										<Badge tone={difficultyTone(k.difficulty)}>
 											{difficultyLabel(k.difficulty)}
-										</span>
+										</Badge>
 									</span>
 								)}
 							</td>
@@ -304,19 +307,19 @@ function KeywordTable({
 												{k.rankCheckedAt ? "Not in top 100" : UNKNOWN}
 											</span>
 										) : (
-											`#${k.position}`
+											<span className="text-foreground">#{k.position}</span>
 										)}
 									</span>
 									<PositionChange k={k} />
 								</span>
 							</td>
-							<td className="max-w-56 px-4 py-2.5">
+							<td className="max-w-56 px-4 py-3">
 								{k.rankedUrl ? (
 									<a
 										href={k.rankedUrl}
 										target="_blank"
 										rel="noreferrer noopener"
-										className="block truncate text-muted-foreground text-xs hover:text-foreground hover:underline"
+										className="block truncate font-mono text-[11.5px] text-muted-foreground hover:text-foreground hover:underline"
 									>
 										{k.rankedUrl.replace(/^https?:\/\/(www\.)?/, "")}
 									</a>
@@ -324,7 +327,7 @@ function KeywordTable({
 									<span className="text-subtle-foreground">{UNKNOWN}</span>
 								)}
 							</td>
-							<td className="px-4 py-2.5 text-center">
+							<td className="px-4 py-3 text-center">
 								<Switch
 									checked={k.tracked}
 									disabled={!editor}
@@ -332,7 +335,7 @@ function KeywordTable({
 									aria-label={`Track ranking for ${k.keyword}`}
 								/>
 							</td>
-							<td className="px-2 py-2.5">
+							<td className="px-2 py-3">
 								<div className="flex justify-end gap-0.5">
 									<Button
 										variant="ghost"
@@ -388,9 +391,7 @@ function AddKeywordsDialog({ onClose }: { onClose: () => void }) {
 			<DialogContent>
 				<DialogHeader>
 					<DialogTitle>Add keywords</DialogTitle>
-					<DialogDescription>
-						New keywords are tracked; we fetch their search metrics and your position shortly.
-					</DialogDescription>
+					<DialogDescription>New keywords are tracked from the next daily check.</DialogDescription>
 				</DialogHeader>
 				<form onSubmit={onSubmit} noValidate className="grid gap-4">
 					<Field

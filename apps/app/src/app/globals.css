@@ -3,37 +3,36 @@
 @import "@socialfly/ui/theme.css";
 
 /*
- * Chart tokens (analytics). Categorical slots follow a fixed order (impressions,
- * engagements, posts) validated for colour-vision deficiency on both surfaces; the
- * dark steps are chosen for the dark surface, not flipped. Slot 3 sits under 3:1 on
- * light, which is why every chart also ships a data-table view.
+ * Chart tokens. Monochrome (docs/design.md §3): series 1 is ink, series 2 the one accent
+ * (info) for comparison, series 3 a mid gray. The heatmap is a grayscale ramp where
+ * near-zero recedes toward the surface. Dark values are chosen for the dark surface, not
+ * flipped. Every chart also ships a data-table view, so no value depends on colour alone.
  */
 :root {
-	--chart-1: #2a78d6;
-	--chart-2: #eb6834;
-	--chart-3: #1baf7a;
-	--chart-grid: #ececef;
-	--chart-axis: #d4d4da;
-	/* Sequential (heatmap) ramp: near-zero recedes toward the surface. */
+	--chart-1: #0bab62;
+	--chart-2: #1a7da6;
+	--chart-3: #a3a3a0;
+	--chart-grid: #ececea;
+	--chart-axis: #d9d9d6;
 	--chart-seq-0: var(--muted);
-	--chart-seq-1: #cde2fb;
-	--chart-seq-2: #9ec5f4;
-	--chart-seq-3: #5598e7;
-	--chart-seq-4: #256abf;
-	--chart-seq-5: #104281;
+	--chart-seq-1: #dcdcd9;
+	--chart-seq-2: #bdbdb9;
+	--chart-seq-3: #8f8f8b;
+	--chart-seq-4: #555552;
+	--chart-seq-5: #1a1a1a;
 }
 
 .dark {
-	--chart-1: #3987e5;
-	--chart-2: #d95926;
-	--chart-3: #199e70;
-	--chart-grid: #1f1f25;
-	--chart-axis: #303038;
-	--chart-seq-1: #0d366b;
-	--chart-seq-2: #184f95;
-	--chart-seq-3: #256abf;
-	--chart-seq-4: #3987e5;
-	--chart-seq-5: #86b6ef;
+	--chart-1: #0be27d;
+	--chart-2: #6fcdf0;
+	--chart-3: #6b6c67;
+	--chart-grid: #1f201d;
+	--chart-axis: #31322e;
+	--chart-seq-1: #2e2f2b;
+	--chart-seq-2: #4a4b47;
+	--chart-seq-3: #767772;
+	--chart-seq-4: #adada8;
+	--chart-seq-5: #f3f3ef;
 }
 
 @theme inline {

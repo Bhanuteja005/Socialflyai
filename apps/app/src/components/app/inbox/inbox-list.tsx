@@ -5,12 +5,13 @@ import { Checkbox } from "@socialfly/ui/components/controls";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { cn } from "@socialfly/ui/utils";
 import { Archive, Inbox, MailOpen, PartyPopper, SearchX, ShieldAlert } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { type useInboxItems, useSetItemStatus } from "@/hooks/use-inbox";
 import type { InboxItem, InboxItemStatus } from "@/lib/api-types";
 import { formatDateTime, formatRelative, pluralize } from "@/lib/format";
 import { useOrg } from "../org-provider";
 import { LoadError } from "../research/research-shared";
+import { InboxSearch } from "./inbox-filters";
 import {
 	AuthorAvatar,
 	authorName,
@@ -19,6 +20,7 @@ import {
 	RelevanceChip,
 	ReplyIndicator,
 	SentimentBadge,
+	VIEW_LABEL,
 } from "./inbox-shared";
 
 /** Statuses each view shows; anything else was just moved away and is hidden until the refetch. */
@@ -43,6 +45,8 @@ export function InboxList({
 	items: query,
 	openId,
 	filtered,
+	search,
+	onSearch,
 	onOpen,
 	onReply,
 }: {
@@ -50,6 +54,8 @@ export function InboxList({
 	items: ReturnType<typeof useInboxItems>;
 	openId: string | null;
 	filtered: boolean;
+	search: string;
+	onSearch: (q: string) => void;
 	onOpen: (id: string) => void;
 	onReply: (id: string) => void;
 }) {
@@ -150,15 +156,20 @@ export function InboxList({
 		return () => document.removeEventListener("keydown", onKey);
 	}, [move, archive, currentId, editor, onReply, view]);
 
+	const allSelected = ids.length > 0 && selectedIds.length === ids.length;
+	const inactive = view === "archived" || view === "spam";
+	const selecting = selectedIds.length > 0;
+
+	let content: ReactNode;
 	if (query.isPending) {
-		return (
-			<div className="grid gap-2" aria-busy="true">
-				{Array.from({ length: 6 }, (_, i) => (
+		content = (
+			<div className="divide-y divide-border" aria-busy="true">
+				{Array.from({ length: 7 }, (_, i) => (
 					// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
-					<div key={i} className="flex gap-3 rounded-lg border border-border p-3">
-						<Skeleton className="size-7 rounded-full" />
+					<div key={i} className="flex gap-3 px-4 py-3.5">
+						<Skeleton className="size-9 rounded-full" />
 						<div className="grid flex-1 gap-2">
-							<Skeleton className="h-3 w-32" />
+							<Skeleton className="h-3 w-28" />
 							<Skeleton className="h-3 w-full" />
 							<Skeleton className="h-3 w-2/3" />
 						</div>
@@ -166,70 +177,122 @@ export function InboxList({
 				))}
 			</div>
 		);
-	}
-	if (query.isError) {
-		return (
-			<LoadError
-				compact
-				title="Couldn't load the inbox"
-				error={query.error}
-				onRetry={() => void query.refetch()}
-			/>
+	} else if (query.isError) {
+		content = (
+			<div className="p-3">
+				<LoadError
+					compact
+					title="Couldn't load the inbox"
+					error={query.error}
+					onRetry={() => void query.refetch()}
+				/>
+			</div>
+		);
+	} else if (items.length === 0) {
+		content = (
+			<div className="p-3">
+				{filtered ? (
+					<EmptyState
+						compact
+						icon={SearchX}
+						title="Nothing matches these filters"
+						description="Try a lower relevance, another channel, or clear the search."
+					/>
+				) : view === "open" ? (
+					<EmptyState
+						compact
+						icon={PartyPopper}
+						title="Inbox zero"
+						description="Everyone has been answered. New comments and mentions show up here as they arrive."
+					/>
+				) : view === "discussions" ? (
+					<EmptyState
+						compact
+						icon={Inbox}
+						title="No discussions yet"
+						description="Add listening queries to find public conversations where your brand could help."
+					/>
+				) : (
+					<EmptyState
+						compact
+						icon={Inbox}
+						title={`Nothing ${view === "replied" ? "replied to" : `in ${view}`} yet`}
+					/>
+				)}
+			</div>
+		);
+	} else {
+		content = (
+			<>
+				<p id={hintId} className="sr-only">
+					j and k move, Enter opens{editor ? ", r replies, e archives, x selects" : ""}.
+				</p>
+				<ul
+					ref={listRef}
+					className="divide-y divide-border"
+					aria-label="Inbox items"
+					aria-describedby={hintId}
+				>
+					{items.map((item) => (
+						<Row
+							key={item.id}
+							item={item}
+							open={item.id === openId}
+							selectable={editor}
+							selecting={selecting}
+							selected={selected.has(item.id)}
+							onSelect={(on) =>
+								setSelected((s) => {
+									const next = new Set(s);
+									if (on) next.add(item.id);
+									else next.delete(item.id);
+									return next;
+								})
+							}
+							onOpen={() => onOpen(item.id)}
+							shortcuts={editor ? "Enter r e x" : "Enter"}
+						/>
+					))}
+				</ul>
+				{query.hasNextPage ? (
+					<div className="p-3">
+						<Button
+							variant="outline"
+							size="sm"
+							className="w-full"
+							loading={query.isFetchingNextPage}
+							onClick={() => void query.fetchNextPage()}
+						>
+							Load more
+						</Button>
+					</div>
+				) : null}
+			</>
 		);
 	}
-	if (items.length === 0) {
-		return filtered ? (
-			<EmptyState
-				compact
-				icon={SearchX}
-				title="Nothing matches these filters"
-				description="Try a lower relevance, another channel, or clear the search."
-			/>
-		) : view === "open" ? (
-			<EmptyState
-				compact
-				icon={PartyPopper}
-				title="Inbox zero"
-				description="Everyone has been answered. New comments and mentions show up here as they arrive."
-			/>
-		) : view === "discussions" ? (
-			<EmptyState
-				compact
-				icon={Inbox}
-				title="No discussions yet"
-				description="Add listening queries to find public conversations where your brand could help."
-			/>
-		) : (
-			<EmptyState
-				compact
-				icon={Inbox}
-				title={`Nothing ${view === "replied" ? "replied to" : `in ${view}`} yet`}
-			/>
-		);
-	}
-
-	const allSelected = selectedIds.length === ids.length;
-	const inactive = view === "archived" || view === "spam";
 
 	return (
-		<div className="grid gap-2">
-			{editor ? (
+		<div className="flex min-h-0 w-full min-w-0 flex-col">
+			<div className="grid gap-2 border-border border-b px-3 pt-3 pb-2">
+				<InboxSearch value={search} onChange={onSearch} />
 				<div
-					className="flex min-h-8 flex-wrap items-center gap-2 rounded-lg bg-muted/60 px-2 py-1"
-					role="toolbar"
-					aria-label="Bulk actions"
+					className="flex min-h-7 items-center gap-2 pl-1"
+					// Only editors get bulk actions; for viewers this is just the count.
+					{...(editor ? { role: "toolbar", "aria-label": "Bulk actions" } : {})}
 				>
-					<Checkbox
-						aria-label={allSelected ? "Deselect all" : "Select all"}
-						checked={allSelected ? true : selectedIds.length ? "indeterminate" : false}
-						onCheckedChange={() => setSelected(allSelected ? new Set() : new Set(ids))}
-					/>
-					{selectedIds.length ? (
+					{editor && ids.length ? (
+						<Checkbox
+							aria-label={allSelected ? "Deselect all" : "Select all"}
+							checked={allSelected ? true : selecting ? "indeterminate" : false}
+							onCheckedChange={() => setSelected(allSelected ? new Set() : new Set(ids))}
+						/>
+					) : null}
+					{selecting ? (
 						<>
-							<span className="text-muted-foreground text-xs tabular-nums">
+							<span className="font-mono font-medium text-xs tabular-nums">
 								{selectedIds.length} selected
 							</span>
-							<div className="ml-auto flex flex-wrap gap-1">
+							<div className="ml-auto flex gap-0.5">
 								{inactive ? (
 									<Button variant="ghost" size="xs" onClick={() => archive(selectedIds, "read")}>
 										<Inbox />
@@ -260,58 +323,19 @@ export function InboxList({
 							</div>
 						</>
 					) : (
-						<span className="text-muted-foreground text-xs">
-							{pluralize(ids.length, "item")}
-							{query.hasNextPage ? "+" : ""}
-						</span>
+						<p className="flex items-baseline gap-1.5 text-xs">
+							<span className="font-medium text-[13px]">{VIEW_LABEL[view]}</span>
+							{query.data ? (
+								<span className="font-mono text-muted-foreground tabular-nums">
+									{pluralize(ids.length, "conversation")}
+									{query.hasNextPage ? "+" : ""}
+								</span>
+							) : null}
+						</p>
 					)}
 				</div>
-			) : null}
-
-			<p id={hintId} className="hidden text-subtle-foreground text-xs lg:block">
-				<kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> move ·{" "}
-				<kbd className="font-mono">Enter</kbd> open
-				{editor ? (
-					<>
-						{" "}
-						· <kbd className="font-mono">r</kbd> reply · <kbd className="font-mono">e</kbd> archive
-						· <kbd className="font-mono">x</kbd> select
-					</>
-				) : null}
-			</p>
-
-			<ul ref={listRef} className="grid gap-1.5" aria-label="Inbox items" aria-describedby={hintId}>
-				{items.map((item) => (
-					<Row
-						key={item.id}
-						item={item}
-						open={item.id === openId}
-						selectable={editor}
-						selected={selected.has(item.id)}
-						onSelect={(on) =>
-							setSelected((s) => {
-								const next = new Set(s);
-								if (on) next.add(item.id);
-								else next.delete(item.id);
-								return next;
-							})
-						}
-						onOpen={() => onOpen(item.id)}
-						shortcuts={editor ? "Enter r e x" : "Enter"}
-					/>
-				))}
-			</ul>
-
-			{query.hasNextPage ? (
-				<Button
-					variant="outline"
-					size="sm"
-					loading={query.isFetchingNextPage}
-					onClick={() => void query.fetchNextPage()}
-				>
-					Load more
-				</Button>
-			) : null}
+			</div>
+			<div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">{content}</div>
 		</div>
 	);
 }
@@ -320,6 +344,7 @@ function Row({
 	item,
 	open,
 	selectable,
+	selecting,
 	selected,
 	onSelect,
 	onOpen,
@@ -328,6 +353,8 @@ function Row({
 	item: InboxItem;
 	open: boolean;
 	selectable: boolean;
+	/** Something is selected: every row shows its checkbox over the avatar. */
+	selecting: boolean;
 	selected: boolean;
 	onSelect: (on: boolean) => void;
 	onOpen: () => void;
@@ -339,68 +366,86 @@ function Row({
 		<li
 			data-row-id={item.id}
 			className={cn(
-				"flex gap-2.5 rounded-lg border p-3 transition-colors",
+				"group relative grid gap-1.5 px-4 py-3 transition-colors",
 				open
-					? "border-primary/40 bg-primary-soft/40"
+					? "bg-muted/60 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-ink"
 					: selected
-						? "border-border-strong bg-muted/60"
-						: "border-border bg-surface-raised hover:border-border-strong",
+						? "bg-muted/70"
+						: "hover:bg-surface",
 			)}
 		>
-			{selectable ? (
-				<Checkbox
-					className="mt-1.5"
-					checked={selected}
-					onCheckedChange={(v) => onSelect(v === true)}
-					aria-label={`Select ${authorName(item.author)}'s ${KIND_LABEL[item.kind].toLowerCase()}`}
+			{unread ? (
+				<span
+					className="absolute top-[1.3rem] left-1.5 size-1.5 rounded-full bg-ink"
+					aria-hidden="true"
 				/>
 			) : null}
-			<div className="grid min-w-0 flex-1 gap-1.5">
-				<button
-					type="button"
-					data-inbox-row
-					onClick={onOpen}
-					aria-current={open ? "true" : undefined}
-					aria-keyshortcuts={shortcuts}
-					className="flex min-w-0 cursor-pointer gap-2.5 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-4"
+			{selectable ? (
+				// Sits over the avatar: shown on hover or focus, or on every row once anything is selected.
+				<span
+					className={cn(
+						"absolute top-3 left-4 z-10 flex size-9 items-center justify-center rounded-full bg-surface-raised ring-1 ring-border transition-opacity",
+						selecting || selected
+							? "opacity-100"
+							: "opacity-0 focus-within:opacity-100 group-hover:opacity-100",
+					)}
 				>
-					<AuthorAvatar item={item} />
-					<span className="grid min-w-0 flex-1 gap-1">
-						<span className="flex min-w-0 items-center gap-1.5">
-							{unread ? (
-								<span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-							) : null}
-							<span className={cn("truncate text-sm", unread ? "font-semibold" : "font-medium")}>
-								{authorName(item.author)}
-							</span>
-							<time
-								dateTime={item.postedAt}
-								title={formatDateTime(item.postedAt)}
-								className="ml-auto shrink-0 text-subtle-foreground text-xs"
-							>
-								{formatRelative(item.postedAt)}
-							</time>
-						</span>
+					<Checkbox
+						checked={selected}
+						onCheckedChange={(v) => onSelect(v === true)}
+						aria-label={`Select ${authorName(item.author)}'s ${KIND_LABEL[item.kind].toLowerCase()}`}
+					/>
+				</span>
+			) : null}
+			<button
+				type="button"
+				data-inbox-row
+				onClick={onOpen}
+				aria-current={open ? "true" : undefined}
+				aria-keyshortcuts={shortcuts}
+				className="flex min-w-0 cursor-pointer gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+			>
+				<AuthorAvatar item={item} size="md" />
+				<span className="grid min-w-0 flex-1 gap-0.5">
+					<span className="flex min-w-0 items-baseline gap-2">
 						<span
 							className={cn(
-								"line-clamp-2 text-sm leading-snug",
-								unread ? "text-foreground" : "text-muted-foreground",
+								"truncate text-[13px] text-foreground",
+								unread ? "font-medium" : "font-normal",
 							)}
 						>
-							{snippet}
+							{authorName(item.author)}
 						</span>
-						{unread ? <span className="sr-only">Unread.</span> : null}
+						<time
+							dateTime={item.postedAt}
+							title={formatDateTime(item.postedAt)}
+							className={cn(
+								"ml-auto shrink-0 font-mono text-[11px] tabular-nums",
+								unread ? "text-foreground" : "text-subtle-foreground",
+							)}
+						>
+							{formatRelative(item.postedAt)}
+						</time>
 					</span>
-				</button>
-				{/* Outside the button so the relevance tooltip can be focused on its own. */}
-				<div className="flex min-w-0 flex-wrap items-center gap-1 pl-9.5">
-					<span className="mr-auto truncate text-subtle-foreground text-xs">
-						{KIND_LABEL[item.kind]} · {item.community ?? item.channel.name}
+					<span
+						className={cn(
+							"line-clamp-2 text-[13px] leading-snug",
+							unread ? "text-foreground" : "text-muted-foreground",
+						)}
+					>
+						{snippet}
 					</span>
-					<ReplyIndicator reply={item.latestReply} />
-					<SentimentBadge sentiment={item.sentiment} />
-					<RelevanceChip relevance={item.relevance} reason={item.relevanceReason} />
-				</div>
+					{unread ? <span className="sr-only">Unread.</span> : null}
+				</span>
+			</button>
+			{/* Outside the button so the relevance tooltip can be focused on its own. */}
+			<div className="flex min-w-0 items-center gap-2 pl-12">
+				<span className="mr-auto truncate text-subtle-foreground text-xs">
+					{KIND_LABEL[item.kind]} · {item.community ?? item.channel.name}
+				</span>
+				<ReplyIndicator reply={item.latestReply} />
+				<SentimentBadge sentiment={item.sentiment} />
+				<RelevanceChip relevance={item.relevance} reason={item.relevanceReason} />
 			</div>
 		</li>
 	);

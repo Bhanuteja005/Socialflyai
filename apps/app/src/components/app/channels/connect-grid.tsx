@@ -2,8 +2,8 @@
 
 import { Button } from "@socialfly/ui/components/button";
 import { Tooltip } from "@socialfly/ui/components/controls";
-import { Skeleton } from "@socialfly/ui/components/feedback";
-import { Plus } from "lucide-react";
+import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
+import { Plug, Plus } from "lucide-react";
 import { useProviders } from "@/hooks/queries";
 import { useConnectChannel } from "@/hooks/use-connect-channel";
 import { providerMeta } from "@/lib/providers";
@@ -28,9 +28,12 @@ export function ConnectGrid() {
 
 	if (!providers?.length) {
 		return (
-			<p className="rounded-lg border border-border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
-				No platforms are configured on this SocialFly server yet.
-			</p>
+			<EmptyState
+				compact
+				icon={Plug}
+				title="No platforms configured"
+				description="Add a platform's API credentials to this SocialFly server to connect accounts."
+			/>
 		);
 	}
 
@@ -55,11 +58,11 @@ export function ConnectGrid() {
 				return (
 					<li
 						key={p.id}
-						className="flex flex-col gap-3 rounded-lg border border-border bg-surface-raised p-4 shadow-xs transition-colors hover:border-border-strong"
+						className="flex flex-col gap-3 rounded-xl border border-border bg-surface-raised p-4 shadow-card transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-sm"
 					>
 						<div className="flex items-center gap-3">
-							<ProviderIcon provider={p.id} size="md" />
-							<p className="font-medium text-sm">{p.name}</p>
+							<ProviderIcon provider={p.id} size="lg" />
+							<p className="font-semibold text-sm">{p.name}</p>
 						</div>
 						<p className="flex-1 text-muted-foreground text-xs leading-relaxed">
 							{meta.description}

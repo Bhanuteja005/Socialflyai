@@ -64,10 +64,7 @@ export function SignupForm() {
 
 	return (
 		<>
-			<AuthHeading
-				title="Create your account"
-				description="Start scheduling to every channel in minutes."
-			/>
+			<AuthHeading title="Create your account" />
 			<GoogleButton next={next} label="Sign up with Google" />
 			<Divider>or</Divider>
 			<form onSubmit={onSubmit} className="grid gap-4" noValidate>

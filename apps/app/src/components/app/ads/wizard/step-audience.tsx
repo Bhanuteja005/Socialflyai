@@ -246,7 +246,7 @@ function CodeMultiSelect({
 				items={value.map((c) => ({ id: c, name: nameOf(c) }))}
 				onRemove={(c) => toggle(c, false)}
 			/>
-			<div className="rounded-md border border-border">
+			<div className="rounded-xl border border-border">
 				<div className="relative border-border border-b">
 					<Search
 						className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -372,7 +372,7 @@ function TargetingPicker({
 				) : results.data && options.length === 0 && !results.isFetching ? (
 					<p className="text-muted-foreground text-xs">No matches for “{debounced}”.</p>
 				) : options.length ? (
-					<ul className="scrollbar-thin grid max-h-48 gap-0.5 overflow-y-auto rounded-md border border-border p-1">
+					<ul className="scrollbar-thin grid max-h-48 gap-0.5 overflow-y-auto rounded-xl border border-border p-1">
 						{options.map((o) => (
 							<li key={o.id}>
 								<button

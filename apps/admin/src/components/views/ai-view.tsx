@@ -1,9 +1,10 @@
 "use client";
 
 import { Badge } from "@socialfly/ui/components/badge";
+import { Button } from "@socialfly/ui/components/button";
 import { EmptyState } from "@socialfly/ui/components/feedback";
 import { NativeSelect } from "@socialfly/ui/components/select";
-import { Sparkles } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useGenerations } from "@/hooks/use-admin";
@@ -21,6 +22,7 @@ import {
 	tdClass,
 	thClass,
 } from "../common";
+import { Monogram, Toolbar } from "./parts";
 
 // Typed against the API's enum: adding a kind server-side fails typecheck here until labelled.
 const KIND_LABEL: Record<GenerationKind, string> = {
@@ -54,11 +56,20 @@ export function AiView() {
 		<>
 			<PageHeader
 				title="AI usage"
-				description="Every AI generation across all organizations, newest first, with its cost."
+				description="Every AI generation across all organizations, with its cost."
 			/>
-			<div className="mb-4 flex flex-wrap items-end gap-3">
-				<div className="grid gap-1.5">
-					<label htmlFor="ai-status" className="font-medium text-xs">
+			<Toolbar
+				aside={
+					items.length ? (
+						<span>
+							<span className="text-foreground">{formatUsdPrecise(shownCost)}</span> across the{" "}
+							{items.length} shown
+						</span>
+					) : null
+				}
+			>
+				<div className="flex items-center gap-2">
+					<label htmlFor="ai-status" className="text-muted-foreground text-xs">
 						Status
 					</label>
 					<NativeSelect
@@ -75,8 +86,8 @@ export function AiView() {
 						))}
 					</NativeSelect>
 				</div>
-				<div className="grid gap-1.5">
-					<label htmlFor="ai-kind" className="font-medium text-xs">
+				<div className="flex items-center gap-2">
+					<label htmlFor="ai-kind" className="text-muted-foreground text-xs">
 						Kind
 					</label>
 					<NativeSelect
@@ -93,12 +104,20 @@ export function AiView() {
 						))}
 					</NativeSelect>
 				</div>
-				{items.length ? (
-					<p className="pb-2 text-muted-foreground text-xs" aria-live="polite">
-						{formatUsdPrecise(shownCost)} across the {items.length} shown
-					</p>
+				{filtered ? (
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => {
+							setStatus("all");
+							setKind("all");
+						}}
+					>
+						<X />
+						Clear
+					</Button>
 				) : null}
-			</div>
+			</Toolbar>
 			{query.isError && !query.data ? (
 				<QueryError error={query.error} onRetry={() => void query.refetch()} />
 			) : query.isPending ? (
@@ -112,7 +131,7 @@ export function AiView() {
 				/>
 			) : (
 				<TableCard>
-					<table className={tableClass}>
+					<table className={`${tableClass} relative`}>
 						<caption className="sr-only">AI generations</caption>
 						<thead>
 							<tr>
@@ -140,19 +159,26 @@ export function AiView() {
 							{items.map((g) => {
 								const s = statusMeta(GENERATION_STATUS, g.status);
 								return (
-									<tr key={g.id} className="hover:bg-muted/40">
+									<tr key={g.id} className="transition-colors hover:bg-surface">
 										<td className={tdClass}>
-											<Link
-												href={`/organizations/${g.organization.id}`}
-												className="font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-											>
-												{g.organization.name}
-											</Link>
-											<div className="text-muted-foreground text-xs">
-												{g.userEmail ?? <None label="Unknown user" />}
+											<div className="flex items-center gap-3">
+												<Monogram name={g.organization.name} />
+												<div className="grid min-w-0 gap-0.5">
+													<Link
+														href={`/organizations/${g.organization.id}`}
+														className="truncate font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+													>
+														{g.organization.name}
+													</Link>
+													<div className="truncate text-muted-foreground text-xs">
+														{g.userEmail ?? <None label="Unknown user" />}
+													</div>
+												</div>
 											</div>
 										</td>
-										<td className={tdClass}>{KIND_LABEL[g.kind] ?? g.kind}</td>
+										<td className={tdClass}>
+											<Badge tone="outline">{KIND_LABEL[g.kind] ?? g.kind}</Badge>
+										</td>
 										<td className={tdClass}>
 											<Badge tone={s.tone} dot>
 												{s.label}
@@ -164,12 +190,18 @@ export function AiView() {
 											) : null}
 										</td>
 										<td className={tdClass}>
-											{g.model ? <code className="font-mono text-xs">{g.model}</code> : <None />}
+											{g.model ? (
+												<code className="font-mono text-muted-foreground text-xs">{g.model}</code>
+											) : (
+												<None />
+											)}
 										</td>
-										<td className={`${tdClass} text-right tabular-nums`}>
+										<td className={`${tdClass} text-right font-mono tabular-nums`}>
 											{formatUsdPrecise(g.costUsd)}
 										</td>
-										<td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+										<td
+											className={`${tdClass} whitespace-nowrap font-mono text-muted-foreground text-xs`}
+										>
 											<span title={formatDateTime(g.createdAt)}>{formatRelative(g.createdAt)}</span>
 										</td>
 									</tr>

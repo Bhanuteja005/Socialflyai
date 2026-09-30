@@ -1,10 +1,12 @@
 "use client";
 
+import { Badge } from "@socialfly/ui/components/badge";
 import { Button } from "@socialfly/ui/components/button";
 import {
 	ConfirmDialog,
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogHeader,
 	DialogTitle,
 } from "@socialfly/ui/components/dialog";
@@ -12,7 +14,7 @@ import { Field } from "@socialfly/ui/components/field";
 import { Textarea } from "@socialfly/ui/components/input";
 import { toast } from "@socialfly/ui/components/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { ExternalLink, Film, ImageIcon, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, call, callVoid } from "@/lib/api-client";
 import type { MediaAsset } from "@/lib/api-types";
@@ -79,15 +81,17 @@ export function MediaDetailsDialog({
 	return (
 		<>
 			<Dialog open={asset !== null && !confirmDelete} onOpenChange={onOpenChange}>
-				<DialogContent className="max-w-3xl">
-					<DialogHeader>
-						<DialogTitle className="truncate">{asset?.fileName}</DialogTitle>
-					</DialogHeader>
+				<DialogContent className="max-w-4xl gap-0 overflow-hidden p-0 sm:p-0">
 					{asset ? (
-						<div className="grid gap-5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-							<div className="flex max-h-[60dvh] items-center justify-center overflow-hidden rounded-lg bg-muted">
+						<div className="grid md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]">
+							<div className="flex min-h-64 items-center justify-center bg-muted p-4 md:min-h-[480px]">
 								{asset.kind === "video" ? (
-									<video src={asset.url} controls playsInline className="max-h-[60dvh] w-full">
+									<video
+										src={asset.url}
+										controls
+										playsInline
+										className="max-h-[60dvh] w-full rounded-xl"
+									>
 										<track kind="captions" />
 									</video>
 								) : (
@@ -95,23 +99,40 @@ export function MediaDetailsDialog({
 									<img
 										src={asset.url}
 										alt={asset.altText ?? ""}
-										className="max-h-[60dvh] w-auto object-contain"
+										className="max-h-[60dvh] w-auto rounded-xl object-contain"
 									/>
 								)}
 							</div>
-							<div className="grid content-start gap-4">
-								<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+							<div className="grid content-start gap-5 border-border border-t p-5 md:border-t-0 md:border-l">
+								<DialogHeader>
+									<DialogTitle className="truncate">{asset.fileName}</DialogTitle>
+									<DialogDescription className="flex flex-wrap items-center gap-1.5">
+										<Badge tone="outline">
+											{asset.kind === "video" ? <Film /> : <ImageIcon />}
+											{asset.kind === "video" ? "Video" : "Image"}
+										</Badge>
+										{asset.source === "ai" ? (
+											<Badge tone="outline">
+												<Sparkles />
+												AI generated
+											</Badge>
+										) : null}
+									</DialogDescription>
+								</DialogHeader>
+								<dl className="grid divide-y divide-border rounded-xl border border-border text-sm">
 									{facts.map(([k, v]) => (
-										<div key={k} className="contents">
+										<div key={k} className="flex items-center justify-between gap-4 px-3 py-2">
 											<dt className="text-muted-foreground">{k}</dt>
-											<dd className="truncate">{v}</dd>
+											<dd className="truncate text-right font-mono text-[13px] tabular-nums">
+												{v}
+											</dd>
 										</div>
 									))}
 								</dl>
 								<Field
 									label="Alt text"
 									htmlFor="alt-text"
-									hint="Describes the image for people using screen readers. Sent to platforms that support it."
+									hint="Read by screen readers; sent to platforms that support it."
 								>
 									<Textarea
 										id="alt-text"
@@ -123,8 +144,8 @@ export function MediaDetailsDialog({
 										placeholder={editable ? "A team photo at the product launch…" : "No alt text"}
 									/>
 								</Field>
-								{editable ? (
-									<div className="flex flex-wrap items-center justify-between gap-2">
+								<div className="flex flex-wrap items-center gap-2">
+									{editable ? (
 										<Button
 											variant="danger-outline"
 											size="sm"
@@ -133,16 +154,25 @@ export function MediaDetailsDialog({
 											<Trash2 />
 											Delete
 										</Button>
+									) : null}
+									<Button variant="ghost" size="sm" asChild>
+										<a href={asset.url} target="_blank" rel="noreferrer">
+											<ExternalLink />
+											Open original
+										</a>
+									</Button>
+									{editable ? (
 										<Button
 											size="sm"
+											className="ml-auto"
 											loading={save.isPending}
 											disabled={altText === (asset.altText ?? "")}
 											onClick={() => save.mutate(altText)}
 										>
 											Save alt text
 										</Button>
-									</div>
-								) : null}
+									) : null}
+								</div>
 							</div>
 						</div>
 					) : null}

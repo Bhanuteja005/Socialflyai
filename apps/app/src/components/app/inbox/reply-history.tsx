@@ -168,10 +168,7 @@ export function ReplyHistory({
 	const sorted = [...replies].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 	return (
 		<section aria-labelledby={`replies-${itemId}`} className="grid gap-2">
-			<h3
-				id={`replies-${itemId}`}
-				className="font-medium text-[11px] text-subtle-foreground uppercase tracking-wider"
-			>
+			<h3 id={`replies-${itemId}`} className="font-medium text-muted-foreground text-xs">
 				Your replies
 			</h3>
 			<ul className="grid gap-2">
@@ -216,8 +213,10 @@ function ReplyCard({
 	return (
 		<li
 			className={cn(
-				"grid gap-2 rounded-lg border p-3",
-				reply.status === "sent" ? "border-primary/25 bg-primary-soft/30" : "border-border",
+				"grid gap-2 rounded-xl border p-3.5",
+				reply.status === "sent"
+					? "border-border-strong bg-surface-raised"
+					: "border-border bg-surface-raised",
 			)}
 		>
 			<div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -231,7 +230,7 @@ function ReplyCard({
 				<span className="text-muted-foreground">
 					{reply.createdBy ? (mine ? "You" : reply.createdBy.name) : "Someone"}
 					{" · "}
-					<time dateTime={when} title={formatDateTime(when)}>
+					<time dateTime={when} title={formatDateTime(when)} className="font-mono tabular-nums">
 						{formatRelative(when)}
 					</time>
 				</span>

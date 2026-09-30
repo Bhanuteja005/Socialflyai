@@ -37,6 +37,8 @@ export const qk = {
 		["org", orgId, "analytics", "posts", query] as const,
 	analyticsPost: (orgId: string, postId: string) =>
 		["org", orgId, "analytics", "post", postId] as const,
+	analyticsChannel: (orgId: string, channelId: string, from: string, to: string) =>
+		["org", orgId, "analytics", "channel", channelId, from, to] as const,
 	bestTimes: (orgId: string, channelIds: string) =>
 		["org", orgId, "analytics", "best-times", channelIds] as const,
 	researchAll: (orgId: string) => ["org", orgId, "research"] as const,

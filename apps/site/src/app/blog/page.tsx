@@ -1,6 +1,12 @@
 import { TrendingUp, Zap } from "lucide-react";
 import { pageMetadata } from "@/components/marketing/metadata";
-import { Accent, Container, headingDisplay } from "@/components/marketing/primitives";
+import {
+	Accent,
+	Container,
+	headingDisplay,
+	headingSection,
+	PixelField,
+} from "@/components/marketing/primitives";
 import { BlogGrid } from "./blog-grid";
 import { BLOG_POSTS } from "./data";
 import { NewsletterForm } from "./newsletter-form";
@@ -18,20 +24,17 @@ export default function BlogPage() {
 
 	return (
 		<section className="relative overflow-hidden pt-32 pb-20 lg:pt-44 lg:pb-28">
-			<div
-				aria-hidden="true"
-				className="pointer-events-none absolute top-0 left-1/2 h-[800px] w-full -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_50%_20%,#0BE27D_0%,transparent_70%)] opacity-10 blur-[150px]"
-			/>
+			<PixelField />
 			<Container className="relative">
 				<header className="mb-12 max-w-2xl">
-					<p className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-black text-[10px] text-primary uppercase tracking-widest">
+					<p className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1 font-mono text-muted-foreground text-xs">
 						<TrendingUp className="size-3" aria-hidden="true" />
 						Latest Insights
 					</p>
-					<h1 className={`${headingDisplay} lg:text-7xl`}>
+					<h1 className={headingDisplay}>
 						Socialfly <Accent>Insights.</Accent>
 					</h1>
-					<p className="mt-6 text-lg text-white/60 leading-relaxed">
+					<p className="mt-5 text-base text-muted-foreground leading-relaxed sm:text-lg">
 						Expert strategies, AI breakthroughs, and brand growth tactics delivered to your
 						dashboard daily.
 					</p>
@@ -39,19 +42,15 @@ export default function BlogPage() {
 
 				<BlogGrid featured={featured} posts={posts} />
 
-				<div className="relative mt-32 overflow-hidden rounded-[32px] border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent p-8 text-center sm:p-10 lg:mt-40 lg:rounded-[40px] lg:p-20">
-					<div
-						aria-hidden="true"
-						className="absolute top-0 left-1/2 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-primary/50 to-transparent"
-					/>
-					<Zap className="mx-auto mb-8 size-12 text-primary" aria-hidden="true" />
-					<h2 className="mb-6 font-bold text-3xl text-white lg:text-5xl">Master Social ROI</h2>
-					<p className="mx-auto mb-10 max-w-xl text-lg text-white/60">
+				<div className="relative mt-32 overflow-hidden rounded-3xl border border-border bg-surface-raised p-8 text-center sm:p-10 lg:mt-40 lg:p-16">
+					<Zap className="mx-auto mb-6 size-6 text-foreground" aria-hidden="true" />
+					<h2 className={`mb-4 ${headingSection}`}>Master Social ROI</h2>
+					<p className="mx-auto mb-8 max-w-xl text-base text-muted-foreground">
 						Join 50,000+ creators and brands receiving our weekly strategy teardowns, AI tool
 						updates, and industry insights.
 					</p>
 					<NewsletterForm />
-					<p className="mt-6 font-black text-[10px] text-white/40 uppercase tracking-widest">
+					<p className="mt-5 font-mono text-subtle-foreground text-xs">
 						No Spam. Just Alpha. Unsubscribe at any time.
 					</p>
 				</div>

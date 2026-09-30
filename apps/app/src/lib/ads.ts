@@ -105,7 +105,7 @@ export const CAMPAIGN_STATUS: Record<AdCampaignStatus, StatusMeta> = {
 	draft: { label: "Draft", tone: "neutral", description: "Being written. Not sent anywhere." },
 	pending_approval: {
 		label: "Pending approval",
-		tone: "violet",
+		tone: "warning",
 		description: "Waiting for an admin to approve it.",
 	},
 	approved: {

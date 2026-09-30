@@ -22,7 +22,7 @@ const data: CompetitorPageData = {
 			"Hootsuite's legacy interface and enterprise pricing can slow your team down. SocialflyAI offers a faster, AI-native experience with better results at a fraction of the cost.",
 		socialProof: (
 			<>
-				Trusted by <span className="font-bold text-white">1,000+</span> teams
+				Trusted by <span className="font-mono text-foreground tabular-nums">1,000+</span> teams
 			</>
 		),
 	},

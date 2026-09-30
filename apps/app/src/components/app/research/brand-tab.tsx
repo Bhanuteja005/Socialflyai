@@ -22,8 +22,6 @@ import {
 	FileText,
 	GalleryHorizontal,
 	Globe,
-	History,
-	Lightbulb,
 	PenSquare,
 	RefreshCw,
 	Telescope,
@@ -44,11 +42,11 @@ import type { ContentIdea, ResearchRun, ResearchRunStatus } from "@/lib/api-type
 import { friendlyCode } from "@/lib/errors";
 import { formatDateTime, formatNumber, formatRelative, formatUsd, pluralize } from "@/lib/format";
 import { providerName } from "@/lib/providers";
-import { AiError, AiNotConfigured } from "../ai/ai-shared";
+import { AiError } from "../ai/ai-shared";
 import { useOrg } from "../org-provider";
 import { ProviderIcon } from "../provider-icon";
 import { InsightPicker } from "./insight-picker";
-import { hostOf, LoadError } from "./research-shared";
+import { hostOf, LoadError, SetupNote } from "./research-shared";
 
 type OpenTab = (tab: "visibility" | "keywords" | "competitors") => void;
 
@@ -143,11 +141,12 @@ export function BrandTab({ onOpenTab }: { onOpenTab: OpenTab }) {
 
 	return (
 		<div className="grid gap-6">
-			{!configured ? (
-				<AiNotConfigured>
-					Brand research reads your website and summarizes it with AI. Add{" "}
-					<code>ANTHROPIC_API_KEY</code> to the API's environment to turn it on.
-				</AiNotConfigured>
+			{/* The first-run hero carries its own not-configured note. */}
+			{!configured && (viewingId || brief || active) ? (
+				<SetupNote>
+					AI isn't configured. Add <code>ANTHROPIC_API_KEY</code> to the API's environment to turn
+					on brand research.
+				</SetupNote>
 			) : null}
 			{body}
 			<RunHistory
@@ -200,8 +199,7 @@ function StartResearch({
 
 	const costNote = (
 		<p className="text-subtle-foreground text-xs">
-			Reads your public pages, then uses your AI budget to summarize them — usually a few cents. It
-			takes a few minutes and runs in the background.
+			Takes a few minutes in the background and uses a few cents of your AI budget.
 		</p>
 	);
 
@@ -210,13 +208,11 @@ function StartResearch({
 		return (
 			<form
 				onSubmit={onSubmit}
-				className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border border-dashed px-4 py-3"
+				className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface-raised px-5 py-3.5"
 			>
 				<div className="grid gap-0.5">
 					<p className="font-medium text-sm">Website changed?</p>
-					<p className="text-muted-foreground text-xs">
-						Run the research again to refresh these insights. Uses your AI budget.
-					</p>
+					<p className="text-muted-foreground text-xs">Run it again to refresh these insights.</p>
 				</div>
 				<div className="grid justify-items-end gap-1">
 					<Button
@@ -232,7 +228,7 @@ function StartResearch({
 					{!website && brand.isSuccess ? (
 						<span className="text-muted-foreground text-xs">
 							Reads {hostOf(again)} again ·{" "}
-							<Link href="/settings/brand" className="text-primary-text hover:underline">
+							<Link href="/settings/brand" className="text-foreground hover:underline">
 								save your website
 							</Link>
 						</span>
@@ -245,80 +241,106 @@ function StartResearch({
 
 	return (
 		<Card>
-			<CardContent className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-start">
-				<div className="grid gap-3">
-					<div className="flex size-10 items-center justify-center rounded-lg border border-border bg-surface shadow-xs">
-						<Telescope className="size-5 text-primary-text" aria-hidden="true" />
+			<CardContent className="grid gap-8 p-6 md:p-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-center">
+				<div className="grid content-start gap-5">
+					<div className="grid gap-2">
+						<h2 className="text-balance font-medium text-[20px] leading-7 tracking-[-0.01em]">
+							{intro ? "Let SocialFly get to know your brand" : "Research your website"}
+						</h2>
+						<p className="max-w-prose text-pretty text-muted-foreground text-sm">
+							We read your website and turn it into a brand brief.
+						</p>
 					</div>
-					<h2 className="font-semibold text-lg tracking-tight">
-						{intro ? "Let SocialFly get to know your brand" : "Research your website"}
-					</h2>
-					<p className="max-w-prose text-muted-foreground text-sm">
-						We read your website and turn it into a brand brief: who you serve, what you offer, the
-						questions buyers ask, likely competitors, content gaps and ready-to-make content ideas.
-						You can then track those questions in AI assistants and the keywords in search.
-					</p>
+					<ul className="grid gap-2.5" aria-label="What you'll get">
+						{WHAT_YOU_GET.map((item) => (
+							<li key={item} className="flex items-center gap-2.5 text-sm">
+								<Check className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+								{item}
+							</li>
+						))}
+					</ul>
 				</div>
 
-				{!editor ? (
-					<Alert tone="info" icon={Telescope}>
-						Ask an editor to research your website.
-					</Alert>
-				) : (
-					<form onSubmit={onSubmit} noValidate className="grid gap-3">
-						{brand.isPending ? (
-							<Skeleton className="h-9" />
-						) : website ? (
-							<p className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm">
-								<Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-								<span className="truncate">{hostOf(website)}</span>
-								<Link
-									href="/settings/brand"
-									className="ml-auto shrink-0 text-primary-text text-xs hover:underline"
-								>
-									Change
-								</Link>
-							</p>
-						) : (
-							<Field
-								label="Your website"
-								htmlFor="research-url"
-								error={urlError}
-								hint={
-									<>
-										Or save it once in{" "}
-										<Link href="/settings/brand" className="text-primary-text hover:underline">
-											Brand voice settings
+				<div className="grid gap-4 rounded-2xl bg-surface p-5">
+					{!configured ? (
+						<SetupNote>
+							AI isn't configured. Add <code>ANTHROPIC_API_KEY</code> to the API's environment to
+							turn it on.
+						</SetupNote>
+					) : null}
+					{!editor ? (
+						<p className="text-muted-foreground text-sm">Ask an editor to research your website.</p>
+					) : (
+						<form onSubmit={onSubmit} noValidate className="grid gap-3">
+							{brand.isPending ? (
+								<Skeleton className="h-9" />
+							) : website ? (
+								<div className="grid gap-1.5">
+									<span className="font-medium text-sm">Your website</span>
+									<p className="flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3.5 py-2 text-sm">
+										<Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+										<span className="truncate">{hostOf(website)}</span>
+										<Link
+											href="/settings/brand"
+											className="ml-auto shrink-0 text-muted-foreground text-xs hover:text-foreground hover:underline"
+										>
+											Change
 										</Link>
-										.
-									</>
-								}
-							>
-								<Input
-									id="research-url"
-									type="url"
-									inputMode="url"
-									value={url}
-									maxLength={500}
-									placeholder="https://example.com"
-									onChange={(e) => setUrl(e.target.value)}
-									disabled={start.isPending}
-									{...fieldAria("research-url", urlError, true)}
-								/>
-							</Field>
-						)}
-						<Button type="submit" loading={start.isPending} disabled={!configured}>
-							{start.isPending ? null : <Telescope />}
-							Research my website
-						</Button>
-						{costNote}
-						{start.error ? <AiError error={start.error} /> : null}
-					</form>
-				)}
+									</p>
+								</div>
+							) : (
+								<Field
+									label="Your website"
+									htmlFor="research-url"
+									error={urlError}
+									hint={
+										<>
+											Or save it in{" "}
+											<Link href="/settings/brand" className="text-foreground hover:underline">
+												Brand settings
+											</Link>
+											.
+										</>
+									}
+								>
+									<div className="relative">
+										<Globe
+											className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle-foreground"
+											aria-hidden="true"
+										/>
+										<Input
+											id="research-url"
+											type="url"
+											inputMode="url"
+											className="pl-9"
+											value={url}
+											maxLength={500}
+											placeholder="https://example.com"
+											onChange={(e) => setUrl(e.target.value)}
+											disabled={start.isPending}
+											{...fieldAria("research-url", urlError, true)}
+										/>
+									</div>
+								</Field>
+							)}
+							<Button type="submit" size="lg" loading={start.isPending} disabled={!configured}>
+								Research my website
+							</Button>
+							{costNote}
+							{start.error ? <AiError error={start.error} /> : null}
+						</form>
+					)}
+				</div>
 			</CardContent>
 		</Card>
 	);
 }
+
+const WHAT_YOU_GET = [
+	"Your audience, offer and topics",
+	"Buyer questions, competitors and keywords",
+	"Content gaps and ready-to-make ideas",
+];
 
 // ── A run in progress ────────────────────────────────────────────────────────
 
@@ -333,12 +355,9 @@ function RunProgress({ run }: { run: ResearchRun }) {
 	const ratio = run.pagesFound > 0 ? Math.min(1, run.pagesCrawled / run.pagesFound) : 0;
 	return (
 		<Card>
-			<CardHeader>
+			<CardHeader className="border-border border-b pb-4">
 				<CardTitle>Researching {hostOf(run.startUrl)}</CardTitle>
-				<CardDescription>
-					This usually takes a few minutes. You can leave this page — it keeps going in the
-					background.
-				</CardDescription>
+				<CardDescription>A few minutes. You can leave this page; it keeps going.</CardDescription>
 			</CardHeader>
 			<CardContent className="grid gap-5">
 				<ol className="grid gap-3 sm:grid-cols-3" aria-label="Research progress">
@@ -350,13 +369,13 @@ function RunProgress({ run }: { run: ResearchRun }) {
 								key={step.status}
 								aria-current={active ? "step" : undefined}
 								className={cn(
-									"flex items-start gap-3 rounded-lg border px-3 py-2.5",
-									active ? "border-primary/40 bg-primary-soft" : "border-border",
+									"flex items-start gap-3 rounded-xl border px-3 py-2.5",
+									active ? "border-border-strong bg-surface" : "border-border",
 								)}
 							>
 								<span
 									className={cn(
-										"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[11px]",
+										"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px]",
 										done
 											? "bg-primary text-primary-foreground"
 											: active
@@ -384,7 +403,7 @@ function RunProgress({ run }: { run: ResearchRun }) {
 				<div className="grid gap-1.5" aria-live="polite">
 					<div className="flex items-baseline justify-between text-sm">
 						<span className="text-muted-foreground">Pages read</span>
-						<span className="font-medium tabular-nums">
+						<span className="font-mono tabular-nums">
 							{formatNumber(run.pagesCrawled)}
 							{run.pagesFound ? ` of ${formatNumber(run.pagesFound)} found` : ""}
 						</span>
@@ -399,7 +418,7 @@ function RunProgress({ run }: { run: ResearchRun }) {
 					>
 						<div
 							className={cn(
-								"h-full rounded-full bg-primary transition-[width] duration-500",
+								"h-full rounded-full bg-ink transition-[width] duration-500",
 								run.status === "pending" && "w-0",
 							)}
 							style={{
@@ -465,7 +484,7 @@ function RunInsights({ run, onOpenTab }: { run: ResearchRun; onOpenTab: OpenTab 
 	return (
 		<div className="grid gap-6">
 			<Card>
-				<CardHeader>
+				<CardHeader className="border-border border-b pb-4">
 					<CardTitle>Your brand at a glance</CardTitle>
 					<CardDescription>
 						From {pluralize(run.pagesCrawled, "page")} of {hostOf(run.startUrl)}
@@ -480,17 +499,13 @@ function RunInsights({ run, onOpenTab }: { run: ResearchRun; onOpenTab: OpenTab 
 				</CardHeader>
 				<CardContent className="grid gap-5">
 					<p className="max-w-prose text-sm leading-relaxed">{insights.summary}</p>
-					<dl className="grid gap-4 md:grid-cols-2">
+					<dl className="grid gap-3 md:grid-cols-2">
 						<div className="grid content-start gap-1">
-							<dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-								Audience
-							</dt>
+							<dt className="font-medium text-muted-foreground text-xs">Audience</dt>
 							<dd className="text-sm">{insights.audience}</dd>
 						</div>
 						<div className="grid content-start gap-1">
-							<dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-								Value proposition
-							</dt>
+							<dt className="font-medium text-muted-foreground text-xs">Value proposition</dt>
 							<dd className="text-sm">{insights.valueProposition}</dd>
 						</div>
 					</dl>
@@ -499,14 +514,14 @@ function RunInsights({ run, onOpenTab }: { run: ResearchRun; onOpenTab: OpenTab 
 
 			{insights.topics.length ? (
 				<section aria-labelledby="topics-heading" className="grid gap-3">
-					<h2 id="topics-heading" className="font-semibold text-[15px] tracking-tight">
+					<h2 id="topics-heading" className="font-medium text-[15px]">
 						Topics you own
 					</h2>
 					<ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 						{insights.topics.map((t) => (
 							<li
 								key={t.name}
-								className="grid content-start gap-1 rounded-lg border border-border bg-surface-raised p-4 shadow-xs"
+								className="grid content-start gap-1 rounded-2xl border border-border bg-surface-raised p-4"
 							>
 								<p className="font-medium text-sm">{t.name}</p>
 								<p className="text-muted-foreground text-sm">{t.description}</p>
@@ -572,17 +587,16 @@ function RunInsights({ run, onOpenTab }: { run: ResearchRun; onOpenTab: OpenTab 
 
 			{insights.contentGaps.length ? (
 				<Card>
-					<CardHeader>
+					<CardHeader className="border-border border-b pb-4">
 						<CardTitle>Content gaps</CardTitle>
 						<CardDescription>
-							Topics your audience cares about that your website doesn't cover well yet.
+							What your audience cares about that your site doesn't cover yet.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<ul className="grid gap-3 md:grid-cols-2">
 							{insights.contentGaps.map((g) => (
-								<li key={g.topic} className="flex gap-3">
-									<Lightbulb className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+								<li key={g.topic} className="flex rounded-xl bg-surface p-3.5">
 									<span className="grid gap-0.5">
 										<span className="font-medium text-sm">{g.topic}</span>
 										<span className="text-muted-foreground text-sm">{g.why}</span>
@@ -597,11 +611,11 @@ function RunInsights({ run, onOpenTab }: { run: ResearchRun; onOpenTab: OpenTab 
 			{insights.contentIdeas.length ? (
 				<section aria-labelledby="ideas-heading" className="grid gap-3">
 					<div className="grid gap-0.5">
-						<h2 id="ideas-heading" className="font-semibold text-[15px] tracking-tight">
+						<h2 id="ideas-heading" className="font-medium text-[15px]">
 							Content ideas
 						</h2>
-						<p className="text-muted-foreground text-sm">
-							Pick one to start drafting — you'll review everything before it's posted.
+						<p className="text-muted-foreground text-xs">
+							Pick one to start a draft. Nothing posts without your review.
 						</p>
 					</div>
 					<ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -621,10 +635,10 @@ const FORMAT: Record<
 	ContentIdea["format"],
 	{ label: string; icon: typeof FileText; tone: BadgeTone }
 > = {
-	post: { label: "Post", icon: PenSquare, tone: "primary" },
-	article: { label: "Article", icon: FileText, tone: "info" },
-	carousel: { label: "Carousel", icon: GalleryHorizontal, tone: "violet" },
-	video: { label: "Video", icon: Clapperboard, tone: "warning" },
+	post: { label: "Post", icon: PenSquare, tone: "neutral" },
+	article: { label: "Article", icon: FileText, tone: "neutral" },
+	carousel: { label: "Carousel", icon: GalleryHorizontal, tone: "neutral" },
+	video: { label: "Video", icon: Clapperboard, tone: "neutral" },
 };
 
 /**
@@ -649,7 +663,7 @@ function IdeaCard({ idea, editable }: { idea: ContentIdea; editable: boolean }) 
 	const f = FORMAT[idea.format];
 	const Icon = f.icon;
 	return (
-		<li className="flex flex-col gap-3 rounded-lg border border-border bg-surface-raised p-4 shadow-xs">
+		<li className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4 transition-colors hover:border-border-strong">
 			<div className="flex items-center justify-between gap-2">
 				<Badge tone={f.tone}>
 					<Icon aria-hidden="true" />
@@ -671,7 +685,7 @@ function IdeaCard({ idea, editable }: { idea: ContentIdea; editable: boolean }) 
 				<p className="text-muted-foreground text-sm">{idea.angle}</p>
 			</div>
 			{editable ? (
-				<Button asChild variant="outline" size="sm" className="justify-self-start">
+				<Button asChild variant="outline" size="sm" className="self-start">
 					<Link href={ideaHref(idea)}>
 						<Icon />
 						Create
@@ -689,13 +703,13 @@ function PagesCrawled({ run }: { run: ResearchRun }) {
 	const items = pages.data?.pages.flatMap((p) => p.items) ?? [];
 	return (
 		<details
-			className="group rounded-lg border border-border bg-surface-raised shadow-xs"
+			className="group rounded-2xl border border-border bg-surface-raised"
 			onToggle={(e) => setOpen(e.currentTarget.open)}
 		>
-			<summary className="flex cursor-pointer select-none items-center justify-between gap-3 rounded-lg px-5 py-3.5 font-medium text-sm focus-visible:outline-2 focus-visible:outline-ring">
+			<summary className="flex cursor-pointer select-none items-center justify-between gap-3 rounded-2xl px-5 py-3.5 font-medium text-sm focus-visible:outline-2 focus-visible:outline-ring">
 				<span>
 					Pages we read{" "}
-					<span className="font-normal text-muted-foreground">
+					<span className="font-mono font-normal text-muted-foreground">
 						({formatNumber(run.pagesCrawled)})
 					</span>
 				</span>
@@ -787,12 +801,9 @@ function RunHistory({
 	const { org } = useOrg();
 	if (runs.length < 2) return null;
 	return (
-		<Card>
+		<Card className="overflow-hidden">
 			<CardHeader>
-				<CardTitle className="flex items-center gap-2">
-					<History className="size-4 text-muted-foreground" aria-hidden="true" />
-					Earlier runs
-				</CardTitle>
+				<CardTitle>Earlier runs</CardTitle>
 			</CardHeader>
 			<ul className="mt-3 divide-y divide-border border-border border-t">
 				{runs.map((r) => {
@@ -814,12 +825,12 @@ function RunHistory({
 								<Badge tone={s.tone} dot>
 									{s.label}
 								</Badge>
-								<span className="text-muted-foreground text-xs tabular-nums">
+								<span className="font-mono text-muted-foreground text-xs tabular-nums">
 									{pluralize(r.pagesCrawled, "page")}
 									{cost !== null && Number.isFinite(cost) ? ` · ${formatUsd(cost)}` : ""}
 								</span>
 								<span
-									className="w-28 text-right text-muted-foreground text-xs"
+									className="w-28 text-right font-mono text-muted-foreground text-xs"
 									title={formatDateTime(r.createdAt, org.timezone)}
 								>
 									{formatRelative(r.createdAt)}

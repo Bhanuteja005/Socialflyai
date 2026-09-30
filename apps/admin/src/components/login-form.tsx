@@ -6,7 +6,7 @@ import { Field } from "@socialfly/ui/components/field";
 import { Input } from "@socialfly/ui/components/input";
 import { cn } from "@socialfly/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type ComponentProps, type FormEvent, useEffect, useState } from "react";
 import { useSession } from "@/hooks/use-session";
@@ -79,9 +79,11 @@ export function LoginForm() {
 
 	return (
 		<>
-			<div className="mb-6 grid gap-1.5 text-center">
-				<h1 className="font-semibold text-xl tracking-tight">Sign in to the admin console</h1>
-				<p className="text-muted-foreground text-sm">For SocialFly staff with platform access.</p>
+			<div className="mb-6 grid gap-2">
+				<h1 className="text-balance font-normal font-pixel text-[24px] leading-8">
+					Sign in to the admin console
+				</h1>
+				<p className="text-muted-foreground text-sm">Use your usual SocialFly account.</p>
 			</div>
 			<form onSubmit={onSubmit} className="grid gap-4" noValidate>
 				{error ? <Alert tone="danger" icon={AlertCircle} title={error} /> : null}
@@ -106,9 +108,13 @@ export function LoginForm() {
 					/>
 				</Field>
 				<Button type="submit" size="lg" loading={pending} disabled={!email || !password}>
-					Sign in
+					<LockKeyhole />
+					Sign in to console
 				</Button>
 			</form>
+			<p className="mt-5 border-border border-t pt-4 text-muted-foreground text-xs">
+				Accounts without platform access can't open the console.
+			</p>
 		</>
 	);
 }

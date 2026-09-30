@@ -95,7 +95,7 @@ const PILLARS = [
 ];
 
 const cardBase = cn(
-	"group relative block h-full overflow-hidden border border-white/10 text-left transition-colors hover:border-primary/40",
+	"group relative block h-full overflow-hidden border border-border text-left transition-colors hover:border-border-strong",
 	focusRing,
 );
 
@@ -103,7 +103,7 @@ function IconBadge({ icon: Icon, size = "md" }: { icon: LucideIcon; size?: "md" 
 	return (
 		<span
 			className={cn(
-				"flex items-center justify-center border border-white/10 bg-white/5 text-primary transition-transform group-hover:scale-110",
+				"flex items-center justify-center border border-border bg-surface-raised text-brand-text transition-transform",
 				size === "lg" ? "mb-10 size-16 rounded-3xl" : "mb-6 size-12 rounded-2xl",
 			)}
 		>
@@ -133,23 +133,19 @@ export default function FeaturesIndexPage() {
 							<li key={tile.href} className="md:col-span-3">
 								<Link
 									href={tile.href}
-									className={cn(cardBase, "rounded-[40px] bg-[#0A0F0C] p-8 sm:p-10")}
+									className={cn(cardBase, "rounded-3xl bg-surface p-8 sm:p-10")}
 								>
-									<div
-										aria-hidden="true"
-										className="pointer-events-none absolute inset-0 bg-[radial-gradient(#0BE27D_1px,transparent_1px)] opacity-10 [background-size:20px_20px]"
-									/>
 									<div className="relative">
 										<IconBadge icon={tile.icon} size="lg" />
-										<span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-black text-[10px] text-primary uppercase tracking-widest">
+										<span className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-strong bg-muted px-3 py-1 font-mono text-[11px] text-brand-text">
 											<Sparkles className="size-3" aria-hidden="true" />
 											Core Workflow
 										</span>
-										<h3 className="mb-6 font-bold text-3xl text-white">{tile.title}</h3>
-										<p className="mb-10 text-lg text-white/60 leading-relaxed">
+										<h3 className="mb-6 font-medium text-3xl text-foreground">{tile.title}</h3>
+										<p className="mb-10 text-lg text-muted-foreground leading-relaxed">
 											{tile.description}
 										</p>
-										<span className="font-bold text-primary text-sm uppercase tracking-widest">
+										<span className="font-medium text-brand-text text-sm font-mono">
 											Explore Workflow &rarr;
 										</span>
 									</div>
@@ -160,18 +156,18 @@ export default function FeaturesIndexPage() {
 						<li className="md:col-span-6">
 							<Link
 								href="/features/analytics"
-								className={cn(cardBase, "rounded-[40px] bg-white/5 p-8 hover:bg-white/10 sm:p-10")}
+								className={cn(cardBase, "rounded-3xl bg-surface-raised p-8 hover:bg-muted sm:p-10")}
 							>
 								<div className="flex flex-col justify-between gap-10 md:flex-row md:items-center">
 									<div className="flex-1">
 										<IconBadge icon={ChartColumn} />
-										<h3 className="mb-6 font-bold text-4xl text-white">Analytics</h3>
-										<p className="max-w-xl text-lg text-white/60 leading-relaxed">
+										<h3 className="mb-6 font-medium text-4xl text-foreground">Analytics</h3>
+										<p className="max-w-xl text-lg text-muted-foreground leading-relaxed">
 											Impact reporting at scale. Data that drives ROI for creators and brands.
 											Visualize your growth journey with deep-dive performance metrics.
 										</p>
 									</div>
-									<span className="font-bold text-primary text-sm uppercase tracking-widest">
+									<span className="font-medium text-brand-text text-sm font-mono">
 										Analyze Data &rarr;
 									</span>
 								</div>
@@ -182,12 +178,14 @@ export default function FeaturesIndexPage() {
 							<li key={tile.href} className="md:col-span-2">
 								<Link
 									href={tile.href}
-									className={cn(cardBase, "rounded-3xl bg-white/5 p-8 hover:bg-white/10")}
+									className={cn(cardBase, "rounded-3xl bg-surface-raised p-8 hover:bg-muted")}
 								>
 									<IconBadge icon={tile.icon} />
-									<h3 className="mb-3 font-bold text-white text-xl">{tile.title}</h3>
-									<p className="mb-6 text-sm text-white/60 leading-relaxed">{tile.description}</p>
-									<span className="font-bold text-primary text-xs uppercase tracking-widest opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+									<h3 className="mb-3 font-medium text-foreground text-xl">{tile.title}</h3>
+									<p className="mb-6 text-sm text-muted-foreground leading-relaxed">
+										{tile.description}
+									</p>
+									<span className="font-medium text-brand-text text-xs font-mono opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
 										Explore &rarr;
 									</span>
 								</Link>
@@ -197,13 +195,13 @@ export default function FeaturesIndexPage() {
 						<li className="md:col-span-6">
 							<Link
 								href="/features/ai-reply"
-								className={cn(cardBase, "rounded-[40px] bg-[#0A0F0C] p-8 sm:p-10")}
+								className={cn(cardBase, "rounded-3xl bg-surface p-8 sm:p-10")}
 							>
 								<div className="flex flex-col justify-between gap-10 md:flex-row md:items-center">
 									<div className="flex-1">
 										<IconBadge icon={MessageSquare} />
-										<h3 className="mb-4 font-bold text-2xl text-white">AI Reply</h3>
-										<p className="max-w-2xl text-lg text-white/60 leading-relaxed">
+										<h3 className="mb-4 font-medium text-2xl text-foreground">AI Reply</h3>
+										<p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
 											Engagement loops that sound like you. Maintain your brand's unique voice while
 											building community on autopilot.
 										</p>
@@ -212,7 +210,7 @@ export default function FeaturesIndexPage() {
 										{["Friendly", "Witty", "Professional", "Helpful"].map((tone) => (
 											<li
 												key={tone}
-												className="rounded-full border border-white/10 bg-white/5 px-5 py-2 font-bold text-white/60 text-xs uppercase tracking-widest"
+												className="rounded-full border border-border bg-surface-raised px-5 py-2 font-medium text-muted-foreground text-xs font-mono"
 											>
 												{tone} Tone
 											</li>
@@ -225,28 +223,32 @@ export default function FeaturesIndexPage() {
 							<li key={tile.href} className="md:col-span-3">
 								<Link
 									href={tile.href}
-									className={cn(cardBase, "rounded-3xl bg-white/5 p-8 hover:bg-white/10")}
+									className={cn(cardBase, "rounded-3xl bg-surface-raised p-8 hover:bg-muted")}
 								>
 									<IconBadge icon={tile.icon} />
-									<h3 className="mb-3 font-bold text-white text-xl">{tile.title}</h3>
-									<p className="text-sm text-white/60 leading-relaxed">{tile.description}</p>
+									<h3 className="mb-3 font-medium text-foreground text-xl">{tile.title}</h3>
+									<p className="text-sm text-muted-foreground leading-relaxed">
+										{tile.description}
+									</p>
 								</Link>
 							</li>
 						))}
 					</ul>
 
-					<div className="rounded-[40px] border border-white/10 bg-white/5 p-8 backdrop-blur-md sm:p-10 lg:p-16">
+					<div className="rounded-3xl border border-border bg-surface-raised p-8 sm:p-10 lg:p-16">
 						<h2 className={cn(headingSection, "mb-12")}>
 							The <Accent>AI-Native</Accent> Difference.
 						</h2>
 						<ul className="grid grid-cols-1 gap-12 md:grid-cols-3">
 							{PILLARS.map((pillar) => (
 								<li key={pillar.title}>
-									<span className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-black">
-										<CircleCheck className="size-6 text-primary" aria-hidden="true" />
+									<span className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-canvas">
+										<CircleCheck className="size-6 text-brand-text" aria-hidden="true" />
 									</span>
-									<h3 className="mb-4 font-bold text-lg text-white">{pillar.title}</h3>
-									<p className="text-sm text-white/60 leading-relaxed">{pillar.description}</p>
+									<h3 className="mb-4 font-medium text-lg text-foreground">{pillar.title}</h3>
+									<p className="text-sm text-muted-foreground leading-relaxed">
+										{pillar.description}
+									</p>
 								</li>
 							))}
 						</ul>

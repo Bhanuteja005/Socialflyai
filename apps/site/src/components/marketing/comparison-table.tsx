@@ -20,7 +20,10 @@ function Cell({
 		return (
 			<>
 				<Check
-					className={cn("mx-auto size-5", highlighted ? "text-primary" : "text-white/50")}
+					className={cn(
+						"mx-auto size-5",
+						highlighted ? "text-brand-text" : "text-muted-foreground",
+					)}
 					aria-hidden="true"
 				/>
 				<span className="sr-only">Included</span>
@@ -34,7 +37,7 @@ function Cell({
 				<Icon
 					className={cn(
 						"mx-auto size-5",
-						falseStyle === "cross" ? "text-red-500/60" : "text-white/25",
+						falseStyle === "cross" ? "text-danger" : "text-subtle-foreground",
 					)}
 					aria-hidden="true"
 				/>
@@ -42,7 +45,7 @@ function Cell({
 			</>
 		);
 	}
-	return <span className={highlighted ? "font-semibold text-white" : undefined}>{value}</span>;
+	return <span className={highlighted ? "font-medium text-foreground" : undefined}>{value}</span>;
 }
 
 /**
@@ -75,10 +78,10 @@ export function ComparisonTable({
 				{title ? (
 					<SectionHeading title={title} description={description} className="mb-12 sm:mb-16" />
 				) : null}
-				<div className="overflow-x-auto rounded-[28px] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md">
+				<div className="overflow-x-auto rounded-3xl border border-border bg-surface-raised">
 					<table className="w-full min-w-[560px] text-left text-sm">
 						<caption className="sr-only">{caption}</caption>
-						<thead className="bg-white/5 font-bold text-white/50 text-xs uppercase tracking-wider">
+						<thead className="border-border border-b font-mono text-muted-foreground text-xs">
 							<tr>
 								<th scope="col" className="px-5 py-5 sm:px-8">
 									Feature
@@ -89,7 +92,7 @@ export function ComparisonTable({
 										scope="col"
 										className={cn(
 											"px-5 py-5 text-center sm:px-8",
-											index === highlightColumn && "bg-primary/5 text-primary",
+											index === highlightColumn && "bg-surface text-brand-text",
 										)}
 									>
 										{column}
@@ -97,10 +100,10 @@ export function ComparisonTable({
 								))}
 							</tr>
 						</thead>
-						<tbody className="divide-y divide-white/5">
+						<tbody className="divide-y divide-border">
 							{rows.map((row) => (
-								<tr key={row.feature} className="transition-colors hover:bg-white/[0.03]">
-									<th scope="row" className="px-5 py-4 font-medium text-white sm:px-8">
+								<tr key={row.feature} className="transition-colors hover:bg-muted">
+									<th scope="row" className="px-5 py-4 font-medium text-foreground sm:px-8">
 										{row.feature}
 									</th>
 									{row.values.map((value, index) => (
@@ -108,8 +111,8 @@ export function ComparisonTable({
 											// biome-ignore lint/suspicious/noArrayIndexKey: cells are positional and aligned with the column headers
 											key={index}
 											className={cn(
-												"px-5 py-4 text-center text-white/60 sm:px-8",
-												index === highlightColumn && "bg-primary/5",
+												"px-5 py-4 text-center text-muted-foreground sm:px-8",
+												index === highlightColumn && "bg-surface",
 											)}
 										>
 											<Cell

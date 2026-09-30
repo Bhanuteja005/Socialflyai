@@ -9,30 +9,7 @@ import { AlertCircle, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { errorMessage } from "@/lib/errors";
 
-export function PageHeader({
-	title,
-	description,
-	actions,
-	eyebrow,
-	className,
-}: {
-	title: ReactNode;
-	description?: ReactNode;
-	actions?: ReactNode;
-	eyebrow?: ReactNode;
-	className?: string;
-}) {
-	return (
-		<div className={cn("mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3", className)}>
-			<div className="grid min-w-0 gap-1">
-				{eyebrow ? <div className="text-muted-foreground text-sm">{eyebrow}</div> : null}
-				<h1 className="font-semibold text-2xl tracking-tight">{title}</h1>
-				{description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
-			</div>
-			{actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-		</div>
-	);
-}
+export { PageHeader, SectionHeader } from "@socialfly/ui/components/page";
 
 /** The "this is not the customer app" marker, shown in the sidebar, header and sign-in page. */
 export function StaffBadge({ className }: { className?: string }) {
@@ -76,33 +53,38 @@ export function QueryError({
 /** Placeholder rows while a table loads. */
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {
 	return (
-		<div className="grid gap-2 p-4" aria-hidden="true">
+		<div className="grid gap-3 p-5" aria-hidden="true">
 			{Array.from({ length: rows }, (_, i) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
-				<Skeleton key={i} className="h-8 w-full" />
+				<Skeleton key={i} className="h-7 w-full rounded-lg" />
 			))}
 		</div>
 	);
 }
 
-/** Wraps a <table> so wide tables scroll horizontally instead of breaking the layout. */
+/**
+ * One white panel per table (docs/design.md §5): flat, hairline border, divided rows. Wide
+ * tables scroll inside it instead of breaking the page.
+ */
 export function TableCard({ children, className }: { children: ReactNode; className?: string }) {
 	return (
 		<div
 			className={cn(
-				"overflow-hidden rounded-lg border border-border bg-surface-raised shadow-xs",
+				"overflow-hidden rounded-2xl border border-border bg-surface-raised",
 				className,
 			)}
 		>
-			<div className="scrollbar-thin overflow-x-auto">{children}</div>
+			<div className="scrollbar-thin relative overflow-x-auto">{children}</div>
 		</div>
 	);
 }
 
-export const tableClass = "w-full min-w-[720px] border-collapse text-left text-sm";
+// Rows are divided (a rule between rows, none under the last) so the panel edge closes the table.
+export const tableClass =
+	"w-full min-w-[720px] border-collapse text-left text-sm [&_tbody>tr+tr]:border-border [&_tbody>tr+tr]:border-t";
 export const thClass =
-	"border-border border-b bg-surface px-4 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wider whitespace-nowrap";
-export const tdClass = "border-border border-b px-4 py-3 align-top";
+	"h-11 border-border border-b px-5 font-normal text-[12.5px] text-muted-foreground whitespace-nowrap";
+export const tdClass = "px-5 py-3.5 align-middle";
 
 /** "Load more" for keyset-paginated lists. */
 export function LoadMore({
@@ -117,8 +99,8 @@ export function LoadMore({
 	shown: number;
 }) {
 	return (
-		<div className="flex items-center justify-between gap-3 px-4 py-3 text-muted-foreground text-xs">
-			<span aria-live="polite">
+		<div className="flex items-center justify-between gap-3 border-border border-t px-5 py-3 text-muted-foreground text-xs">
+			<span aria-live="polite" className="font-mono tabular-nums">
 				Showing {shown} {hasNextPage ? "so far" : shown === 1 ? "row" : "rows"}
 			</span>
 			{hasNextPage ? (
@@ -150,7 +132,7 @@ export function SearchBox({
 	onChange: (value: string) => void;
 }) {
 	return (
-		<div className="relative w-full sm:max-w-xs">
+		<div className="relative w-full sm:w-64">
 			<label htmlFor={id} className="sr-only">
 				{label}
 			</label>
@@ -161,7 +143,7 @@ export function SearchBox({
 			<Input
 				id={id}
 				type="search"
-				className="pl-9"
+				className="h-9 rounded-full pl-9"
 				placeholder={placeholder}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { LOGIN_URL } from "@/components/marketing/app-links";
 import { focusRing } from "./primitives";
-import { NAV_GROUPS, NAV_LINKS } from "./site-config";
+import { NAV_GROUPS, NAV_LINKS, type NavLink } from "./site-config";
 
 /** Hamburger menu shown below the `lg` breakpoint. */
 export function MobileNav() {
@@ -30,7 +30,7 @@ export function MobileNav() {
 				aria-controls={panelId}
 				aria-label={open ? "Close menu" : "Open menu"}
 				onClick={() => setOpen((value) => !value)}
-				className={`flex size-10 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white ${focusRing}`}
+				className={`flex size-10 items-center justify-center rounded-full text-foreground hover:bg-muted hover:text-foreground ${focusRing}`}
 			>
 				{open ? (
 					<X className="size-5" aria-hidden="true" />
@@ -41,7 +41,7 @@ export function MobileNav() {
 			<div
 				id={panelId}
 				hidden={!open}
-				className="absolute inset-x-0 top-[calc(100%+0.5rem)] max-h-[80dvh] overflow-y-auto rounded-3xl border border-white/10 bg-black/95 p-3 shadow-2xl backdrop-blur-md"
+				className="absolute inset-x-0 top-[calc(100%+0.5rem)] max-h-[80dvh] overflow-y-auto rounded-3xl border border-border bg-surface-raised p-2 shadow-lg"
 			>
 				<ul className="flex flex-col">
 					{NAV_GROUPS.map((group) => (
@@ -49,7 +49,7 @@ export function MobileNav() {
 							{/* Native disclosure: keyboard and screen-reader support for free. */}
 							<details className="group">
 								<summary
-									className={`flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-base text-white/80 hover:bg-white/5 hover:text-white ${focusRing}`}
+									className={`flex cursor-pointer list-none items-center justify-between rounded-xl px-4 py-3 text-base text-foreground hover:bg-muted hover:text-foreground ${focusRing}`}
 								>
 									{group.label}
 									<ChevronDown
@@ -57,24 +57,33 @@ export function MobileNav() {
 										aria-hidden="true"
 									/>
 								</summary>
-								<ul className="max-h-72 overflow-y-auto pb-2 pl-3">
-									{[
-										...(group.href
-											? [{ label: `All ${group.label.toLowerCase()}`, href: group.href }]
-											: []),
-										...group.links,
-									].map((link) => (
-										<li key={link.href}>
-											<Link
-												href={link.href}
-												onClick={close}
-												className={`block rounded-2xl px-4 py-2 text-sm text-white/70 hover:bg-white/5 hover:text-white ${focusRing}`}
-											>
-												{link.label}
-											</Link>
-										</li>
-									))}
-								</ul>
+								{group.sections ? (
+									<div className="flex flex-col gap-3 pt-1 pb-3 pl-3">
+										{group.sections.map((section) => (
+											<div key={section.title}>
+												<p className="px-4 pb-1 font-medium text-subtle-foreground text-xs">
+													{section.title}
+												</p>
+												<MobileLinks
+													links={section.more ? [...section.links, section.more] : section.links}
+													onNavigate={close}
+												/>
+											</div>
+										))}
+									</div>
+								) : (
+									<div className="pb-2 pl-3">
+										<MobileLinks
+											links={[
+												...(group.href
+													? [{ label: `All ${group.label.toLowerCase()}`, href: group.href }]
+													: []),
+												...group.links,
+											]}
+											onNavigate={close}
+										/>
+									</div>
+								)}
 							</details>
 						</li>
 					))}
@@ -83,17 +92,17 @@ export function MobileNav() {
 							<Link
 								href={link.href}
 								onClick={close}
-								className={`block rounded-2xl px-4 py-3 text-base text-white/80 hover:bg-white/5 hover:text-white ${focusRing}`}
+								className={`block rounded-xl px-4 py-3 text-base text-foreground hover:bg-muted hover:text-foreground ${focusRing}`}
 							>
 								{link.label}
 							</Link>
 						</li>
 					))}
-					<li className="mt-2 border-white/10 border-t pt-2">
+					<li className="mt-2 border-border border-t pt-2">
 						<Link
 							href={LOGIN_URL}
 							onClick={close}
-							className={`block rounded-2xl px-4 py-3 text-base text-white/80 hover:bg-white/5 hover:text-white ${focusRing}`}
+							className={`block rounded-xl px-4 py-3 text-base text-foreground hover:bg-muted hover:text-foreground ${focusRing}`}
 						>
 							Log in
 						</Link>
@@ -101,5 +110,23 @@ export function MobileNav() {
 				</ul>
 			</div>
 		</div>
+	);
+}
+
+function MobileLinks({ links, onNavigate }: { links: NavLink[]; onNavigate: () => void }) {
+	return (
+		<ul>
+			{links.map((link) => (
+				<li key={link.href}>
+					<Link
+						href={link.href}
+						onClick={onNavigate}
+						className={`block rounded-xl px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground ${focusRing}`}
+					>
+						{link.label}
+					</Link>
+				</li>
+			))}
+		</ul>
 	);
 }

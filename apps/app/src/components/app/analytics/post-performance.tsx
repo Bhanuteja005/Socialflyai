@@ -59,7 +59,7 @@ function TargetPerformance({ target }: { target: PostAnalyticsTarget }) {
 					<div className="grid justify-items-end gap-0.5">
 						<Sparkline
 							values={series.values}
-							color={series.label === "engagements" ? "var(--chart-2)" : "var(--chart-1)"}
+							color="var(--chart-1)"
 							label={`${series.label} growth since publishing`}
 						/>
 						<span className="text-[11px] text-muted-foreground">

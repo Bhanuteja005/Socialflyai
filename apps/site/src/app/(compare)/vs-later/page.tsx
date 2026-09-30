@@ -23,7 +23,7 @@ const data: CompetitorPageData = {
 			"Later is a visual planner. SocialflyAI is an AI strategist. We don't just help you see how your grid looks; we help you create the content that makes the grid look great and convert.",
 		socialProof: (
 			<>
-				<span className="block font-bold text-white">Top Rated AI Tool</span>
+				<span className="block font-medium text-foreground">Top Rated AI Tool</span>
 				Join 500+ creators
 			</>
 		),

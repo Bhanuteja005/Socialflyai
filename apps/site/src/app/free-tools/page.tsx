@@ -9,8 +9,8 @@ import {
 	Container,
 	Eyebrow,
 	focusRing,
-	Glow,
 	headingDisplay,
+	PixelField,
 } from "@/components/marketing/primitives";
 
 export const metadata = pageMetadata({
@@ -24,7 +24,7 @@ export default function FreeToolsIndexPage() {
 	return (
 		<>
 			<section className="relative overflow-hidden px-4 pt-32 pb-16 text-center sm:pt-40">
-				<Glow className="top-20 opacity-20" />
+				<PixelField className="top-20 opacity-20" />
 				<div className="relative mx-auto max-w-4xl">
 					<Eyebrow icon={Sparkles} className="mb-6">
 						Professional Tools
@@ -33,7 +33,7 @@ export default function FreeToolsIndexPage() {
 						Supercharge Your <br />
 						<Accent>Social Workflow</Accent>
 					</h1>
-					<p className="mx-auto mt-6 max-w-2xl text-lg text-white/60 leading-relaxed">
+					<p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
 						Access our suite of free professional tools designed to help you create, optimize, and
 						manage your social media content with ease.
 					</p>
@@ -50,32 +50,34 @@ export default function FreeToolsIndexPage() {
 								<Link
 									href={`/free-tools/${tool.slug}`}
 									className={cn(
-										"group relative flex h-full flex-col justify-between rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-colors duration-300 hover:border-primary/40 hover:bg-white/[0.08]",
+										"group relative flex h-full flex-col justify-between rounded-3xl border border-border bg-surface-raised p-6 transition-colors duration-300 hover:border-border-strong hover:bg-muted",
 										focusRing,
 									)}
 								>
 									<div>
 										<div className="mb-5 flex items-start justify-between gap-3">
-											<div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+											<div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground">
 												<Icon className="size-6" aria-hidden="true" />
 											</div>
 											{soon ? (
-												<span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 font-bold text-[10px] text-white/60 uppercase tracking-widest">
+												<span className="inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-surface-raised px-3 py-1 font-mono text-[11px] text-muted-foreground">
 													<Clock className="size-3" aria-hidden="true" />
 													Coming soon
 												</span>
 											) : (
-												<span className="rounded-full bg-primary/10 px-3 py-1 font-bold text-[10px] text-primary uppercase tracking-widest">
+												<span className="rounded-full bg-muted px-3 py-1 font-mono text-[11px] text-brand-text">
 													Free
 												</span>
 											)}
 										</div>
-										<h2 className="mb-2 font-semibold text-white text-xl transition-colors group-hover:text-primary">
+										<h2 className="mb-2 font-medium text-foreground text-xl transition-colors group-hover:text-brand-text">
 											{tool.title}
 										</h2>
-										<p className="text-sm text-white/50 leading-relaxed">{tool.description}</p>
+										<p className="text-sm text-muted-foreground leading-relaxed">
+											{tool.description}
+										</p>
 									</div>
-									<div className="mt-8 flex items-center gap-2 font-bold text-primary text-sm">
+									<div className="mt-8 flex items-center gap-2 font-medium text-brand-text text-sm">
 										<span>{soon ? "Learn more" : "Try tool"}</span>
 										<ArrowRight
 											className="size-4 transition-transform group-hover:translate-x-1"

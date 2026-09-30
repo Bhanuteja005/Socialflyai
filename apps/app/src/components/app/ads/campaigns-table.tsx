@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@socialfly/ui/components/button";
+import { Tooltip } from "@socialfly/ui/components/controls";
 import { EmptyState, Skeleton } from "@socialfly/ui/components/feedback";
 import { cn } from "@socialfly/ui/utils";
 import { ExternalLink, Megaphone } from "lucide-react";
@@ -23,8 +24,8 @@ export const campaignBudget = (
 			? `${formatMoney(c.lifetimeBudget, c.currency)} total`
 			: "—";
 
-const th = "px-3 py-2 text-left font-medium text-muted-foreground text-xs whitespace-nowrap";
-const td = "px-3 py-2.5 align-middle";
+const th = "h-10 px-4 text-left font-medium text-muted-foreground text-xs whitespace-nowrap";
+const td = "px-4 py-3 align-middle";
 
 export function CampaignsTable({ status }: { status?: AdCampaignStatus }) {
 	const { org, can } = useOrg();
@@ -33,9 +34,16 @@ export function CampaignsTable({ status }: { status?: AdCampaignStatus }) {
 
 	if (campaigns.isPending) {
 		return (
-			<div className="grid gap-2">
+			<div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border">
 				{["a", "b", "c"].map((k) => (
-					<Skeleton key={k} className="h-12" />
+					<div key={k} className="flex items-center gap-3 bg-surface-raised px-4 py-3">
+						<Skeleton className="size-7 rounded-md" />
+						<div className="grid flex-1 gap-1.5">
+							<Skeleton className="h-3.5 w-48" />
+							<Skeleton className="h-3 w-72 max-w-full" />
+						</div>
+						<Skeleton className="h-5 w-16 rounded-full" />
+					</div>
 				))}
 			</div>
 		);
@@ -77,9 +85,9 @@ export function CampaignsTable({ status }: { status?: AdCampaignStatus }) {
 	}
 
 	return (
-		<div className="grid gap-3">
-			<div className="scrollbar-thin overflow-x-auto rounded-lg border border-border bg-surface-raised">
-				<table className="w-full min-w-[760px] text-sm">
+		<div className="grid min-w-0 gap-3">
+			<div className="scrollbar-thin relative min-w-0 overflow-x-auto rounded-2xl border border-border bg-surface-raised">
+				<table className="w-full min-w-[680px] text-sm">
 					<caption className="sr-only">Ad campaigns</caption>
 					<thead className="border-border border-b bg-surface">
 						<tr>
@@ -95,24 +103,25 @@ export function CampaignsTable({ status }: { status?: AdCampaignStatus }) {
 							<th scope="col" className={cn(th, "text-right")}>
 								Spent to date
 							</th>
-							<th scope="col" className={th}>
+							<th scope="col" className={cn(th, "hidden lg:table-cell")}>
 								On the platform
 							</th>
-							<th scope="col" className={th}>
+							<th scope="col" className={cn(th, "w-12")}>
 								<span className="sr-only">Links</span>
 							</th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-border">
 						{items.map((c) => (
-							<tr key={c.id} className="hover:bg-muted/40">
+							<tr key={c.id} className="group relative transition-colors hover:bg-surface">
 								<td className={td}>
-									<div className="flex min-w-0 items-center gap-2.5">
-										<ProviderIcon provider={c.provider} size="sm" />
+									<div className="flex min-w-0 items-center gap-3">
+										<ProviderIcon provider={c.provider} size="md" />
 										<div className="grid min-w-0">
+											{/* The name is the row's link; the ::after stretches it over the whole row. */}
 											<Link
 												href={`/ads/campaigns/${c.id}`}
-												className="truncate font-medium hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+												className="truncate font-medium after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-ring group-hover:underline"
 											>
 												{c.name}
 											</Link>
@@ -126,26 +135,38 @@ export function CampaignsTable({ status }: { status?: AdCampaignStatus }) {
 								<td className={td}>
 									<CampaignStatusBadge status={c.status} />
 								</td>
-								<td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>
+								<td className={cn(td, "whitespace-nowrap text-right font-mono tabular-nums")}>
 									{campaignBudget(c)}
 								</td>
-								<td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>
+								<td
+									className={cn(
+										td,
+										"whitespace-nowrap text-right font-medium font-mono tabular-nums",
+									)}
+								>
 									{c.spendToDate === null ? "—" : formatMoney(c.spendToDate, c.currency)}
 								</td>
-								<td className={cn(td, "text-muted-foreground text-xs")}>
+								<td
+									className={cn(
+										td,
+										"hidden text-muted-foreground text-xs capitalize lg:table-cell",
+									)}
+								>
 									{c.platformStatus ? c.platformStatus.replace(/_/g, " ").toLowerCase() : "—"}
 								</td>
 								<td className={cn(td, "text-right")}>
 									{c.manageUrl ? (
-										<a
-											href={c.manageUrl}
-											target="_blank"
-											rel="noreferrer"
-											className="inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground text-xs hover:text-foreground"
-										>
-											<ExternalLink className="size-3.5" aria-hidden="true" />
-											Open in {adsProviderMeta(c.provider).name} manager
-										</a>
+										<Tooltip content={`Open in ${adsProviderMeta(c.provider).name} manager`}>
+											<a
+												href={c.manageUrl}
+												target="_blank"
+												rel="noreferrer"
+												aria-label={`Open ${c.name} in ${adsProviderMeta(c.provider).name} manager`}
+												className="relative z-10 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+											>
+												<ExternalLink className="size-4" aria-hidden="true" />
+											</a>
+										</Tooltip>
 									) : null}
 								</td>
 							</tr>

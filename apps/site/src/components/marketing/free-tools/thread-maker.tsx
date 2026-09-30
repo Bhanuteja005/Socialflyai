@@ -73,7 +73,7 @@ export function ThreadMaker() {
 	return (
 		<div className={toolPanel}>
 			<label htmlFor={`${id}-content`} className={`${toolLabel} flex items-center gap-2`}>
-				<PenLine className="size-4 text-primary" aria-hidden="true" />
+				<PenLine className="size-4 text-brand-text" aria-hidden="true" />
 				Write your thread content
 			</label>
 			<textarea
@@ -99,19 +99,19 @@ export function ThreadMaker() {
 						className={toolControl}
 					/>
 				</div>
-				<label className="flex cursor-pointer items-center gap-3 py-3 text-sm text-white/80">
+				<label className="flex cursor-pointer items-center gap-3 py-3 text-sm text-foreground">
 					<input
 						type="checkbox"
 						checked={numbering}
 						onChange={(event) => setNumbering(event.target.checked)}
-						className="size-5 accent-[#0BE27D]"
+						className="size-5 accent-primary"
 					/>
 					Include tweet numbering (1/5, 2/5, etc.)
 				</label>
 			</div>
 
-			<div className="mt-8 flex flex-col gap-4 border-white/10 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-				<p className="text-sm text-white/50" aria-live="polite">
+			<div className="mt-8 flex flex-col gap-4 border-border border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+				<p className="text-sm text-muted-foreground" aria-live="polite">
 					{content.length} characters · {tweets.length} {tweets.length === 1 ? "tweet" : "tweets"}
 				</p>
 				<div className="flex flex-col gap-3 sm:flex-row">
@@ -149,23 +149,23 @@ export function ThreadMaker() {
 							<li
 								// biome-ignore lint/suspicious/noArrayIndexKey: a tweet's identity is its position in the thread
 								key={index}
-								className="rounded-2xl border border-white/10 bg-black/40 p-5"
+								className="rounded-2xl border border-border bg-surface p-5"
 							>
 								<div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-									<span className="font-bold text-white">SocialflyAI</span>
-									<CircleCheck className="size-4 text-primary" aria-hidden="true" />
-									<span className="text-white/40">@socialflyai · Just now</span>
-									<span className="ml-auto font-bold text-[10px] text-white/30 uppercase tracking-widest">
+									<span className="font-medium text-foreground">SocialflyAI</span>
+									<CircleCheck className="size-4 text-brand-text" aria-hidden="true" />
+									<span className="text-subtle-foreground">@socialflyai · Just now</span>
+									<span className="ml-auto font-mono text-[11px] text-subtle-foreground">
 										Tweet {index + 1} · {tweet.length}/{TWEET_LIMIT}
 									</span>
 								</div>
-								<p className="whitespace-pre-wrap break-words text-white/85">{tweet}</p>
+								<p className="whitespace-pre-wrap break-words text-foreground">{tweet}</p>
 							</li>
 						))}
 					</ol>
-					<p className="mt-6 text-center text-sm text-white/50">
+					<p className="mt-6 text-center text-sm text-muted-foreground">
 						Want to save and schedule threads?{" "}
-						<Link href={SIGNUP_URL} className="font-semibold text-primary hover:underline">
+						<Link href={SIGNUP_URL} className="font-medium text-brand-text hover:underline">
 							Create a free SocialFly AI account
 						</Link>
 						.

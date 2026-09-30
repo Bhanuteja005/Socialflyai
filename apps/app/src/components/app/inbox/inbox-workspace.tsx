@@ -2,15 +2,14 @@
 
 import { Button } from "@socialfly/ui/components/button";
 import { cn } from "@socialfly/ui/utils";
-import { ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, MessagesSquare } from "lucide-react";
 import { useState } from "react";
-import { useChannels } from "@/hooks/queries";
 import { useInboxItems } from "@/hooks/use-inbox";
 import type { InboxItemsQuery, InboxKind, InboxSentiment } from "@/lib/api-types";
 import { Conversation } from "./conversation";
-import { type InboxFilterState, InboxFilters } from "./inbox-filters";
+import type { InboxFilterState } from "./inbox-filters";
 import { InboxList } from "./inbox-list";
-import { CONVERSATION_KINDS, KIND_LABEL, type ListView, SENTIMENT } from "./inbox-shared";
+import { CONVERSATION_KINDS, Kbd, KIND_LABEL, type ListView, SENTIMENT } from "./inbox-shared";
 
 const csv = (value: string | null) => (value ? value.split(",").filter(Boolean) : []);
 
@@ -53,26 +52,14 @@ function toQuery(view: ListView, f: InboxFilterState): Omit<InboxItemsQuery, "be
 	};
 }
 
-/** Filters | list | conversation. On narrow screens: one pane at a time. */
-export function InboxWorkspace({
-	view,
-	params,
-	update,
-}: {
-	view: ListView;
-	params: URLSearchParams;
-	update: (changes: Record<string, string | null>) => void;
-}) {
-	const channels = useChannels();
+/** Filters live in the URL; the rail edits them and the list reads them. */
+export function useInboxFilters(
+	view: ListView,
+	params: URLSearchParams,
+	update: (changes: Record<string, string | null>) => void,
+) {
 	const filters = readFilters(params, view);
-	const query = toQuery(view, filters);
-	const items = useInboxItems(query);
-	const openId = params.get("item");
-	const [showFilters, setShowFilters] = useState(false);
-	/** "r" on a row: open it and put the cursor in the reply box (a counter so repeats refocus). */
-	const [replyTarget, setReplyTarget] = useState<{ id: string; n: number } | null>(null);
-
-	const activeFilters =
+	const activeCount =
 		filters.channelIds.length +
 		filters.kinds.length +
 		(filters.sentiment ? 1 : 0) +
@@ -90,39 +77,42 @@ export function InboxWorkspace({
 			sort: f.sort === "relevance" ? "relevance" : null,
 		});
 	};
+	return { filters, setFilters, activeCount };
+}
+
+/**
+ * List | conversation in one bordered frame. On wide screens both panes scroll on their own
+ * and the reply box stays pinned; on narrow screens only one pane shows at a time.
+ */
+export function InboxWorkspace({
+	view,
+	params,
+	update,
+	filters,
+	setFilters,
+	activeCount,
+}: {
+	view: ListView;
+	params: URLSearchParams;
+	update: (changes: Record<string, string | null>) => void;
+} & ReturnType<typeof useInboxFilters>) {
+	const items = useInboxItems(toQuery(view, filters));
+	const openId = params.get("item");
+	/** "r" on a row: open it and put the cursor in the reply box (a counter so repeats refocus). */
+	const [replyTarget, setReplyTarget] = useState<{ id: string; n: number } | null>(null);
 
 	return (
-		<div className="grid gap-4 lg:grid-cols-[12.5rem_minmax(0,21rem)_minmax(0,1fr)] lg:items-start">
-			<div className={cn(openId && "hidden lg:block")}>
-				<Button
-					variant="outline"
-					size="sm"
-					className="mb-3 lg:hidden"
-					aria-expanded={showFilters}
-					aria-controls="inbox-filters"
-					onClick={() => setShowFilters((s) => !s)}
-				>
-					<SlidersHorizontal />
-					Filters
-					{activeFilters ? ` (${activeFilters})` : ""}
-				</Button>
-				<div id="inbox-filters" className={cn(!showFilters && "hidden lg:block")}>
-					<InboxFilters
-						view={view}
-						channels={channels.data ?? []}
-						value={filters}
-						onChange={setFilters}
-						activeCount={activeFilters}
-					/>
-				</div>
-			</div>
-
-			<div className={cn(openId && "hidden lg:block")}>
+		<div className="grid overflow-hidden rounded-3xl border border-border bg-surface-raised lg:h-[calc(100dvh-16rem)] lg:min-h-[34rem] xl:h-[calc(100dvh-12.5rem)] lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+			<div
+				className={cn("min-h-0 lg:border-border lg:border-r", openId ? "hidden lg:flex" : "flex")}
+			>
 				<InboxList
 					view={view}
 					items={items}
 					openId={openId}
-					filtered={activeFilters > 0}
+					filtered={activeCount > 0}
+					search={filters.q}
+					onSearch={(q) => setFilters({ q })}
 					onOpen={(id) => {
 						setReplyTarget(null);
 						update({ item: id });
@@ -137,21 +127,18 @@ export function InboxWorkspace({
 			<section
 				aria-label="Conversation"
 				className={cn(
-					"min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto",
-					!openId && "hidden lg:block",
+					"min-h-0 min-w-0 flex-col bg-surface-raised",
+					openId ? "flex" : "hidden lg:flex",
 				)}
 			>
 				{openId ? (
 					<>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="mb-2 lg:hidden"
-							onClick={() => update({ item: null })}
-						>
-							<ArrowLeft />
-							Back to list
-						</Button>
+						<div className="border-border border-b px-3 py-2 lg:hidden">
+							<Button variant="ghost" size="sm" onClick={() => update({ item: null })}>
+								<ArrowLeft />
+								Back to list
+							</Button>
+						</div>
 						<Conversation
 							key={openId}
 							id={openId}
@@ -160,15 +147,46 @@ export function InboxWorkspace({
 						/>
 					</>
 				) : (
-					<div className="hidden rounded-lg border border-border border-dashed px-6 py-16 text-center text-muted-foreground text-sm lg:block">
-						Select a conversation to read and reply.
-						<p className="mt-2 text-xs">
-							Tip: <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> to move,{" "}
-							<kbd className="font-mono">Enter</kbd> to open.
-						</p>
-					</div>
+					<NoConversation />
 				)}
 			</section>
+		</div>
+	);
+}
+
+function NoConversation() {
+	return (
+		<div className="relative flex flex-1 flex-col items-center justify-center gap-4 overflow-hidden bg-surface px-6 py-16 text-center">
+			<MessagesSquare className="relative size-5 text-subtle-foreground" aria-hidden="true" />
+			<div className="relative grid max-w-xs gap-1">
+				<p className="font-medium text-[15px]">Select a conversation</p>
+				<p className="text-muted-foreground text-sm">
+					Read the thread, see why it was flagged and reply.
+				</p>
+			</div>
+			<dl className="relative mt-2 grid grid-cols-[auto_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-surface-raised px-4 py-3 text-left text-muted-foreground text-xs">
+				<dt className="flex gap-1">
+					<Kbd>j</Kbd>
+					<Kbd>k</Kbd>
+				</dt>
+				<dd>Move up and down</dd>
+				<dt>
+					<Kbd>Enter</Kbd>
+				</dt>
+				<dd>Open conversation</dd>
+				<dt>
+					<Kbd>r</Kbd>
+				</dt>
+				<dd>Reply</dd>
+				<dt>
+					<Kbd>e</Kbd>
+				</dt>
+				<dd>Archive</dd>
+				<dt>
+					<Kbd>x</Kbd>
+				</dt>
+				<dd>Select</dd>
+			</dl>
 		</div>
 	);
 }

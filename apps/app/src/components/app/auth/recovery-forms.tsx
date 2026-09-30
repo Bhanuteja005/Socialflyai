@@ -29,13 +29,13 @@ export function StatusPanel({
 			<span
 				className={
 					tone === "success"
-						? "flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary-text"
-						: "flex size-12 items-center justify-center rounded-full bg-danger-soft text-danger"
+						? "flex size-10 items-center justify-center rounded-full bg-muted text-foreground"
+						: "flex size-10 items-center justify-center rounded-full bg-danger-soft text-danger"
 				}
 			>
-				<Icon className="size-6" aria-hidden="true" />
+				<Icon className="size-5" aria-hidden="true" />
 			</span>
-			<h1 className="font-semibold text-2xl tracking-tight">{title}</h1>
+			<h1 className="text-balance font-normal font-pixel text-[24px] leading-8">{title}</h1>
 			<div className="grid gap-4 text-muted-foreground text-sm">{children}</div>
 		</div>
 	);
@@ -67,7 +67,7 @@ export function ForgotPasswordForm() {
 			<StatusPanel icon={MailCheck} title="Check your inbox">
 				<p>
 					If an account exists for <span className="font-medium text-foreground">{email}</span>,
-					we've sent a link to reset your password. It expires soon, so use it right away.
+					we've sent a reset link. It expires soon.
 				</p>
 				<Button variant="outline" asChild>
 					<Link href="/login">
@@ -83,7 +83,7 @@ export function ForgotPasswordForm() {
 		<>
 			<AuthHeading
 				title="Reset your password"
-				description="Enter your email and we'll send you a link to choose a new password."
+				description="We'll email you a link to choose a new one."
 			/>
 			<form onSubmit={onSubmit} className="grid gap-4" noValidate>
 				{errors.form ? <Alert tone="danger" icon={AlertCircle} title={errors.form} /> : null}
@@ -103,7 +103,11 @@ export function ForgotPasswordForm() {
 				</Button>
 			</form>
 			<p className="mt-6 text-center text-sm">
-				<Link href="/login" className="text-muted-foreground hover:text-foreground">
+				<Link
+					href="/login"
+					className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+				>
+					<ArrowLeft className="size-3.5" aria-hidden="true" />
 					Back to sign in
 				</Link>
 			</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@socialfly/ui/components/avatar";
 import { Badge } from "@socialfly/ui/components/badge";
 import { EmptyState } from "@socialfly/ui/components/feedback";
 import { ScrollText } from "lucide-react";
@@ -66,7 +67,7 @@ function AuditData({ event }: { event: AuditEvent }) {
 									{r.field}
 								</th>
 								<td className="pr-2">
-									<code className="rounded bg-danger-soft px-1 font-mono text-danger line-through decoration-danger/50">
+									<code className="rounded-md bg-muted px-1 font-mono text-muted-foreground line-through">
 										{show(r.before)}
 									</code>
 								</td>
@@ -74,7 +75,7 @@ function AuditData({ event }: { event: AuditEvent }) {
 									→
 								</td>
 								<td>
-									<code className="rounded bg-success-soft px-1 font-mono text-success">
+									<code className="rounded-md bg-muted px-1 font-mono text-foreground">
 										{show(r.after)}
 									</code>
 								</td>
@@ -99,7 +100,7 @@ function AuditData({ event }: { event: AuditEvent }) {
 				<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
 					Raw JSON
 				</summary>
-				<pre className="scrollbar-thin mt-1 max-w-md overflow-x-auto rounded-md bg-muted p-2 font-mono">
+				<pre className="scrollbar-thin mt-1 max-w-md overflow-x-auto rounded-xl bg-surface p-2 font-mono">
 					{JSON.stringify(event.data, null, 2)}
 				</pre>
 			</details>
@@ -133,10 +134,7 @@ export function AuditView() {
 
 	return (
 		<>
-			<PageHeader
-				title="Audit log"
-				description="Every staff change, newest first. Rows are written in the same transaction as the change."
-			/>
+			<PageHeader title="Audit log" description="Every staff change, newest first." />
 			{query.isError && !query.data ? (
 				<QueryError error={query.error} onRetry={() => void query.refetch()} />
 			) : query.isPending ? (
@@ -147,7 +145,7 @@ export function AuditView() {
 				<EmptyState icon={ScrollText} title="No admin changes recorded yet" />
 			) : (
 				<TableCard>
-					<table className={tableClass}>
+					<table className={`${tableClass} relative`}>
 						<caption className="sr-only">Audit log</caption>
 						<thead>
 							<tr>
@@ -170,22 +168,29 @@ export function AuditView() {
 						</thead>
 						<tbody>
 							{items.map((e) => (
-								<tr key={e.id}>
-									<td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+								<tr key={e.id} className="transition-colors hover:bg-surface">
+									<td
+										className={`${tdClass} whitespace-nowrap font-mono text-muted-foreground text-xs`}
+									>
 										<time dateTime={e.createdAt} title={formatDateTime(e.createdAt)}>
 											{formatRelative(e.createdAt)}
 										</time>
 									</td>
 									<td className={tdClass}>
-										<code className="font-mono text-xs">{e.action}</code>
+										<code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">
+											{e.action}
+										</code>
 									</td>
 									<td className={tdClass}>
 										{e.actorEmail ? (
-											<span className="text-sm">{e.actorEmail}</span>
+											<span className="flex items-center gap-2 text-sm">
+												<Avatar name={e.actorEmail} size="xs" />
+												{e.actorEmail}
+											</span>
 										) : e.actorUserId ? (
 											<ShortId id={e.actorUserId} />
 										) : (
-											<Badge tone="neutral">CLI</Badge>
+											<Badge tone="outline">CLI</Badge>
 										)}
 									</td>
 									<td className={`${tdClass} whitespace-nowrap`}>

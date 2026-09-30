@@ -22,7 +22,7 @@ const data: CompetitorPageData = {
 			"MeetEdgar automates your queue by recycling old posts. SocialflyAI uses AI to generate new, relevant content daily, ensuring your brand always has something fresh and high-performing to say.",
 		socialProof: (
 			<>
-				<span className="block font-bold text-white">Next-Gen Automation</span>
+				<span className="block font-medium text-foreground">Next-Gen Automation</span>
 				Loved by 1,200+ creators
 			</>
 		),

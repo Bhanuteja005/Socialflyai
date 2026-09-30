@@ -81,8 +81,8 @@ export function InsightPicker({
 	}
 
 	return (
-		<Card>
-			<CardHeader className="flex-row items-start justify-between gap-3">
+		<Card className="overflow-hidden">
+			<CardHeader className="flex-row items-start justify-between gap-3 border-border border-b pb-4">
 				<div className="grid gap-1">
 					<CardTitle>{title}</CardTitle>
 					<CardDescription>{description}</CardDescription>
@@ -124,10 +124,13 @@ export function InsightPicker({
 									htmlFor={id}
 									className={cn(
 										"flex cursor-pointer items-start gap-2.5 text-sm",
+										layout !== "chips" && "rounded-xl border px-3 py-2.5 transition-colors",
+										layout !== "chips" &&
+											(on ? "border-border-strong bg-surface" : "border-border hover:bg-surface"),
 										layout === "chips" &&
 											"items-center rounded-full border py-1 pr-3 pl-2 text-xs transition-colors",
 										layout === "chips" &&
-											(on ? "border-primary/40 bg-primary-soft" : "border-border hover:bg-muted"),
+											(on ? "border-border-strong bg-muted" : "border-border hover:bg-muted"),
 									)}
 								>
 									<Checkbox
@@ -145,7 +148,7 @@ export function InsightPicker({
 			</CardContent>
 			{editable ? (
 				<CardFooter className="justify-between">
-					<span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+					<span className="font-mono text-muted-foreground text-xs tabular-nums" aria-live="polite">
 						{selected.size} of {items.length} selected
 					</span>
 					<div className="flex flex-wrap gap-2">

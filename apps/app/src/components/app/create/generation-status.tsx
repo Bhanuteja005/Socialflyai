@@ -98,3 +98,15 @@ export function GenerationProgress({
 	}
 	return <>{children(generation)}</>;
 }
+
+/** "1" "2" "3" chip in front of a studio card's title, so the steps read as a sequence. */
+export function StepNumber({ n }: { n: number }) {
+	return (
+		<span
+			className="mr-2 inline-flex size-5 items-center justify-center rounded-full bg-foreground font-mono text-[11px] text-background tabular-nums"
+			aria-hidden="true"
+		>
+			{n}
+		</span>
+	);
+}

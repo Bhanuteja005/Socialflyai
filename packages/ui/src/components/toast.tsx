@@ -23,7 +23,7 @@ export function Toaster({ theme }: ToasterProps = {}) {
 			toastOptions={{
 				classNames: {
 					toast:
-						"!rounded-lg !border !border-border !bg-surface-raised !text-foreground !shadow-lg !font-sans",
+						"!rounded-2xl !border !border-border !bg-surface-raised !text-foreground !shadow-lg !font-sans",
 					description: "!text-muted-foreground",
 				},
 			}}

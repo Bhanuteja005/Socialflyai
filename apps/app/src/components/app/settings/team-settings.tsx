@@ -33,9 +33,7 @@ import { formatDate } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
 import { ROLE_LABEL } from "@/lib/status";
 import { clearStoredOrg, useOrg } from "../org-provider";
-import { PageHeader } from "../page-header";
 import { Invitations } from "./invitations";
-import { SettingsNav } from "./settings-nav";
 
 export function TeamSettings() {
 	const { orgId, org, can } = useOrg();
@@ -105,9 +103,7 @@ export function TeamSettings() {
 	const leaving = removing?.userId === user?.id;
 
 	return (
-		<div className="max-w-3xl">
-			<PageHeader title="Settings" />
-			<SettingsNav />
+		<div className="min-w-0">
 			<div className="grid gap-6">
 				<Card>
 					<CardHeader>
