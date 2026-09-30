@@ -16,7 +16,7 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@scalar/hono-api-reference": "^0.12.4",
+		"@scalar/hono-api-reference": "^0.12.6",
 		"@socialfly/ai": "workspace:*",
 		"@socialfly/config": "workspace:*",
 		"@socialfly/core": "workspace:*",
@@ -24,8 +24,8 @@
 		"@socialfly/integrations": "workspace:*",
 		"@socialfly/queue": "workspace:*",
 		"@socialfly/research": "workspace:*",
-		"bullmq": "^6.3.8",
-		"hono": "^4.13.8",
+		"bullmq": "^6.3.9",
+		"hono": "^4.13.9",
 		"hono-openapi": "^1.3.3",
 		"zod": "^4.6.5"
 	},

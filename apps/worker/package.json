@@ -22,8 +22,8 @@
 		"@socialfly/integrations": "workspace:*",
 		"@socialfly/queue": "workspace:*",
 		"@socialfly/research": "workspace:*",
-		"bullmq": "^6.3.8",
-		"hono": "^4.13.8",
+		"bullmq": "^6.3.9",
+		"hono": "^4.13.9",
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
