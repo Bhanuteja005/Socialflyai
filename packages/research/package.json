@@ -12,11 +12,11 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "^0.128.0",
-		"@google/genai": "^2.24.0",
+		"@anthropic-ai/sdk": "^0.131.0",
+		"@google/genai": "^2.27.0",
 		"@socialfly/ai": "workspace:*",
 		"@socialfly/integrations": "workspace:*",
-		"openai": "^7.23.0",
+		"openai": "^7.27.0",
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {

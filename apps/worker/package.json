@@ -13,8 +13,8 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@bull-board/api": "^9.10.1",
-		"@bull-board/hono": "^9.10.1",
+		"@bull-board/api": "^9.10.2",
+		"@bull-board/hono": "^9.10.2",
 		"@socialfly/ai": "workspace:*",
 		"@socialfly/config": "workspace:*",
 		"@socialfly/core": "workspace:*",
@@ -22,8 +22,8 @@
 		"@socialfly/integrations": "workspace:*",
 		"@socialfly/queue": "workspace:*",
 		"@socialfly/research": "workspace:*",
-		"bullmq": "^6.3.8",
-		"hono": "^4.13.8",
+		"bullmq": "^6.3.11",
+		"hono": "^4.13.13",
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
