@@ -8,7 +8,7 @@
 
 FROM docker:29-cli AS docker-cli
 
-FROM jenkins/jenkins:2.568.3-lts-jdk21
+FROM jenkins/jenkins:2.580.1-lts-jdk21
 
 # Builds drive the HOST Docker daemon through the mounted socket (see compose.yaml):
 # the CLI, BuildKit (buildx) and compose are all the controller needs. Static
