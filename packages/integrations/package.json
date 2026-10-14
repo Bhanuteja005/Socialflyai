@@ -12,7 +12,7 @@
 	},
 	"dependencies": {
 		"@socialfly/core": "workspace:*",
-		"zod": "^4.6.5"
+		"zod": "^4.6.6"
 	},
 	"devDependencies": {
 		"@socialfly/tsconfig": "workspace:*",

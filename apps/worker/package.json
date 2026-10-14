@@ -13,8 +13,8 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@bull-board/api": "^9.10.1",
-		"@bull-board/hono": "^9.10.1",
+		"@bull-board/api": "^9.10.4",
+		"@bull-board/hono": "^9.10.4",
 		"@socialfly/ai": "workspace:*",
 		"@socialfly/config": "workspace:*",
 		"@socialfly/core": "workspace:*",
@@ -22,14 +22,14 @@
 		"@socialfly/integrations": "workspace:*",
 		"@socialfly/queue": "workspace:*",
 		"@socialfly/research": "workspace:*",
-		"bullmq": "^6.3.8",
-		"hono": "^4.13.8",
-		"zod": "^4.6.5"
+		"bullmq": "^6.3.12",
+		"hono": "^4.13.13",
+		"zod": "^4.6.6"
 	},
 	"devDependencies": {
 		"@socialfly/tsconfig": "workspace:*",
 		"@types/bun": "^1.4.2",
-		"drizzle-orm": "^0.45.3",
+		"drizzle-orm": "^0.45.4",
 		"postgres": "^3.4.9",
 		"typescript": "5.9.3"
 	}

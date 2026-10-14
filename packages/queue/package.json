@@ -10,9 +10,9 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"bullmq": "^6.3.8",
+		"bullmq": "^6.3.12",
 		"ioredis": "^5.8.0",
-		"zod": "^4.6.5"
+		"zod": "^4.6.6"
 	},
 	"devDependencies": {
 		"@socialfly/tsconfig": "workspace:*",
