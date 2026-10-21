@@ -12,16 +12,16 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "^0.128.0",
-		"@google/genai": "^2.24.0",
+		"@anthropic-ai/sdk": "^0.135.0",
+		"@google/genai": "^2.30.0",
 		"@socialfly/ai": "workspace:*",
 		"@socialfly/integrations": "workspace:*",
-		"openai": "^7.23.0",
-		"zod": "^4.6.5"
+		"openai": "^7.38.0",
+		"zod": "^4.6.7"
 	},
 	"devDependencies": {
 		"@socialfly/tsconfig": "workspace:*",
-		"@types/bun": "^1.4.2",
+		"@types/bun": "^1.4.3",
 		"typescript": "5.9.3"
 	}
 }

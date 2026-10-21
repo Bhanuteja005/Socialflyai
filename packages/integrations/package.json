@@ -12,11 +12,11 @@
 	},
 	"dependencies": {
 		"@socialfly/core": "workspace:*",
-		"zod": "^4.6.5"
+		"zod": "^4.6.7"
 	},
 	"devDependencies": {
 		"@socialfly/tsconfig": "workspace:*",
-		"@types/bun": "^1.4.2",
+		"@types/bun": "^1.4.3",
 		"typescript": "5.9.3"
 	}
 }
