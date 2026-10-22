@@ -46,6 +46,6 @@
 		"@socialfly/tsconfig": "workspace:*",
 		"@types/bun": "^1.4.2",
 		"@types/nodemailer": "^8.0.2",
-		"typescript": "5.9.3"
+		"typescript": "7.0.2"
 	}
 }

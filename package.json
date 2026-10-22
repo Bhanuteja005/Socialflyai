@@ -29,7 +29,7 @@
 		"@commitlint/config-conventional": "^21.2.0",
 		"lefthook": "^2.1.14",
 		"turbo": "^2.11.2",
-		"typescript": "5.9.3"
+		"typescript": "7.0.2"
 	},
 	"trustedDependencies": [
 		"ffmpeg-static"
