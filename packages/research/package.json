@@ -13,15 +13,15 @@
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.128.0",
-		"@google/genai": "^2.24.0",
+		"@google/genai": "^2.31.0",
 		"@socialfly/ai": "workspace:*",
 		"@socialfly/integrations": "workspace:*",
-		"openai": "^7.23.0",
+		"openai": "^7.43.0",
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
 		"@socialfly/tsconfig": "workspace:*",
-		"@types/bun": "^1.4.2",
+		"@types/bun": "^1.4.4",
 		"typescript": "5.9.3"
 	}
 }
